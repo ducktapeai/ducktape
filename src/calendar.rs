@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use log::debug;
 use std::process::Command;
 
 pub fn list_calendars() -> Result<()> {
@@ -57,8 +58,16 @@ pub fn list_calendars() -> Result<()> {
     }
 }
 
-pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&str>) -> Result<()> {
-    let datetime = format!("{} {}", date, time);
+pub fn create_event(
+    title: &str,
+    date: &str,
+    time: &str,
+    calendar_id: Option<&str>,
+    all_day: bool,
+    location: Option<String>,
+    description: Option<String>,
+) -> Result<()> {
+    let datetime = format!("{} {}", date, if all_day { "00:00" } else { time });
     let dt = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M")
         .map_err(|_| anyhow!("Invalid date/time format. Please use YYYY-MM-DD HH:MM format"))?;
 
@@ -81,10 +90,24 @@ pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&st
         return Err(anyhow!("Please ensure Calendar.app is running"));
     }
 
+    // Use simple duration in seconds: 86400 for all-day, 3600 otherwise.
+    let duration = if all_day { 86400 } else { 3600 };
+
+    // Build extras for properties: include location if non-empty, include allday if true.
+    let mut extra = String::new();
+    if let Some(loc) = &location {
+        if !loc.is_empty() {
+            extra.push_str(&format!(", location:\"{}\"", loc));
+        }
+    }
+    if all_day {
+        extra.push_str(", allday:true");
+    }
+
     let script = format!(
         r#"tell application "Calendar"
             try
-                -- Find the calendar
+                -- Find calendar
                 set calendarName to "{}"
                 set targetCal to missing value
                 repeat with c in calendars
@@ -93,12 +116,10 @@ pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&st
                         exit repeat
                     end if
                 end repeat
-                
                 if targetCal is missing value then
                     error "Calendar '" & calendarName & "' not found"
                 end if
-                
-                -- Set up the date
+                -- Set up start date
                 set startDate to current date
                 set year of startDate to {}
                 set month of startDate to {}
@@ -106,12 +127,9 @@ pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&st
                 set hours of startDate to {}
                 set minutes of startDate to {}
                 set seconds of startDate to 0
-                
-                -- Create the event
-                tell targetCal to make new event at end with properties ¬
-                    {{summary:"{}", start date:startDate, ¬
-                    end date:(startDate + 3600), description:"Created by DuckTape"}}
-                
+                -- Build properties and create the event
+                set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}
+                tell targetCal to make new event at end with properties props
                 return "Success: Event created"
             on error errMsg
                 return "Error: " & errMsg
@@ -123,20 +141,22 @@ pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&st
         local_dt.format("%-d"),
         local_dt.format("%-H"),
         local_dt.format("%-M"),
-        title
+        title,
+        duration,
+        description.as_deref().unwrap_or("Created by DuckTape"),
+        extra
     );
 
     println!("Debug: Generated AppleScript:\n{}", script);
-
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-
     let result = String::from_utf8_lossy(&output.stdout);
     let error_output = String::from_utf8_lossy(&output.stderr);
-
     if result.contains("Success") {
         println!(
             "Calendar event created: {} at {} ({} timezone)",
-            title, datetime, tz_name
+            title,
+            format!("{} {}", date, time),
+            local_dt.offset()
         );
         Ok(())
     } else {
@@ -153,6 +173,66 @@ pub fn create_event(title: &str, date: &str, time: &str, calendar_id: Option<&st
             } else {
                 &result
             }
+        ))
+    }
+}
+
+pub fn list_event_properties() -> Result<()> {
+    // First verify Calendar.app is running
+    let check_script = r#"tell application "Calendar" to if it is running then return true"#;
+    let check = Command::new("osascript")
+        .arg("-e")
+        .arg(check_script)
+        .output()?;
+
+    if !check.status.success() {
+        return Err(anyhow!("Please ensure Calendar.app is running"));
+    }
+
+    let script = r#"tell application "Calendar"
+        try
+            set propList to {}
+            
+            -- Basic properties that we can set
+            copy "summary (title)" to end of propList
+            copy "start date" to end of propList
+            copy "end date" to end of propList
+            copy "allday" to end of propList
+            copy "description" to end of propList
+            copy "location" to end of propList
+            copy "url" to end of propList
+            copy "calendar" to end of propList
+            copy "recurrence" to end of propList
+            copy "status" to end of propList
+            copy "availability" to end of propList
+            
+            return propList
+        on error errMsg
+            error "Failed to get event properties: " & errMsg
+        end try
+    end tell"#;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()?;
+
+
+    if output.status.success() {
+        println!("Available Calendar Event Properties:");
+        let properties = String::from_utf8_lossy(&output.stdout);
+        if !properties.trim().is_empty() {
+            for prop in properties.trim_matches('{').trim_matches('}').split(", ") {
+                println!("  - {}", prop.trim_matches('"'));
+            }
+        } else {
+            println!("  No properties found. Calendar might not be accessible.");
+        }
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Failed to get event properties: {}", 
+            String::from_utf8_lossy(&output.stderr)
         ))
     }
 }
