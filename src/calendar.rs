@@ -93,16 +93,20 @@ pub fn create_event(
     // Use simple duration in seconds: 86400 for all-day, 3600 otherwise.
     let duration = if all_day { 86400 } else { 3600 };
 
-    // Build extras for properties: include location if non-empty, include allday if true.
+    // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
     if let Some(loc) = &location {
         if !loc.is_empty() {
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
-    if all_day {
-        extra.push_str(", allday:true");
-    }
+
+    // Set up a separate code block for marking the event as an all-day event.
+    let all_day_code = if all_day {
+        "\n                set allday event of newEvent to true"
+    } else {
+        ""
+    };
 
     let script = format!(
         r#"tell application "Calendar"
@@ -129,7 +133,10 @@ pub fn create_event(
                 set seconds of startDate to 0
                 -- Build properties and create the event
                 set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}
-                tell targetCal to make new event at end with properties props
+                tell targetCal
+                    set newEvent to make new event at end with properties props
+                    {}
+                end tell
                 return "Success: Event created"
             on error errMsg
                 return "Error: " & errMsg
@@ -144,7 +151,8 @@ pub fn create_event(
         title,
         duration,
         description.as_deref().unwrap_or("Created by DuckTape"),
-        extra
+        extra,
+        all_day_code
     );
 
     println!("Debug: Generated AppleScript:\n{}", script);
