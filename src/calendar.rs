@@ -26,7 +26,7 @@ pub struct EventConfig<'a> {
     pub title: &'a str,
     pub date: &'a str,
     pub time: &'a str,
-    pub calendar: Option<&'a str>,
+    pub calendars: Vec<&'a str>,  // Changed from Option<&'a str> to Vec<&'a str>
     pub all_day: bool,
     pub location: Option<String>,
     pub description: Option<String>,
@@ -40,7 +40,7 @@ impl<'a> EventConfig<'a> {
             title,
             date,
             time,
-            calendar: None,
+            calendars: Vec::new(),
             all_day: false,
             location: None,
             description: None,
@@ -105,6 +105,50 @@ pub fn list_calendars() -> Result<()> {
 }
 
 pub fn create_event(config: EventConfig) -> Result<()> {
+    debug!("Creating event with config: {:?}", config);
+    
+    let calendars = if config.calendars.is_empty() {
+        vec!["Calendar"]
+    } else {
+        config.calendars
+    };
+
+    let mut success_count = 0;
+    let total_calendars = calendars.len();
+
+    for calendar in calendars {
+        let this_config = EventConfig {
+            title: config.title,
+            date: config.date,
+            time: config.time,
+            calendars: vec![calendar],
+            all_day: config.all_day,
+            location: config.location.clone(),
+            description: config.description.clone(),
+            email: config.email.clone(),
+        };
+
+        match create_single_event(this_config) {
+            Ok(_) => success_count += 1,
+            Err(e) => {
+                error!("Failed to create event in calendar '{}': {}", calendar, e);
+            }
+        }
+    }
+
+    if success_count > 0 {
+        println!(
+            "Calendar event created in {}/{} calendars",
+            success_count,
+            total_calendars
+        );
+        Ok(())
+    } else {
+        Err(anyhow!("Failed to create event in any calendar"))
+    }
+}
+
+fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
     
     let datetime = format!("{} {}", config.date, if config.all_day { "00:00" } else { config.time });
@@ -180,7 +224,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
                 set seconds of startDate to 0
                 -- Build properties and create the event
                 set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}"#,
-        config.calendar.unwrap_or("Calendar"),
+        config.calendars[0],
         local_dt.format("%Y"),
         local_dt.format("%-m"),
         local_dt.format("%-d"),
@@ -240,13 +284,13 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     } else {
         // First check for calendar not found error
         if result.contains("Calendar '") && result.contains("' not found") {
-            if let Some(cal_id) = config.calendar {
+            if let Some(cal_id) = config.calendars.get(0) {
                 return Err(CalendarError::CalendarNotFound(cal_id.to_string()).into());
             }
         }
 
         // Log debug information
-        if let Some(cal_id) = config.calendar {
+        if let Some(cal_id) = config.calendars.get(0) {
             debug!("Attempted to find calendar matching '{}'", cal_id);
         }
         if !error_output.is_empty() {
@@ -340,7 +384,7 @@ mod tests {
             title: "Test Event",
             date: "2024-02-21",
             time: "14:30",
-            calendar: Some("Test Calendar"),
+            calendars: vec!["Test Calendar"],
             all_day: false,
             location: Some("Test Location".to_string()),
             description: Some("Test Description".to_string()),
@@ -355,7 +399,7 @@ mod tests {
         assert_eq!(config.date, "2024-02-21");
         assert_eq!(config.time, "14:30");
         assert!(!config.all_day);
-        assert!(config.calendar.is_none());
+        assert!(config.calendars.is_empty());
     }
 
     #[test]
@@ -380,7 +424,7 @@ mod tests {
             title: "Test Event",
             date: "2024-02-21",
             time: "14:30",
-            calendar: Some("NonexistentCalendar"),
+            calendars: vec!["NonexistentCalendar"],
             all_day: false,
             location: None,
             description: None,
