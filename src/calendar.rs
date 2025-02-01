@@ -228,6 +228,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     let error_output = String::from_utf8_lossy(&output.stderr);
+    
     if result.contains("Success") {
         println!(
             "Calendar event created: {} at {} ({} timezone)",
@@ -237,20 +238,27 @@ pub fn create_event(config: EventConfig) -> Result<()> {
         );
         Ok(())
     } else {
-        if let Some(cal_id) = config.calendar {
-            println!("Debug: Attempted to find calendar matching '{}'", cal_id);
-            if !error_output.is_empty() {
-                println!("Debug log:\n{}", error_output);
+        // First check for calendar not found error
+        if result.contains("Calendar '") && result.contains("' not found") {
+            if let Some(cal_id) = config.calendar {
+                return Err(CalendarError::CalendarNotFound(cal_id.to_string()).into());
             }
         }
-        Err(anyhow!(
-            "Failed to create calendar event: {}",
-            if result.is_empty() {
-                "Unknown error occurred"
-            } else {
-                &result
-            }
-        ))
+
+        // Log debug information
+        if let Some(cal_id) = config.calendar {
+            debug!("Attempted to find calendar matching '{}'", cal_id);
+        }
+        if !error_output.is_empty() {
+            debug!("AppleScript error: {}", error_output);
+        }
+
+        // Return appropriate error
+        Err(if result.is_empty() {
+            CalendarError::ScriptError("Unknown error occurred".to_string()).into()
+        } else {
+            CalendarError::ScriptError(result.to_string()).into()
+        })
     }
 }
 
@@ -319,5 +327,74 @@ pub fn list_event_properties() -> Result<()> {
             "Failed to get event properties: {}", 
             String::from_utf8_lossy(&output.stderr)
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn create_test_config() -> EventConfig<'static> {
+        EventConfig {
+            title: "Test Event",
+            date: "2024-02-21",
+            time: "14:30",
+            calendar: Some("Test Calendar"),
+            all_day: false,
+            location: Some("Test Location".to_string()),
+            description: Some("Test Description".to_string()),
+            email: Some("test@example.com".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_event_config_new() {
+        let config = EventConfig::new("Test", "2024-02-21", "14:30");
+        assert_eq!(config.title, "Test");
+        assert_eq!(config.date, "2024-02-21");
+        assert_eq!(config.time, "14:30");
+        assert!(!config.all_day);
+        assert!(config.calendar.is_none());
+    }
+
+    #[test]
+    fn test_parse_datetime() {
+        let config = create_test_config();
+        let datetime = format!("{} {}", config.date, config.time);
+        let result = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_invalid_datetime() {
+        let config = EventConfig::new("Test", "invalid-date", "25:00");
+        let datetime = format!("{} {}", config.date, config.time);
+        let result = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calendar_not_found_error() {
+        let config = EventConfig {
+            title: "Test Event",
+            date: "2024-02-21",
+            time: "14:30",
+            calendar: Some("NonexistentCalendar"),
+            all_day: false,
+            location: None,
+            description: None,
+            email: None,
+        };
+
+        let result = create_event(config);
+        assert!(result.is_err());
+        
+        match result.unwrap_err().downcast::<CalendarError>() {
+            Ok(CalendarError::CalendarNotFound(name)) => {
+                assert_eq!(name, "NonexistentCalendar");
+            }
+            other => panic!("Expected CalendarNotFound error, got {:?}", other),
+        }
     }
 }

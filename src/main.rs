@@ -20,15 +20,26 @@ impl CommandArgs {
         let mut parts = Vec::new();
         let mut current = String::new();
         let mut in_quotes = false;
+        let mut chars = input.chars().peekable();
 
-        for c in input.chars() {
+        while let Some(c) = chars.next() {
             match c {
                 '"' => {
-                    in_quotes = !in_quotes;
-                    if !in_quotes && !current.is_empty() {
-                        parts.push(current.clone());
-                        current.clear();
+                    if let Some('\\') = chars.peek() {
+                        // Found an escaped quote
+                        chars.next(); // Skip the backslash
+                        current.push('"');
+                    } else {
+                        in_quotes = !in_quotes;
+                        if !in_quotes && !current.is_empty() {
+                            parts.push(current.clone());
+                            current.clear();
+                        }
                     }
+                }
+                // Skip escaped backslashes before quotes
+                '\\' if chars.peek() == Some(&'"') => {
+                    continue;
                 }
                 ' ' if !in_quotes => {
                     if !current.is_empty() {
@@ -185,4 +196,50 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     }
 
     calendar::create_event(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_command_args_parse_basic() {
+        let input = "calendar \"Test Event\" 2024-02-21 14:30";
+        let args = CommandArgs::parse(input).unwrap();
+        assert_eq!(args.command, "calendar");
+        assert_eq!(args.args.len(), 3);
+        assert_eq!(args.args[0], "Test Event");
+        assert_eq!(args.flags.len(), 0);
+    }
+
+    #[test]
+    fn test_command_args_parse_with_flags() {
+        let input = "calendar \"Test Event\" 2024-02-21 --all-day --location \"Test Location\"";
+        let args = CommandArgs::parse(input).unwrap();
+        assert_eq!(args.command, "calendar");
+        assert_eq!(args.args[0], "Test Event");
+        assert!(args.flags.contains_key("--all-day"));
+        assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Test Location");
+    }
+
+    #[test]
+    fn test_command_args_parse_empty() {
+        let input = "";
+        let result = CommandArgs::parse(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_args_parse_quoted_strings() {
+        let input = r#"calendar "Meeting with \"quotes\"" 2024-02-21"#;
+        let args = CommandArgs::parse(input).unwrap();
+        assert_eq!(args.args[0], r#"Meeting with "quotes""#, 
+            "\nExpected: Meeting with \"quotes\"\nGot: {}", args.args[0]);
+        
+        // Add more test cases
+        let input2 = r#"calendar "Meeting \"quoted\" text" 2024-02-21"#;
+        let args2 = CommandArgs::parse(input2).unwrap();
+        assert_eq!(args2.args[0], r#"Meeting "quoted" text"#);
+    }
 }
