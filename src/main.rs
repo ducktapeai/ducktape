@@ -81,67 +81,94 @@ fn process_command(command: &str) -> Result<()> {
             file_search::search(&parts[1], &parts[2])?;
         }
         "calendar" => {
-            if parts.len() < 3 {
-                println!("Usage:");
-                println!("  For timed events:");
-                println!("    calendar \"<title>\" <date> <time> [calendar-name] [--location \"<location>\"] [--description \"<description>\"]");
-                println!("    Example: calendar \"Team Meeting\" 2024-02-20 14:30 \"Work\" --location \"Conference Room\" --description \"Discuss project updates\"");
-                println!();
-                println!("  For all-day events:");
-                println!("    calendar \"<title>\" <date> [calendar-name] [--location \"<location>\"] [--description \"<description>\"] --all-day");
-                println!("    Example: calendar \"Company Holiday\" 2024-02-20 \"Work\" --all-day --description \"Holiday celebration\"");
-                return Ok(());
-            }
-
+            // Revised calendar command parsing:
+            // Determine if "--all-day" is present in the command.
+            let all_day = parts.contains(&"--all-day".to_string());
             let mut title = String::new();
             let mut date = String::new();
-            let mut time = "00:00".to_string();
+            let mut time = "00:00".to_string(); // default for all_day events
             let mut calendar = None;
-            let mut all_day = false;
             let mut location = None;
             let mut description = None;
-
-            let mut i = 1;
-            while i < parts.len() {
-                if i == 1 {
-                    title = parts[i].clone();
-                } else if i == 2 {
-                    date = parts[i].clone();
-                } else {
-                    match parts[i].as_str() {
-                        "--all-day" => {
-                            all_day = true;
-                        }
+            
+            if all_day {
+                // For all-day events:
+                if parts.len() < 3 {
+                    println!("Usage: calendar \"<title>\" <date> [calendar-name] [--location \"<location>\"] [--description \"<description>\"] --all-day");
+                    return Ok(());
+                }
+                title = parts[1].clone();
+                date = parts[2].clone();
+                // Check if an optional calendar token is provided at index 3 that is not a flag.
+                let mut flag_index = 3;
+                if parts.len() > flag_index && !parts[flag_index].starts_with("--") {
+                    calendar = Some(parts[flag_index].clone());
+                    flag_index += 1;
+                }
+                // Process remaining flags.
+                while flag_index < parts.len() {
+                    match parts[flag_index].as_str() {
                         "--location" => {
-                            if i + 1 < parts.len() {
-                                location = Some(parts[i + 1].to_string());
-                                i += 1;
+                            if flag_index + 1 < parts.len() {
+                                location = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
                             } else {
                                 println!("--location requires a value");
                                 return Ok(());
                             }
                         }
                         "--description" => {
-                            if i + 1 < parts.len() {
-                                description = Some(parts[i + 1].to_string());
-                                i += 1;
+                            if flag_index + 1 < parts.len() {
+                                description = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
                             } else {
                                 println!("--description requires a value");
                                 return Ok(());
                             }
                         }
-                        _ => {
-                            if time == "00:00" && !all_day {
-                                time = parts[i].clone();
+                        _ => { }
+                    }
+                    flag_index += 1;
+                }
+            } else {
+                // For timed events.
+                if parts.len() < 4 {
+                    println!("Usage: calendar \"<title>\" <date> <time> [calendar-name] [--location \"<location>\"] [--description \"<description>\"]");
+                    return Ok(());
+                }
+                title = parts[1].clone();
+                date = parts[2].clone();
+                time = parts[3].clone();
+                let mut flag_index = 4;
+                if parts.len() > flag_index && !parts[flag_index].starts_with("--") {
+                    calendar = Some(parts[flag_index].clone());
+                    flag_index += 1;
+                }
+                while flag_index < parts.len() {
+                    match parts[flag_index].as_str() {
+                        "--location" => {
+                            if flag_index + 1 < parts.len() {
+                                location = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
                             } else {
-                                calendar = Some(parts[i].clone());
+                                println!("--location requires a value");
+                                return Ok(());
                             }
                         }
+                        "--description" => {
+                            if flag_index + 1 < parts.len() {
+                                description = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
+                            } else {
+                                println!("--description requires a value");
+                                return Ok(());
+                            }
+                        }
+                        _ => { }
                     }
+                    flag_index += 1;
                 }
-                i += 1;
             }
-
             calendar::create_event(&title, &date, &time, calendar.as_deref(), all_day, location, description)?;
         }
         "calendars" => {
