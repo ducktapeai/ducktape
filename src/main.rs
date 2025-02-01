@@ -166,7 +166,7 @@ fn process_command(command: &str) -> Result<()> {
 
 fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     if args.args.len() < 2 {
-        println!("Usage: calendar \"<title>\" <date> [time] [calendar-name] [--location \"<location>\"] [--description \"<description>\"] [--email \"<email>\"] [--all-day]");
+        println!("Usage: calendar \"<title>\" <date> [time] [calendar-name...] [--location \"<location>\"] [--description \"<description>\"] [--email \"<email>\"] [--all-day]");
         return Ok(());
     }
 
@@ -179,9 +179,12 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 
     config.all_day = all_day;
     
-    // Set calendar if provided
+    // Set calendars if provided
     if !all_day && args.args.len() > 3 || all_day && args.args.len() > 2 {
-        config.calendar = Some(&args.args[if all_day { 2 } else { 3 }]);
+        let calendar_index = if all_day { 2 } else { 3 };
+        config.calendars = args.args[calendar_index..].iter()
+            .map(String::as_str)
+            .collect();
     }
 
     // Set optional properties from flags
