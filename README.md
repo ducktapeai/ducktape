@@ -77,12 +77,12 @@ The application requires access to Calendar.app. You may need to grant permissio
 
 1. Create a team meeting:
 ```bash
->> calendar "Team Meeting" 2024-02-21 14:30 "Work" --location "Conference Room" --description "Weekly sync" --email "team@company.com"
+>> calendar "Team Meeting" 2025-02-21 14:30 "Work" --location "Conference Room" --description "Weekly sync" --email "team@company.com"
 ```
 
 2. Create an all-day holiday:
 ```bash
->> calendar "Company Holiday" 2024-02-21 "Work" --all-day --description "Office Closed"
+>> calendar "Company Holiday" 2025-02-21 "Work" --all-day --description "Office Closed"
 ```
 
 3. List available calendars:
