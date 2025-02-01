@@ -90,11 +90,12 @@ fn process_command(command: &str) -> Result<()> {
             let mut calendar = None;
             let mut location = None;
             let mut description = None;
+            let mut email = None; // New email parameter
             
             if all_day {
                 // For all-day events:
                 if parts.len() < 3 {
-                    println!("Usage: calendar \"<title>\" <date> [calendar-name] [--location \"<location>\"] [--description \"<description>\"] --all-day");
+                    println!("Usage: calendar \"<title>\" <date> [calendar-name] [--location \"<location>\"] [--description \"<description>\"] [--email \"<email>\"] --all-day");
                     return Ok(());
                 }
                 title = parts[1].clone();
@@ -126,6 +127,12 @@ fn process_command(command: &str) -> Result<()> {
                                 return Ok(());
                             }
                         }
+                        "--email" => {  // New flag for email
+                            if flag_index + 1 < parts.len() {
+                                email = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
+                            } else { println!("--email requires a value"); return Ok(()); }
+                        }
                         _ => { }
                     }
                     flag_index += 1;
@@ -133,7 +140,7 @@ fn process_command(command: &str) -> Result<()> {
             } else {
                 // For timed events.
                 if parts.len() < 4 {
-                    println!("Usage: calendar \"<title>\" <date> <time> [calendar-name] [--location \"<location>\"] [--description \"<description>\"]");
+                    println!("Usage: calendar \"<title>\" <date> <time> [calendar-name] [--location \"<location>\"] [--description \"<description>\"] [--email \"<email>\"]");
                     return Ok(());
                 }
                 title = parts[1].clone();
@@ -164,12 +171,18 @@ fn process_command(command: &str) -> Result<()> {
                                 return Ok(());
                             }
                         }
+                        "--email" => {  // New flag for email
+                            if flag_index + 1 < parts.len() {
+                                email = Some(parts[flag_index + 1].clone());
+                                flag_index += 1;
+                            } else { println!("--email requires a value"); return Ok(()); }
+                        }
                         _ => { }
                     }
                     flag_index += 1;
                 }
             }
-            calendar::create_event(&title, &date, &time, calendar.as_deref(), all_day, location, description)?;
+            calendar::create_event(&title, &date, &time, calendar.as_deref(), all_day, location, description, email)?;
         }
         "calendars" => {
             calendar::list_calendars()?;

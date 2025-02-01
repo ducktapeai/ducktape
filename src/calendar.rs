@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
-use log::debug;
 use std::process::Command;
 
 pub fn list_calendars() -> Result<()> {
@@ -66,6 +65,7 @@ pub fn create_event(
     all_day: bool,
     location: Option<String>,
     description: Option<String>,
+    email: Option<String>,
 ) -> Result<()> {
     let datetime = format!("{} {}", date, if all_day { "00:00" } else { time });
     let dt = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M")
@@ -108,6 +108,23 @@ pub fn create_event(
         ""
     };
 
+    // Build email code block if provided, using documented Apple syntax
+    let email_code = if let Some(email_addr) = &email {
+        format!(
+            r#"
+                -- Add attendee
+                tell application "Calendar"
+                    tell newEvent
+                        make new attendee at end with properties {{email:"{}", display name:"{}"}}
+                    end tell
+                end tell"#,
+            email_addr,
+            email_addr  // Using email as display name, could be parameterized further
+        )
+    } else {
+        String::new()
+    };
+
     let script = format!(
         r#"tell application "Calendar"
             try
@@ -132,16 +149,7 @@ pub fn create_event(
                 set minutes of startDate to {}
                 set seconds of startDate to 0
                 -- Build properties and create the event
-                set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}
-                tell targetCal
-                    set newEvent to make new event at end with properties props
-                    {}
-                end tell
-                return "Success: Event created"
-            on error errMsg
-                return "Error: " & errMsg
-            end try
-        end tell"#,
+                set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}"#,
         calendar_id.unwrap_or("Calendar"),
         local_dt.format("%Y"),
         local_dt.format("%-m"),
@@ -151,9 +159,40 @@ pub fn create_event(
         title,
         duration,
         description.as_deref().unwrap_or("Created by DuckTape"),
-        extra,
-        all_day_code
+        extra
     );
+
+    // Add conditional blocks after the main script
+    let script = if !all_day_code.is_empty() || !email_code.is_empty() {
+        format!(
+            r#"{}
+                tell targetCal
+                    set newEvent to make new event at end with properties props
+                    {}{}
+                end tell
+                return "Success: Event created"
+            on error errMsg
+                return "Error: " & errMsg
+            end try
+        end tell"#,
+            script,
+            all_day_code,
+            email_code
+        )
+    } else {
+        format!(
+            r#"{}
+                tell targetCal
+                    make new event at end with properties props
+                end tell
+                return "Success: Event created"
+            on error errMsg
+                return "Error: " & errMsg
+            end try
+        end tell"#,
+            script
+        )
+    };
 
     println!("Debug: Generated AppleScript:\n{}", script);
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
