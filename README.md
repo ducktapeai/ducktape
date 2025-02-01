@@ -1,6 +1,7 @@
 # DuckTape
 
 A command-line calendar management tool for macOS that interfaces with Apple Calendar.app.
+This has the ability to add an event to multiple apps within your Calander leveraging the command line. Calendar as configuration.
 
 ## Installation
 
