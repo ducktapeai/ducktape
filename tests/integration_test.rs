@@ -13,11 +13,12 @@ fn test_create_basic_event() -> Result<()> {
         title: "Integration Test Event",
         date: "2024-02-21",
         time: "14:30",
-        calendar: Some("Calendar"),
+        calendars: vec!["Calendar"],  // Changed from calendar: Some("Calendar")
         all_day: false,
         location: None,
         description: None,
         email: None,
+        reminder: None,
     };
 
     ducktape::calendar::create_event(config)?;
@@ -30,11 +31,12 @@ fn test_create_all_day_event() -> Result<()> {
         title: "Integration Test All-Day Event",
         date: "2024-02-21",
         time: "00:00",
-        calendar: Some("Calendar"),
+        calendars: vec!["Calendar"],  // Changed from calendar: Some("Calendar")
         all_day: true,
         location: None,
         description: None,
         email: None,
+        reminder: None,
     };
 
     ducktape::calendar::create_event(config)?;

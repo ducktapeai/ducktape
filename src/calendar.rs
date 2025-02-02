@@ -31,6 +31,7 @@ pub struct EventConfig<'a> {
     pub location: Option<String>,
     pub description: Option<String>,
     pub email: Option<String>,
+    pub reminder: Option<i32>,  // Minutes before event to show reminder
 }
 
 impl<'a> EventConfig<'a> {
@@ -45,6 +46,7 @@ impl<'a> EventConfig<'a> {
             location: None,
             description: None,
             email: None,
+            reminder: None,
         }
     }
 }
@@ -126,6 +128,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             location: config.location.clone(),
             description: config.description.clone(),
             email: config.email.clone(),
+            reminder: config.reminder,
         };
 
         match create_single_event(this_config) {
@@ -199,11 +202,24 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         String::new()
     };
 
+    // Build reminder code block if provided
+    let reminder_code = if let Some(minutes) = config.reminder {
+        format!(
+            r#"
+                -- Add reminder alarm
+                set theAlarm to make new display alarm at end of newEvent
+                set trigger interval of theAlarm to -{}"#,
+            minutes * 60  // Convert minutes to seconds for Calendar.app
+        )
+    } else {
+        String::new()
+    };
+
     let script = format!(
         r#"tell application "Calendar"
             try
                 -- Find calendar
-                set calendarName to "{}"
+                set calendarName to "{calendar_name}"
                 set targetCal to missing value
                 repeat with c in calendars
                     if name of c is calendarName then
@@ -216,57 +232,36 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 end if
                 -- Set up start date
                 set startDate to current date
-                set year of startDate to {}
-                set month of startDate to {}
-                set day of startDate to {}
-                set hours of startDate to {}
-                set minutes of startDate to {}
+                set year of startDate to {year}
+                set month of startDate to {month}
+                set day of startDate to {day}
+                set hours of startDate to {hours}
+                set minutes of startDate to {minutes}
                 set seconds of startDate to 0
                 -- Build properties and create the event
-                set props to {{summary:"{}", start date:startDate, end date:(startDate + {}), description:"{}"{}}}"#,
-        config.calendars[0],
-        local_dt.format("%Y"),
-        local_dt.format("%-m"),
-        local_dt.format("%-d"),
-        local_dt.format("%-H"),
-        local_dt.format("%-M"),
-        config.title,
-        duration,
-        config.description.as_deref().unwrap_or("Created by DuckTape"),
-        extra
+                tell targetCal
+                    set newEvent to make new event at end with properties {{summary:"{title}", start date:startDate, end date:(startDate + {duration}), description:"{description}"{extra}}}
+                    {all_day_code}{email_code}{reminder_code}
+                end tell
+                return "Success: Event created"
+            on error errMsg
+                return "Error: " & errMsg
+            end try
+        end tell"#,
+        calendar_name = config.calendars[0],
+        year = local_dt.format("%Y"),
+        month = local_dt.format("%-m"),
+        day = local_dt.format("%-d"),
+        hours = local_dt.format("%-H"),
+        minutes = local_dt.format("%-M"),
+        title = config.title,
+        duration = duration,
+        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
+        extra = extra,
+        all_day_code = all_day_code,
+        email_code = email_code,
+        reminder_code = reminder_code
     );
-
-    // Add conditional blocks after the main script
-    let script = if !all_day_code.is_empty() || !email_code.is_empty() {
-        format!(
-            r#"{}
-                tell targetCal
-                    set newEvent to make new event at end with properties props
-                    {}{}
-                end tell
-                return "Success: Event created"
-            on error errMsg
-                return "Error: " & errMsg
-            end try
-        end tell"#,
-            script,
-            all_day_code,
-            email_code
-        )
-    } else {
-        format!(
-            r#"{}
-                tell targetCal
-                    make new event at end with properties props
-                end tell
-                return "Success: Event created"
-            on error errMsg
-                return "Error: " & errMsg
-            end try
-        end tell"#,
-            script
-        )
-    };
 
     println!("Debug: Generated AppleScript:\n{}", script);
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
@@ -389,6 +384,7 @@ mod tests {
             location: Some("Test Location".to_string()),
             description: Some("Test Description".to_string()),
             email: Some("test@example.com".to_string()),
+            reminder: Some(30),
         }
     }
 
@@ -400,6 +396,7 @@ mod tests {
         assert_eq!(config.time, "14:30");
         assert!(!config.all_day);
         assert!(config.calendars.is_empty());
+        assert!(config.reminder.is_none());
     }
 
     #[test]
@@ -429,6 +426,7 @@ mod tests {
             location: None,
             description: None,
             email: None,
+            reminder: None,
         };
 
         let result = create_event(config);
