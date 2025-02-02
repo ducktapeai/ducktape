@@ -147,9 +147,15 @@ fn process_command(command: &str) -> Result<()> {
         "help" => {
             println!("Available commands:");
             println!("  search <path> <pattern> - Search for files");
-            println!("  calendar \"<title>\" <date> <time> [calendar-name] - Create calendar event");
+            println!("  calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
             println!("  calendars - List available calendars");
             println!("  calendar-props - List available calendar event properties");
+            println!("  Options:");
+            println!("    --all-day                  Create an all-day event");
+            println!("    --location \"<location>\"    Set event location");
+            println!("    --description \"<desc>\"     Set event description");
+            println!("    --email \"<email>\"         Add attendee");
+            println!("    --reminder <minutes>       Set reminder (minutes before event)");
             println!("  help - Show this help");
             println!("  exit - Exit the application");
             Ok(())
@@ -196,6 +202,15 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     }
     if let Some(email) = args.flags.get("--email") {
         config.email = email.clone();
+    }
+
+    // Set reminder if provided (in minutes)
+    if let Some(reminder) = args.flags.get("--reminder") {
+        if let Some(minutes_str) = reminder {
+            config.reminder = Some(minutes_str.parse().map_err(|_| {
+                anyhow::anyhow!("Invalid reminder duration: must be a number of minutes")
+            })?);
+        }
     }
 
     calendar::create_event(config)
