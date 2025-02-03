@@ -34,9 +34,9 @@ Regular timed event in a single calendar:
 >> calendar "Meeting Title" 2024-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
 ```
 
-Event in multiple calendars:
+Event in multiple calendars (pass additional calendar names after the time or date for all-day events):
 ```bash
->> calendar "Team Meeting" 2024-02-21 14:30 "Work" "Personal" "Family" --location "Conference Room" --description "Meeting details"
+>> calendar "Team Meeting" 2024-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Meeting details"
 ```
 
 All-day event in multiple calendars:
@@ -44,12 +44,14 @@ All-day event in multiple calendars:
 >> calendar "Company Holiday" 2024-02-21 "Work" "Personal" --all-day --description "Office Closed"
 ```
 
+Note: The --email flag now supports adding a single attendee per event.
+
 ### Command Options
 
 - `--all-day`: Create an all-day event
 - `--location "Location"`: Add a location to the event
-- `--description "Description"`: Add a description to the event
-- `--email "email@example.com"`: Add an attendee to the event
+- `--description "Description"`: Add an event description
+- `--email "email@example.com"`: Add an attendee (single email per event)
 
 ### View Available Calendar Properties
 
