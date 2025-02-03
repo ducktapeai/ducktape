@@ -31,17 +31,17 @@ DuckTape provides several commands for managing calendar events:
 
 Regular timed event in a single calendar:
 ```bash
->> calendar "Meeting Title" 2024-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
+>> calendar "Meeting Title" 2025-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
 ```
 
 Event in multiple calendars (pass additional calendar names after the time or date for all-day events):
 ```bash
->> calendar "Team Meeting" 2024-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Meeting details"
+>> calendar "Team Meeting" 2025-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Meeting details"
 ```
 
 All-day event in multiple calendars:
 ```bash
->> calendar "Company Holiday" 2024-02-21 "Work" "Personal" --all-day --description "Office Closed"
+>> calendar "Company Holiday" 2025-02-21 "Work" "Personal" --all-day --description "Office Closed"
 ```
 
 Note: The --email flag now supports adding a single attendee per event.
@@ -85,17 +85,17 @@ The application requires access to Calendar.app. You may need to grant permissio
 
 1. Create a team meeting in multiple calendars:
 ```bash
->> calendar "Team Meeting" 2024-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Weekly sync" --email "team@company.com"
+>> calendar "Team Meeting" 2025-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Weekly sync" --email "team@company.com"
 ```
 
 2. Create an all-day holiday in both work and personal calendars:
 ```bash
->> calendar "Company Holiday" 2024-02-21 "Work" "Personal" --all-day --description "Office Closed"
+>> calendar "Company Holiday" 2025-02-21 "Work" "Personal" --all-day --description "Office Closed"
 ```
 
 3. Create an event with attendees in multiple calendars:
 ```bash
->> calendar "Project Review" 2024-02-21 15:00 "Work" "Projects" --location "Conference Room" --description "Monthly review" --email "team@company.com"
+>> calendar "Project Review" 2025-02-21 15:00 "Work" "Projects" --location "Conference Room" --description "Monthly review" --email "team@company.com"
 ```
 
 4. List available calendars:
