@@ -109,8 +109,14 @@ fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
     println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
 
+    // Use either the emoji duck or ASCII duck depending on terminal support
+    let prompt = "🦆 "; // Unicode duck emoji
+    // Alternative ASCII art duck if emoji doesn't render well:
+    // let prompt = ">)  "; // Simple ASCII duck
+    // let prompt = "<=)  "; // Another ASCII duck variation
+
     loop {
-        let readline = rl.readline(">> ");
+        let readline = rl.readline(prompt);
         match readline {
             Ok(line) => {
                 let _ = rl.add_history_entry(line.as_str());
