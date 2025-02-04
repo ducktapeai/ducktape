@@ -1,5 +1,6 @@
 mod file_search;
 mod calendar;
+mod todo; // Import the todo module
 
 use anyhow::Result;
 use env_logger::Env;
@@ -144,6 +145,7 @@ fn process_command(command: &str) -> Result<()> {
         "calendar" => handle_calendar_command(args),
         "calendars" => calendar::list_calendars(),
         "calendar-props" => calendar::list_event_properties(),
+        "todo" => handle_todo_command(args),
         "help" => {
             println!("Available commands:");
             println!("  search <path> <pattern> - Search for files");
@@ -168,6 +170,29 @@ fn process_command(command: &str) -> Result<()> {
             Ok(())
         }
     }
+}
+
+// New function to handle todo creation
+fn handle_todo_command(args: CommandArgs) -> Result<()> {
+    if args.args.is_empty() {
+        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"<list1>,<list2>,...\"]");
+        return Ok(());
+    }
+    let mut config = todo::TodoConfig::new(&args.args[0]);
+    if let Some(notes) = args.flags.get("--notes") {
+        config.notes = notes.clone();
+    }
+    if let Some(lists) = args.flags.get("--lists") {
+        let list_names: Vec<&str> = lists
+            .as_deref()
+            .unwrap_or("")
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+        config.lists = list_names;
+    }
+    todo::create_todo(config)
 }
 
 fn handle_calendar_command(args: CommandArgs) -> Result<()> {
