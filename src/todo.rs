@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use std::process::Command;
+use chrono::NaiveDateTime;
 
 #[derive(Debug)]
 pub struct TodoConfig<'a> {
@@ -7,11 +8,13 @@ pub struct TodoConfig<'a> {
     pub notes: Option<String>,
     // New field for tagging a todo to different lists
     pub lists: Vec<&'a str>,
+    // New field for setting a reminder time for the todo item
+    pub reminder_time: Option<&'a str>,
 }
 
 impl<'a> TodoConfig<'a> {
     pub fn new(title: &'a str) -> Self {
-        Self { title, notes: None, lists: Vec::new() }
+        Self { title, notes: None, lists: Vec::new(), reminder_time: None }
     }
 }
 
@@ -20,6 +23,23 @@ pub fn create_todo(mut config: TodoConfig) -> Result<()> {
         vec!["Reminders"]
     } else {
         config.lists
+    };
+    // Format reminder time to AppleScript-friendly string if provided
+    let reminder_prop = if let Some(time_str) = config.reminder_time {
+        // Parse input in format "YYYY-MM-DD HH:MM"
+        match chrono::NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M") {
+            Ok(naive_dt) => {
+                // Format as "MM/dd/yyyy hh:mm:ss AM/PM"
+                let formatted = naive_dt.format("%m/%d/%Y %I:%M:%S %p").to_string();
+                format!(", remind me date:date \"{}\"", formatted)
+            },
+            Err(e) => {
+                println!("Invalid reminder time format: {}", e);
+                String::new()
+            }
+        }
+    } else {
+        String::new()
     };
     let mut success_count = 0;
     for list in target_lists {
@@ -33,7 +53,7 @@ r#"tell application "Reminders"
         else
             set targetList to make new list with properties {{name:"{}"}}
         end if
-        set newTodo to make new reminder in targetList with properties {{name:"{}", body:"{}"}}
+        set newTodo to make new reminder in targetList with properties {{name:"{}", body:"{}"{} }}
         return "Success: Todo created"
     on error errMsg
         return "Error: " & errMsg
@@ -42,7 +62,8 @@ end tell"#,
             list, // search for list
             list, // create list if not found
             config.title,
-            config.notes.as_deref().unwrap_or("")
+            config.notes.as_deref().unwrap_or(""),
+            reminder_prop
         );
         let output = Command::new("osascript")
             .arg("-e")
