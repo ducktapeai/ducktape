@@ -160,6 +160,30 @@ fn process_command(command: &str) -> Result<()> {
             }
             Ok(())
         },
+        "list-events" => {
+            let events = state::load_events()?;
+            println!("Stored Calendar Events:");
+            for event in events {
+                println!("  - {} [{}]", event.title, 
+                    if event.all_day { "All day" } else { &event.time });
+                println!("    Date: {}", event.date);
+                println!("    Calendars: {}", event.calendars.join(", "));
+                if let Some(loc) = event.location {
+                    println!("    Location: {}", loc);
+                }
+                if let Some(desc) = event.description {
+                    println!("    Description: {}", desc);
+                }
+                if let Some(email) = event.email {
+                    println!("    Attendee: {}", email);
+                }
+                if let Some(reminder) = event.reminder {
+                    println!("    Reminder: {} minutes before", reminder);
+                }
+                println!();  // Empty line between events
+            }
+            Ok(())
+        },
         "help" => {
             println!("Available commands:");
             println!("  search <path> <pattern> - Search for files");
@@ -168,6 +192,14 @@ fn process_command(command: &str) -> Result<()> {
             println!("  calendar-props - List available calendar event properties");
             println!("  todo \"<title>\" - Create a todo item");
             println!("  list-todos - List all stored todo items");
+            println!("  list-events - List all stored calendar events with details");
+            println!("\nCalendar Event Details:");
+            println!("  - Date and time");
+            println!("  - Calendar assignments");
+            println!("  - Location (if set)");
+            println!("  - Description (if set)");
+            println!("  - Attendees (if any)");
+            println!("  - Reminder settings");
             println!("\nCalendar Options:");
             println!("    --all-day                  Create an all-day event");
             println!("    --location \"<location>\"    Set event location");
