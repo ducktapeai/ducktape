@@ -94,16 +94,9 @@ pub fn load_todos() -> Result<Vec<TodoItem>> {
     StateManager::new()?.load()
 }
 
-pub fn save_todos(todos: &[TodoItem]) -> Result<()> {
-    StateManager::new()?.save(todos)
-}
-
+// Remove unused save_events function since it's handled by StateManager
 pub fn load_events() -> Result<Vec<CalendarItem>> {
     StateManager::new()?.load()
-}
-
-pub fn save_events(events: &[CalendarItem]) -> Result<()> {
-    StateManager::new()?.save(events)
 }
 
 #[cfg(test)]

@@ -82,34 +82,3 @@ end tell"#,
         Err(anyhow!("Failed to create todo in any specified list"))
     }
 }
-
-pub fn list_todos() -> Result<()> {
-    // List to‑do items; for demonstration we're listing reminders as todos.
-    let script = r#"tell application "Reminders"
-        try
-            set output to {}
-            repeat with r in reminders
-                copy name of r to end of output
-            end repeat
-            return output
-        on error errMsg
-            return "Error: " & errMsg
-        end try
-    end tell"#;
-    
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()?;
-        
-    let result = String::from_utf8_lossy(&output.stdout);
-    if result.contains("Error") {
-        Err(anyhow::anyhow!("Failed to list todos: {}", result))
-    } else {
-        println!("To-do items:");
-        for todo in result.trim_matches(&['{', '}'][..]).split(", ") {
-            println!("  - {}", todo.trim_matches('"'));
-        }
-        Ok(())
-    }
-}

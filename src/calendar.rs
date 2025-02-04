@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use log::{debug, error};
 use std::process::Command;
-use crate::state::{self, CalendarItem, StateManager};
+use crate::state::{CalendarItem, StateManager};
 
 /// Duration in seconds for different event types
 const ALL_DAY_DURATION: i64 = 86400;
