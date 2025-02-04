@@ -46,6 +46,10 @@ All-day event in multiple calendars:
 
 Note: The --email flag now supports adding a single attendee per event.
 
+### Create a Todo Item
+
+To create a new todo item and tag it to specific lists, use the "todo" command with optional flags for notes and lists. If no --lists flag is provided, the item will be added to the default "Reminders" list.
+
 ### Command Options
 
 - `--all-day`: Create an all-day event
