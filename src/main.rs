@@ -175,7 +175,7 @@ fn process_command(command: &str) -> Result<()> {
 // New function to handle todo creation
 fn handle_todo_command(args: CommandArgs) -> Result<()> {
     if args.args.is_empty() {
-        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"<list1>,<list2>,...\"]");
+        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"<list1>,<list2>,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]");
         return Ok(());
     }
     let mut config = todo::TodoConfig::new(&args.args[0]);
@@ -191,6 +191,9 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
             .filter(|s| !s.is_empty())
             .collect();
         config.lists = list_names;
+    }
+    if let Some(reminder) = args.flags.get("--reminder-time") {
+        config.reminder_time = reminder.as_deref();
     }
     todo::create_todo(config)
 }
