@@ -1,7 +1,7 @@
 # DuckTape
 
-A command-line calendar management tool for macOS that interfaces with Apple Calendar.app and Reminders.app.
-All commands use the 'ducktape' prefix for consistency and clarity.
+A command-line calendar producitivity tool for macOS.
+Duct tape fixes anything—just like this tool. No clicks, no distractions, just pure productivity. Stick with what works.
 
 ## Features
 
