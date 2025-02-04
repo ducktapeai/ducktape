@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use log::{debug, error};
 use std::process::Command;
+use crate::state::{self, CalendarItem, StateManager};
 
 /// Duration in seconds for different event types
 const ALL_DAY_DURATION: i64 = 86400;
@@ -112,7 +113,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     let calendars = if config.calendars.is_empty() {
         vec!["Calendar"]
     } else {
-        config.calendars
+        config.calendars.clone()  // Clone here to avoid the move
     };
 
     let mut success_count = 0;
@@ -140,6 +141,20 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     }
 
     if success_count > 0 {
+        // Save the event to state
+        let calendar_item = CalendarItem {
+            title: config.title.to_string(),
+            date: config.date.to_string(),
+            time: config.time.to_string(),
+            calendars: config.calendars.iter().map(|&s| s.to_string()).collect(),
+            all_day: config.all_day,
+            location: config.location,
+            description: config.description,
+            email: config.email,
+            reminder: config.reminder,
+        };
+        StateManager::new()?.add(calendar_item)?;
+        
         println!(
             "Calendar event created in {}/{} calendars",
             success_count,

@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use std::process::Command;
-use chrono::NaiveDateTime;
 
 #[derive(Debug)]
 pub struct TodoConfig<'a> {
@@ -18,7 +17,7 @@ impl<'a> TodoConfig<'a> {
     }
 }
 
-pub fn create_todo(mut config: TodoConfig) -> Result<()> {
+pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
     let target_lists = if config.lists.is_empty() {
         vec!["Reminders"]
     } else {
