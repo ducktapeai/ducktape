@@ -25,6 +25,13 @@ cargo run
 
 ## Usage
 
+Get help on available commands:
+```bash
+>> ducktape --help
+# or
+>> ducktape -h
+```
+
 All commands must be prefixed with 'ducktape'. For example:
 
 ### Calendar Management

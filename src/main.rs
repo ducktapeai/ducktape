@@ -64,6 +64,15 @@ impl CommandArgs {
             return Err(anyhow::anyhow!("No command provided"));
         }
 
+        // Special case for help command
+        if parts.len() == 1 && (parts[0] == "--help" || parts[0] == "-h") {
+            return Ok(CommandArgs {
+                command: "help".to_string(),
+                args: vec![],
+                flags: std::collections::HashMap::new(),
+            });
+        }
+
         // Check for and remove "ducktape" prefix
         if parts[0] != "ducktape" {
             return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
@@ -72,6 +81,15 @@ impl CommandArgs {
 
         if parts.is_empty() {
             return Err(anyhow::anyhow!("No command provided after 'ducktape'"));
+        }
+
+        // Check if the first argument after "ducktape" is a help flag
+        if parts[0] == "--help" || parts[0] == "-h" {
+            return Ok(CommandArgs {
+                command: "help".to_string(),
+                args: vec![],
+                flags: std::collections::HashMap::new(),
+            });
         }
 
         let command = parts.remove(0);
@@ -217,41 +235,13 @@ fn process_command(command: &str) -> Result<()> {
             Ok(())
         }
         "help" => {
-            println!("Available commands:");
-            println!("  ducktape search <path> <pattern> - Search for files");
-            println!("  ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
-            println!("  ducktape calendars - List available calendars");
-            println!("  ducktape calendar-props - List available calendar event properties");
-            println!("  ducktape todo \"<title>\" - Create a todo item");
-            println!("  ducktape list-todos - List all stored todo items");
-            println!("  ducktape list-events - List all stored calendar events with details");
-            println!("\nCalendar Event Details:");
-            println!("  - Date and time");
-            println!("  - Calendar assignments");
-            println!("  - Location (if set)");
-            println!("  - Description (if set)");
-            println!("  - Attendees (if any)");
-            println!("  - Reminder settings");
-            println!("\nCalendar Options:");
-            println!("    --all-day                  Create an all-day event");
-            println!("    --location \"<location>\"    Set event location");
-            println!("    --description \"<desc>\"     Set event description");
-            println!("    --email \"<email>\"         Add attendee");
-            println!("    --reminder <minutes>       Set reminder (minutes before event)");
-            println!("\nTodo Options:");
-            println!("    --notes \"<notes>\"         Add notes to the todo");
-            println!("    --lists \"<list1,list2>\"   Add to specific lists");
-            println!("    --reminder-time \"YYYY-MM-DD HH:MM\"  Set reminder time");
-            println!("\nGeneral commands:");
-            println!("  help - Show this help");
-            println!("  exit - Exit the application");
-            Ok(())
+            print_help()
         }
         "exit" => {
             std::process::exit(0);
         }
         _ => {
-            println!("Unknown command. Type 'ducktape help' for available commands.");
+            println!("Unknown command. Type 'ducktape --help' for available commands.");
             Ok(())
         }
     }
@@ -347,6 +337,42 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     }
 
     calendar::create_event(config)
+}
+
+fn print_help() -> Result<()> {
+    println!("DuckTape - Calendar and Todo Management Tool");
+    println!("\nUsage:");
+    println!("  ducktape [command] [options]");
+    println!("  ducktape --help | -h");
+    println!("\nAvailable commands:");
+    println!("  ducktape search <path> <pattern> - Search for files");
+    println!("  ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
+    println!("  ducktape calendars - List available calendars");
+    println!("  ducktape calendar-props - List available calendar event properties");
+    println!("  ducktape todo \"<title>\" - Create a todo item");
+    println!("  ducktape list-todos - List all stored todo items");
+    println!("  ducktape list-events - List all stored calendar events with details");
+    println!("\nCalendar Event Details:");
+    println!("  - Date and time");
+    println!("  - Calendar assignments");
+    println!("  - Location (if set)");
+    println!("  - Description (if set)");
+    println!("  - Attendees (if any)");
+    println!("  - Reminder settings");
+    println!("\nCalendar Options:");
+    println!("    --all-day                  Create an all-day event");
+    println!("    --location \"<location>\"    Set event location");
+    println!("    --description \"<desc>\"     Set event description");
+    println!("    --email \"<email>\"         Add attendee");
+    println!("    --reminder <minutes>       Set reminder (minutes before event)");
+    println!("\nTodo Options:");
+    println!("    --notes \"<notes>\"         Add notes to the todo");
+    println!("    --lists \"<list1,list2>\"   Add to specific lists");
+    println!("    --reminder-time \"YYYY-MM-DD HH:MM\"  Set reminder time");
+    println!("\nGeneral commands:");
+    println!("  help - Show this help");
+    println!("  exit - Exit the application");
+    Ok(())
 }
 
 #[cfg(test)]
