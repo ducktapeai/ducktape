@@ -1,12 +1,17 @@
 mod file_search;
 mod calendar;
-mod todo; // Import the todo module
+mod todo;
+mod state;  // Add local state module
 
 use anyhow::Result;
 use env_logger::Env;
 use log::{error, info};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+
+// Remove ducktape imports since we're using local modules
+// use ducktape::state;
+// use ducktape::todo::TodoConfig;
 
 /// Command line arguments structure
 #[derive(Debug)]
@@ -146,6 +151,15 @@ fn process_command(command: &str) -> Result<()> {
         "calendars" => calendar::list_calendars(),
         "calendar-props" => calendar::list_event_properties(),
         "todo" => handle_todo_command(args),
+        "list-todos" => {
+            let todos = state::load_todos()?;
+            println!("Stored Todo Items:");
+            for item in todos {
+                println!("  - {} [{}]", item.title, 
+                    item.reminder_time.as_deref().unwrap_or("No reminder"));
+            }
+            Ok(())
+        },
         "help" => {
             println!("Available commands:");
             println!("  search <path> <pattern> - Search for files");
@@ -172,7 +186,7 @@ fn process_command(command: &str) -> Result<()> {
     }
 }
 
-// New function to handle todo creation
+// Modify the todo handler to save state after creating a todo
 fn handle_todo_command(args: CommandArgs) -> Result<()> {
     if args.args.is_empty() {
         println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"<list1>,<list2>,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]");
@@ -195,7 +209,21 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
     if let Some(reminder) = args.flags.get("--reminder-time") {
         config.reminder_time = reminder.as_deref();
     }
-    todo::create_todo(config)
+    todo::create_todo(config)?;
+    
+    // Save todo state after creation
+    let mut todos = state::load_todos().unwrap_or_else(|_| vec![]);
+    todos.push(state::TodoItem {
+        title: args.args[0].clone(),
+        notes: args.flags.get("--notes").and_then(|n| n.clone()),
+        lists: args.flags.get("--lists")
+                     .map(|l| l.as_deref().unwrap_or("").split(',').map(|s| s.trim().to_owned()).collect())
+                     .unwrap_or(vec!["Reminders".to_owned()]),
+        reminder_time: args.flags.get("--reminder-time").and_then(|r| r.clone()),
+    });
+    state::save_todos(&todos)?;
+    
+    Ok(())
 }
 
 fn handle_calendar_command(args: CommandArgs) -> Result<()> {
