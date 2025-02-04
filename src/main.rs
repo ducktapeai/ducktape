@@ -1,7 +1,7 @@
-mod file_search;
 mod calendar;
-mod todo;
-mod state;  // Add local state module
+mod file_search;
+mod state;
+mod todo; // Add local state module
 
 use anyhow::Result;
 use env_logger::Env;
@@ -84,7 +84,11 @@ impl CommandArgs {
             i += 1;
         }
 
-        Ok(CommandArgs { command, args, flags })
+        Ok(CommandArgs {
+            command,
+            args,
+            flags,
+        })
     }
 }
 
@@ -109,11 +113,13 @@ fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
     println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
 
-    // Use either the emoji duck or ASCII duck depending on terminal support
-    let prompt = "🦆 "; // Unicode duck emoji
-    // Alternative ASCII art duck if emoji doesn't render well:
-    // let prompt = ">)  "; // Simple ASCII duck
-    // let prompt = "<=)  "; // Another ASCII duck variation
+    // Duck with tape emoji combination
+    let prompt = "🦆⌇ "; // Duck with paperclip (representing tape)
+                         // Alternative combinations:
+                         // let prompt = "🦆🤐 ";  // Duck with zipper mouth (looks like tape)
+                         // let prompt = "🦆⌇ ";   // Duck with tape-like symbol
+                         // ASCII art alternative:
+                         // let prompt = "<=|] ";  // Duck with tape mark
 
     loop {
         let readline = rl.readline(prompt);
@@ -143,7 +149,7 @@ fn main() -> Result<()> {
 
 fn process_command(command: &str) -> Result<()> {
     let args = CommandArgs::parse(command)?;
-    
+
     match args.command.as_str() {
         "search" => {
             if args.args.len() < 2 {
@@ -161,17 +167,27 @@ fn process_command(command: &str) -> Result<()> {
             let todos = state::load_todos()?;
             println!("Stored Todo Items:");
             for item in todos {
-                println!("  - {} [{}]", item.title, 
-                    item.reminder_time.as_deref().unwrap_or("No reminder"));
+                println!(
+                    "  - {} [{}]",
+                    item.title,
+                    item.reminder_time.as_deref().unwrap_or("No reminder")
+                );
             }
             Ok(())
-        },
+        }
         "list-events" => {
             let events = state::load_events()?;
             println!("Stored Calendar Events:");
             for event in events {
-                println!("  - {} [{}]", event.title, 
-                    if event.all_day { "All day" } else { &event.time });
+                println!(
+                    "  - {} [{}]",
+                    event.title,
+                    if event.all_day {
+                        "All day"
+                    } else {
+                        &event.time
+                    }
+                );
                 println!("    Date: {}", event.date);
                 println!("    Calendars: {}", event.calendars.join(", "));
                 if let Some(loc) = event.location {
@@ -186,14 +202,16 @@ fn process_command(command: &str) -> Result<()> {
                 if let Some(reminder) = event.reminder {
                     println!("    Reminder: {} minutes before", reminder);
                 }
-                println!();  // Empty line between events
+                println!(); // Empty line between events
             }
             Ok(())
-        },
+        }
         "help" => {
             println!("Available commands:");
             println!("  search <path> <pattern> - Search for files");
-            println!("  calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
+            println!(
+                "  calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event"
+            );
             println!("  calendars - List available calendars");
             println!("  calendar-props - List available calendar event properties");
             println!("  todo \"<title>\" - Create a todo item");
@@ -220,7 +238,7 @@ fn process_command(command: &str) -> Result<()> {
             println!("  help - Show this help");
             println!("  exit - Exit the application");
             Ok(())
-        },
+        }
         "exit" => {
             std::process::exit(0);
         }
@@ -255,19 +273,27 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
         config.reminder_time = reminder.as_deref();
     }
     todo::create_todo(config)?;
-    
+
     // Save todo state after creation
     let mut todos = state::load_todos().unwrap_or_else(|_| vec![]);
     todos.push(state::TodoItem {
         title: args.args[0].clone(),
         notes: args.flags.get("--notes").and_then(|n| n.clone()),
-        lists: args.flags.get("--lists")
-                     .map(|l| l.as_deref().unwrap_or("").split(',').map(|s| s.trim().to_owned()).collect())
-                     .unwrap_or(vec!["Reminders".to_owned()]),
+        lists: args
+            .flags
+            .get("--lists")
+            .map(|l| {
+                l.as_deref()
+                    .unwrap_or("")
+                    .split(',')
+                    .map(|s| s.trim().to_owned())
+                    .collect()
+            })
+            .unwrap_or(vec!["Reminders".to_owned()]),
         reminder_time: args.flags.get("--reminder-time").and_then(|r| r.clone()),
     });
     state::save_todos(&todos)?;
-    
+
     Ok(())
 }
 
@@ -281,15 +307,20 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     let mut config = calendar::EventConfig::new(
         &args.args[0],
         &args.args[1],
-        if all_day { "00:00" } else { args.args.get(2).map_or("00:00", String::as_str) }
+        if all_day {
+            "00:00"
+        } else {
+            args.args.get(2).map_or("00:00", String::as_str)
+        },
     );
 
     config.all_day = all_day;
-    
+
     // Set calendars if provided
     if !all_day && args.args.len() > 3 || all_day && args.args.len() > 2 {
         let calendar_index = if all_day { 2 } else { 3 };
-        config.calendars = args.args[calendar_index..].iter()
+        config.calendars = args.args[calendar_index..]
+            .iter()
             .map(String::as_str)
             .collect();
     }
@@ -339,7 +370,10 @@ mod tests {
         assert_eq!(args.command, "calendar");
         assert_eq!(args.args[0], "Test Event");
         assert!(args.flags.contains_key("--all-day"));
-        assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Test Location");
+        assert_eq!(
+            args.flags.get("--location").unwrap().as_ref().unwrap(),
+            "Test Location"
+        );
     }
 
     #[test]
@@ -353,9 +387,12 @@ mod tests {
     fn test_command_args_parse_quoted_strings() {
         let input = r#"calendar "Meeting with \"quotes\"" 2024-02-21"#;
         let args = CommandArgs::parse(input).unwrap();
-        assert_eq!(args.args[0], r#"Meeting with "quotes""#, 
-            "\nExpected: Meeting with \"quotes\"\nGot: {}", args.args[0]);
-        
+        assert_eq!(
+            args.args[0], r#"Meeting with "quotes""#,
+            "\nExpected: Meeting with \"quotes\"\nGot: {}",
+            args.args[0]
+        );
+
         // Add more test cases
         let input2 = r#"calendar "Meeting \"quoted\" text" 2024-02-21"#;
         let args2 = CommandArgs::parse(input2).unwrap();
