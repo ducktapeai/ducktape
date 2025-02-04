@@ -1,7 +1,16 @@
 # DuckTape
 
 A command-line calendar management tool for macOS that interfaces with Apple Calendar.app.
-This has the ability to add an event to multiple apps within your Calander leveraging the command line. Calendar as configuration.
+This has the ability to add an event to multiple apps within your Calendar leveraging the command line.
+
+## Features
+
+- Create and manage calendar events
+- Create and track todo items
+- Persistent state storage
+- Multiple calendar support
+- Todo list management
+- Reminder settings
 
 ## Installation
 
@@ -19,43 +28,49 @@ cargo run
 
 ## Usage
 
-DuckTape provides several commands for managing calendar events:
+### Calendar Management
 
-### List Available Calendars
-
+List available calendars:
 ```bash
 >> calendars
 ```
 
-### Create a Calendar Event
-
-Regular timed event in a single calendar:
+Create a calendar event:
 ```bash
->> calendar "Meeting Title" 2025-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
+>> calendar "Meeting Title" 2025-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details"
 ```
 
-Event in multiple calendars (pass additional calendar names after the time or date for all-day events):
+### Todo Management
+
+Create a todo item:
 ```bash
->> calendar "Team Meeting" 2025-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Meeting details"
+>> todo "Buy groceries" --notes "Milk, Eggs, Bread" --lists "Personal,Shopping" --reminder-time "2025-02-05 11:00"
 ```
 
-All-day event in multiple calendars:
+List all stored todos:
 ```bash
->> calendar "Company Holiday" 2025-02-21 "Work" "Personal" --all-day --description "Office Closed"
+>> list-todos
 ```
 
-Note: The --email flag now supports adding a single attendee per event.
+### State Management
 
-### Create a Todo Item
-
-To create a new todo item and tag it to specific lists, use the "todo" command with optional flags for notes and lists. If no --lists flag is provided, the item will be added to the default "Reminders" list.
+All todos and calendar events are automatically saved to:
+- `~/.ducktape/todos.json` - Todo items
+- `~/.ducktape/events.json` - Calendar events
 
 ### Command Options
 
-- `--all-day`: Create an all-day event
-- `--location "Location"`: Add a location to the event
-- `--description "Description"`: Add an event description
-- `--email "email@example.com"`: Add an attendee (single email per event)
+Calendar options:
+- `--all-day` - Create an all-day event
+- `--location "<location>"` - Set event location
+- `--description "<desc>"` - Set event description
+- `--email "<email>"` - Add attendee
+- `--reminder <minutes>` - Set reminder (minutes before event)
+
+Todo options:
+- `--notes "<notes>"` - Add notes to the todo
+- `--lists "<list1,list2>"` - Add to specific lists
+- `--reminder-time "YYYY-MM-DD HH:MM"` - Set reminder time
 
 ### View Available Calendar Properties
 

@@ -166,16 +166,23 @@ fn process_command(command: &str) -> Result<()> {
             println!("  calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
             println!("  calendars - List available calendars");
             println!("  calendar-props - List available calendar event properties");
-            println!("  Options:");
+            println!("  todo \"<title>\" - Create a todo item");
+            println!("  list-todos - List all stored todo items");
+            println!("\nCalendar Options:");
             println!("    --all-day                  Create an all-day event");
             println!("    --location \"<location>\"    Set event location");
             println!("    --description \"<desc>\"     Set event description");
             println!("    --email \"<email>\"         Add attendee");
             println!("    --reminder <minutes>       Set reminder (minutes before event)");
+            println!("\nTodo Options:");
+            println!("    --notes \"<notes>\"         Add notes to the todo");
+            println!("    --lists \"<list1,list2>\"   Add to specific lists");
+            println!("    --reminder-time \"YYYY-MM-DD HH:MM\"  Set reminder time");
+            println!("\nGeneral commands:");
             println!("  help - Show this help");
             println!("  exit - Exit the application");
             Ok(())
-        }
+        },
         "exit" => {
             std::process::exit(0);
         }
