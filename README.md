@@ -1,16 +1,15 @@
 # DuckTape
 
-A command-line calendar management tool for macOS that focuses on productivity without the ClickProdOps.
-For example this has the ability to add an event to multiple apps within your Calendar leveraging the command line.
+A command-line productivity management tool for macOS. Duct tape fixes anything—just like this tool. No clicks, no distractions, just pure productivity. Stick with what works.
 
 ## Features
 
-- Create and manage calendar events
-- Create and track todo items
+- Create and manage calendar events across multiple calendars
+- Create and track todo items in multiple lists
 - Persistent state storage
-- Multiple calendar support
-- Todo list management
-- Reminder settings
+- Rich command-line interface
+- Reminder settings for both events and todos
+- Detailed event and todo listing
 
 ## Installation
 
@@ -37,7 +36,12 @@ List available calendars:
 
 Create a calendar event:
 ```bash
->> calendar "Meeting Title" 2025-02-21 14:30 "Calendar Name" --location "Conference Room" --description "Meeting details"
+>> calendar "Meeting Title" 2025-02-21 14:30 "Work" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
+```
+
+List all calendar events with details:
+```bash
+>> list-events
 ```
 
 ### Todo Management
@@ -54,7 +58,7 @@ List all stored todos:
 
 ### State Management
 
-All todos and calendar events are automatically saved to:
+All data is automatically persisted to:
 - `~/.ducktape/todos.json` - Todo items
 - `~/.ducktape/events.json` - Calendar events
 
@@ -72,82 +76,21 @@ Todo options:
 - `--lists "<list1,list2>"` - Add to specific lists
 - `--reminder-time "YYYY-MM-DD HH:MM"` - Set reminder time
 
-### View Available Calendar Properties
-
-```bash
->> calendar-props
-```
-
-### Search Files (Utility Function)
-
-```bash
->> search <path> <pattern>
-```
-
-### Help
-
-```bash
->> help
-```
-
 ## Requirements
 
 - macOS 10.13 or later
 - Rust toolchain
 - Calendar.app with proper permissions
+- Reminders.app with proper permissions
 
 ## Permissions
 
-The application requires access to Calendar.app. You may need to grant permission in System Preferences > Security & Privacy > Privacy > Calendar.
-
-## Examples
-
-1. Create a team meeting in multiple calendars:
-```bash
->> calendar "Team Meeting" 2025-02-21 14:30 "Work" "Personal" --location "Conference Room" --description "Weekly sync" --email "team@company.com"
-```
-
-2. Create an all-day holiday in both work and personal calendars:
-```bash
->> calendar "Company Holiday" 2025-02-21 "Work" "Personal" --all-day --description "Office Closed"
-```
-
-3. Create an event with attendees in multiple calendars:
-```bash
->> calendar "Project Review" 2025-02-21 15:00 "Work" "Projects" --location "Conference Room" --description "Monthly review" --email "team@company.com"
-```
-
-4. List available calendars:
-```bash
->> calendars
-```
-
-## License
-
-MIT License
-
-Copyright (c) 2024 [Shaun Stuart]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The application requires access to Calendar.app and Reminders.app. You may need to grant permissions in System Preferences > Security & Privacy > Privacy > Calendar/Reminders.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Please make sure to update tests as appropriate.
+## License
+
+MIT License - See LICENSE file for details.
