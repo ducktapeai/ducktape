@@ -1,15 +1,15 @@
 # DuckTape
 
-A command-line productivity management tool for macOS. Duct tape fixes anythingâ€”just like this tool. No clicks, no distractions, just pure productivity. Stick with what works.
+A command-line calendar management tool for macOS that interfaces with Apple Calendar.app and Reminders.app.
+All commands use the 'ducktape' prefix for consistency and clarity.
 
 ## Features
 
-- Create and manage calendar events across multiple calendars
-- Create and track todo items in multiple lists
+- Calendar event management
+- Todo and reminder management
 - Persistent state storage
+- Multiple calendar support
 - Rich command-line interface
-- Reminder settings for both events and todos
-- Detailed event and todo listing
 
 ## Installation
 
@@ -18,49 +18,43 @@ A command-line productivity management tool for macOS. Duct tape fixes anythingâ
 git clone https://github.com/yourusername/ducktape.git
 cd ducktape
 
-# Build the project
+# Build and run
 cargo build --release
-
-# Run the application
 cargo run
 ```
 
 ## Usage
 
+All commands must be prefixed with 'ducktape'. For example:
+
 ### Calendar Management
 
 List available calendars:
 ```bash
->> calendars
+>> ducktape calendars
 ```
 
 Create a calendar event:
 ```bash
->> calendar "Meeting Title" 2025-02-21 14:30 "Work" --location "Conference Room" --description "Meeting details" --email "attendee@example.com"
+>> ducktape calendar "Meeting" 2025-02-21 14:30 "Work" --location "Room 1" --description "Weekly sync"
 ```
 
-List all calendar events with details:
+List all calendar events:
 ```bash
->> list-events
+>> ducktape list-events
 ```
 
 ### Todo Management
 
 Create a todo item:
 ```bash
->> todo "Buy groceries" --notes "Milk, Eggs, Bread" --lists "Personal,Shopping" --reminder-time "2025-02-05 11:00"
+>> ducktape todo "Buy groceries" --notes "Milk, Eggs" --lists "Personal" --reminder-time "2025-02-05 11:00"
 ```
 
-List all stored todos:
+List all todos:
 ```bash
->> list-todos
+>> ducktape list-todos
 ```
-
-### State Management
-
-All data is automatically persisted to:
-- `~/.ducktape/todos.json` - Todo items
-- `~/.ducktape/events.json` - Calendar events
 
 ### Command Options
 
@@ -69,19 +63,24 @@ Calendar options:
 - `--location "<location>"` - Set event location
 - `--description "<desc>"` - Set event description
 - `--email "<email>"` - Add attendee
-- `--reminder <minutes>` - Set reminder (minutes before event)
+- `--reminder <minutes>` - Set reminder before event
 
 Todo options:
 - `--notes "<notes>"` - Add notes to the todo
 - `--lists "<list1,list2>"` - Add to specific lists
 - `--reminder-time "YYYY-MM-DD HH:MM"` - Set reminder time
 
+### State Management
+
+All data is automatically persisted to:
+- `~/.ducktape/todos.json` - Todo items
+- `~/.ducktape/events.json` - Calendar events
+
 ## Requirements
 
 - macOS 10.13 or later
 - Rust toolchain
-- Calendar.app with proper permissions
-- Reminders.app with proper permissions
+- Calendar.app and Reminders.app with proper permissions
 
 ## Permissions
 

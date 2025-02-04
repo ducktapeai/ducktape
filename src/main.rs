@@ -64,6 +64,16 @@ impl CommandArgs {
             return Err(anyhow::anyhow!("No command provided"));
         }
 
+        // Check for and remove "ducktape" prefix
+        if parts[0] != "ducktape" {
+            return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
+        }
+        parts.remove(0); // Remove "ducktape"
+
+        if parts.is_empty() {
+            return Err(anyhow::anyhow!("No command provided after 'ducktape'"));
+        }
+
         let command = parts.remove(0);
         let mut args = Vec::new();
         let mut flags = std::collections::HashMap::new();
@@ -114,12 +124,12 @@ fn main() -> Result<()> {
     println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
 
     // Duck with tape emoji combination
-    let prompt = "🦆⌇ "; // Duck with paperclip (representing tape)
-                         // Alternative combinations:
-                         // let prompt = "🦆🤐 ";  // Duck with zipper mouth (looks like tape)
-                         // let prompt = "🦆⌇ ";   // Duck with tape-like symbol
-                         // ASCII art alternative:
-                         // let prompt = "<=|] ";  // Duck with tape mark
+    let prompt = "🦆 "; // Duck with paperclip (representing tape)
+                        // Alternative combinations:
+                        // let prompt = "🦆🤐 ";  // Duck with zipper mouth (looks like tape)
+                        // let prompt = "🦆⌇ ";   // Duck with tape-like symbol
+                        // ASCII art alternative:
+                        // let prompt = "<=|] ";  // Duck with tape mark
 
     loop {
         let readline = rl.readline(prompt);
@@ -208,15 +218,13 @@ fn process_command(command: &str) -> Result<()> {
         }
         "help" => {
             println!("Available commands:");
-            println!("  search <path> <pattern> - Search for files");
-            println!(
-                "  calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event"
-            );
-            println!("  calendars - List available calendars");
-            println!("  calendar-props - List available calendar event properties");
-            println!("  todo \"<title>\" - Create a todo item");
-            println!("  list-todos - List all stored todo items");
-            println!("  list-events - List all stored calendar events with details");
+            println!("  ducktape search <path> <pattern> - Search for files");
+            println!("  ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
+            println!("  ducktape calendars - List available calendars");
+            println!("  ducktape calendar-props - List available calendar event properties");
+            println!("  ducktape todo \"<title>\" - Create a todo item");
+            println!("  ducktape list-todos - List all stored todo items");
+            println!("  ducktape list-events - List all stored calendar events with details");
             println!("\nCalendar Event Details:");
             println!("  - Date and time");
             println!("  - Calendar assignments");
@@ -243,7 +251,7 @@ fn process_command(command: &str) -> Result<()> {
             std::process::exit(0);
         }
         _ => {
-            println!("Unknown command. Type 'help' for available commands.");
+            println!("Unknown command. Type 'ducktape help' for available commands.");
             Ok(())
         }
     }
@@ -274,26 +282,19 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
     }
     todo::create_todo(config)?;
 
-    // Save todo state after creation
-    let mut todos = state::load_todos().unwrap_or_else(|_| vec![]);
-    todos.push(state::TodoItem {
+    // Create new todo item and save using StateManager
+    let todo_item = state::TodoItem {
         title: args.args[0].clone(),
         notes: args.flags.get("--notes").and_then(|n| n.clone()),
-        lists: args
-            .flags
-            .get("--lists")
-            .map(|l| {
-                l.as_deref()
-                    .unwrap_or("")
-                    .split(',')
-                    .map(|s| s.trim().to_owned())
-                    .collect()
-            })
-            .unwrap_or(vec!["Reminders".to_owned()]),
+        lists: args.flags.get("--lists")
+                     .map(|l| l.as_deref().unwrap_or("").split(',').map(|s| s.trim().to_owned()).collect())
+                     .unwrap_or(vec!["Reminders".to_owned()]),
         reminder_time: args.flags.get("--reminder-time").and_then(|r| r.clone()),
-    });
-    state::save_todos(&todos)?;
+    };
 
+    // Use StateManager to save the todo
+    state::StateManager::new()?.add(todo_item)?;
+    
     Ok(())
 }
 
@@ -355,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_command_args_parse_basic() {
-        let input = "calendar \"Test Event\" 2024-02-21 14:30";
+        let input = "ducktape calendar \"Test Event\" 2024-02-21 14:30";
         let args = CommandArgs::parse(input).unwrap();
         assert_eq!(args.command, "calendar");
         assert_eq!(args.args.len(), 3);
@@ -365,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_command_args_parse_with_flags() {
-        let input = "calendar \"Test Event\" 2024-02-21 --all-day --location \"Test Location\"";
+        let input = "ducktape calendar \"Test Event\" 2024-02-21 --all-day --location \"Test Location\"";
         let args = CommandArgs::parse(input).unwrap();
         assert_eq!(args.command, "calendar");
         assert_eq!(args.args[0], "Test Event");
@@ -385,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_command_args_parse_quoted_strings() {
-        let input = r#"calendar "Meeting with \"quotes\"" 2024-02-21"#;
+        let input = r#"ducktape calendar "Meeting with \"quotes\"" 2024-02-21"#;
         let args = CommandArgs::parse(input).unwrap();
         assert_eq!(
             args.args[0], r#"Meeting with "quotes""#,
@@ -394,7 +395,7 @@ mod tests {
         );
 
         // Add more test cases
-        let input2 = r#"calendar "Meeting \"quoted\" text" 2024-02-21"#;
+        let input2 = r#"ducktape calendar "Meeting \"quoted\" text" 2024-02-21"#;
         let args2 = CommandArgs::parse(input2).unwrap();
         assert_eq!(args2.args[0], r#"Meeting "quoted" text"#);
     }

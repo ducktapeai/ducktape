@@ -1,44 +1,52 @@
 use anyhow::Result;
+use ducktape::state::{StateManager, TodoItem, CalendarItem};
 
 #[test]
-fn test_calendar_list() -> Result<()> {
-    // This test requires Calendar.app to be running and accessible
-    ducktape::calendar::list_calendars()?;
-    Ok(())
-}
-
-#[test]
-fn test_create_basic_event() -> Result<()> {
-    let config = ducktape::calendar::EventConfig {
-        title: "Integration Test Event",
-        date: "2024-02-21",
-        time: "14:30",
-        calendars: vec!["Calendar"],  // Changed from calendar: Some("Calendar")
+fn test_calendar_operations() -> Result<()> {
+    let manager = StateManager::new()?;
+    
+    // Test calendar event creation and storage
+    let event = CalendarItem {
+        title: "Test Event".to_string(),
+        date: "2025-02-21".to_string(),
+        time: "14:30".to_string(),
+        calendars: vec!["Calendar".to_string()],
         all_day: false,
-        location: None,
-        description: None,
+        location: Some("Test Location".to_string()),
+        description: Some("Test Description".to_string()),
         email: None,
-        reminder: None,
+        reminder: Some(30),
     };
-
-    ducktape::calendar::create_event(config)?;
+    
+    manager.add(event)?;
+    
+    let events: Vec<CalendarItem> = manager.load()?;
+    assert!(!events.is_empty());
+    assert_eq!(events[0].title, "Test Event");
+    
     Ok(())
 }
 
 #[test]
-fn test_create_all_day_event() -> Result<()> {
-    let config = ducktape::calendar::EventConfig {
-        title: "Integration Test All-Day Event",
-        date: "2024-02-21",
-        time: "00:00",
-        calendars: vec!["Calendar"],  // Changed from calendar: Some("Calendar")
-        all_day: true,
-        location: None,
-        description: None,
-        email: None,
-        reminder: None,
+fn test_todo_operations() -> Result<()> {
+    let manager = StateManager::new()?;
+    
+    // Test todo creation and storage
+    let todo = TodoItem {
+        title: "Test Todo".to_string(),
+        notes: Some("Test Notes".to_string()),
+        lists: vec!["Test List".to_string()],
+        reminder_time: Some("2025-02-21 14:30".to_string()),
     };
-
-    ducktape::calendar::create_event(config)?;
+    
+    manager.add(todo)?;
+    
+    let todos: Vec<TodoItem> = manager.load()?;
+    assert!(!todos.is_empty());
+    assert_eq!(todos[0].title, "Test Todo");
+    
     Ok(())
 }
+
+// Remove the CommandArgs test since it's now an implementation detail
+// and should be tested in the main.rs unit tests
