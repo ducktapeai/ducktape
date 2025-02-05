@@ -1,23 +1,32 @@
-use anyhow::{anyhow, Result};
-use reqwest::Client;
-use serde_json::{json, Value};
-use std::env;
-use chrono::Local;
 #[allow(unused_imports)]
 use crate::calendar;
+use anyhow::{anyhow, Result};
+use chrono::Local;
+use once_cell::sync::Lazy;
+use reqwest::Client;
+use serde_json::{json, Value};
+use std::collections::LruCache;
+use std::env;
+use std::num::NonZeroUsize;
+use std::sync::Mutex;
+
+static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
+    Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
 // Function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
     // Execute AppleScript to get calendars
     let output = std::process::Command::new("osascript")
         .arg("-e")
-        .arg(r#"tell application "Calendar"
+        .arg(
+            r#"tell application "Calendar"
             set calList to {}
             repeat with c in calendars
                 copy (name of c) to end of calList
             end repeat
             return calList
-        end tell"#)
+        end tell"#,
+        )
         .output()?;
 
     let calendars_str = String::from_utf8_lossy(&output.stdout);
@@ -71,14 +80,22 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
+    // Check cache first
+    if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
+        return Ok(cached_response.clone());
+    }
+
     // Get available calendars
     let calendars = get_available_calendars().await?;
     let calendar_list = calendars.join("\n- ");
-    let system_prompt = SYSTEM_PROMPT.replace("{available_calendars}", &format!("- {}", calendar_list));
+    let system_prompt =
+        SYSTEM_PROMPT.replace("{available_calendars}", &format!("- {}", calendar_list));
 
     // Add current date context
-    let context = format!("Current date and time: {}", 
-        Local::now().format("%Y-%m-%d %H:%M"));
+    let context = format!(
+        "Current date and time: {}",
+        Local::now().format("%Y-%m-%d %H:%M")
+    );
     let prompt = format!("{}\n\n{}", context, input);
 
     let client = Client::new();
@@ -113,6 +130,12 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("Invalid response format"))?
         .trim()
         .to_string();
+
+    // Cache the response before returning
+    RESPONSE_CACHE
+        .lock()
+        .unwrap()
+        .put(input.to_string(), commands.clone());
 
     // Process each command separately
     let mut results = Vec::new();
