@@ -1,16 +1,39 @@
-# DuckTape
+# DuckTape 🦆
 
-A command-line calendar productivity tool for macOS that integrates with Apple's native apps.
-Duct tape fixes anything—just like this tool. No clicks, no distractions, just pure productivity. Stick with what works.
+Your AI-powered command-line productivity assistant for macOS. DuckTape seamlessly integrates with Apple's native apps while providing natural language interaction.
 
 ## Features
 
-- Calendar event management with Apple Calendar.app
-- Todo and reminder management with Apple Reminders.app
-- Apple Notes integration
-- Multiple calendar/list support
-- Persistent state storage
-- Rich command-line interface
+- **Natural Language Support** - Just type what you want in plain English
+- **AI Command Processing** - Powered by OpenAI's GPT-4
+- **Smart Date Understanding** - Handles relative dates like "tomorrow" or "next Monday"
+- **Native App Integration**:
+  - Apple Calendar.app
+  - Apple Reminders.app
+  - Apple Notes.app
+- **Persistent State Storage**
+- **Rich Command Line Interface**
+
+## Examples
+
+Natural language commands:
+```bash
+>> schedule a team meeting tomorrow at 2pm
+🦆 Interpreting as: ducktape calendar "Team Meeting" 2024-02-06 14:00 "Work"
+
+>> remind me to buy groceries next Monday
+🦆 Interpreting as: ducktape todo "Buy groceries" --reminder-time "2024-02-12 09:00"
+
+>> take notes from the project meeting
+🦆 Interpreting as: ducktape note "Project Meeting Notes" --content "Meeting notes" --folder "Work"
+```
+
+Or use traditional commands:
+```bash
+>> ducktape calendar "Meeting" 2024-02-06 14:00 "Work" --location "Room 1"
+>> ducktape todo "Buy groceries" --lists "Personal" --reminder-time "2024-02-12 09:00"
+>> ducktape note "Meeting Notes" --content "Important points" --folder "Work"
+```
 
 ## Installation
 
@@ -24,92 +47,63 @@ cargo build --release
 cargo run
 ```
 
-## Usage
+## Setup
 
-Get help on available commands:
+1. Get an OpenAI API key from https://platform.openai.com/
+2. Export your API key:
 ```bash
->> ducktape --help
-# or
->> ducktape -h
+export OPENAI_API_KEY='your-api-key-here'
 ```
 
-All commands must be prefixed with 'ducktape'. For example:
+## Features
 
 ### Calendar Management
-
-List available calendars:
-```bash
->> ducktape calendars
-```
-
-Create a calendar event:
-```bash
->> ducktape calendar "Meeting" 2025-02-21 14:30 "Work" --location "Room 1" --description "Weekly sync"
-```
+- Create events with natural language
+- Support for multiple calendars
+- Location, description, and attendee management
+- Reminder settings
 
 ### Todo Management
-
-Create a todo item:
-```bash
->> ducktape todo "Buy groceries" --notes "Milk, Eggs" --lists "Personal" --reminder-time "2025-02-05 11:00"
-```
+- Create todos with natural language
+- Multiple list support
+- Notes and reminders
+- Smart date parsing
 
 ### Note Management
+- Create and organize notes
+- Folder organization
+- Quick capture of ideas
 
-Create a note:
-```bash
->> ducktape note "Meeting Notes" --content "Important points..." --folder "Work"
-```
+### AI Features
+- Natural language processing
+- Smart date/time understanding
+- Context-aware command generation
+- Automatic calendar/list selection
 
-List all notes:
-```bash
->> ducktape notes
-```
-
-### Command Options
-
-Calendar options:
-- `--all-day` - Create an all-day event
-- `--location "<location>"` - Set event location
-- `--description "<desc>"` - Set event description
-- `--email "<email>"` - Add attendee
-- `--reminder <minutes>` - Set reminder before event
-
-Todo options:
-- `--notes "<notes>"` - Add notes to the todo
-- `--lists "<list1,list2>"` - Add to specific lists
-- `--reminder-time "YYYY-MM-DD HH:MM"` - Set reminder time
-
-Note options:
-- `--content "<content>"` - Set note content
-- `--folder "<folder>"` - Specify note folder (creates if doesn't exist)
-
-### List and View Commands
-
-- `ducktape list-todos` - Show all stored todos
-- `ducktape list-events` - Show all calendar events with details
-- `ducktape notes` - List all Apple Notes
-
-### State Management
+## State Management
 
 All data is automatically persisted to:
 - `~/.ducktape/todos.json` - Todo items
 - `~/.ducktape/events.json` - Calendar events
+- `~/.ducktape/notes.json` - Notes
 
 ## Requirements
 
 - macOS 10.13 or later
 - Rust toolchain
+- OpenAI API key
 - Calendar.app, Reminders.app, and Notes.app with proper permissions
 
 ## Permissions
 
-The application requires access to Apple's native apps. Grant permissions in:
-System Preferences > Security & Privacy > Privacy > Calendar/Reminders/Notes
+Grant permissions in System Preferences:
+- Security & Privacy > Privacy > Calendar
+- Security & Privacy > Privacy > Reminders
+- Security & Privacy > Privacy > Notes
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Feel free to submit issues or pull requests.
 
 ## License
 
