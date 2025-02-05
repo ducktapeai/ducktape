@@ -1,9 +1,9 @@
 mod calendar;
 mod file_search;
 mod notes;
+mod openai_parser;
 mod state;
-mod todo;
-mod openai_parser;  // Keep only this one, remove ai_parser
+mod todo; // Keep only this one, remove others
 
 use anyhow::Result;
 use env_logger::Env;
@@ -178,12 +178,10 @@ fn main() -> Result<()> {
 }
 
 fn process_command(command: &str) -> Result<()> {
-    // If the command doesn't start with "ducktape", treat it as natural language
     if !command.trim().starts_with("ducktape") {
         let runtime = tokio::runtime::Runtime::new()?;
         match runtime.block_on(crate::openai_parser::parse_natural_language(command)) {
             Ok(commands) => {
-                // Process multiple commands
                 for cmd in commands.lines() {
                     let trimmed = cmd.trim();
                     if !trimmed.is_empty() {
@@ -205,111 +203,115 @@ fn process_command(command: &str) -> Result<()> {
                 return Err(e);
             }
         }
-    }
-
-    let args = CommandArgs::parse(command)?;
-
-    match args.command.as_str() {
-        "search" => {
-            if args.args.len() < 2 {
-                println!("Usage: search <path> <pattern>");
-                return Ok(());
+    } else {
+        let args = CommandArgs::parse(command)?;
+        match args.command.as_str() {
+            "search" => {
+                if args.args.len() < 2 {
+                    println!("Usage: search <path> <pattern>");
+                    return Ok(());
+                }
+                file_search::search(&args.args[0], &args.args[1])?;
+                Ok(())
             }
-            file_search::search(&args.args[0], &args.args[1])?;
-            Ok(())
-        }
-        "calendar" => handle_calendar_command(args),
-        "calendars" => calendar::list_calendars(),
-        "calendar-props" => calendar::list_event_properties(),
-        "todo" => handle_todo_command(args),
-        "list-todos" => {
-            let todos = state::load_todos()?;
-            println!("Stored Todo Items:");
-            for item in todos {
-                println!(
-                    "  - {} [{}]",
-                    item.title,
-                    item.reminder_time.as_deref().unwrap_or("No reminder")
-                );
+            "calendar" => handle_calendar_command(args),
+            "calendars" => calendar::list_calendars(),
+            "calendar-props" => calendar::list_event_properties(),
+            "todo" => handle_todo_command(args),
+            "list-todos" => {
+                let todos = state::load_todos()?;
+                println!("Stored Todo Items:");
+                for item in todos {
+                    println!(
+                        "  - {} [{}]",
+                        item.title,
+                        item.reminder_time.as_deref().unwrap_or("No reminder")
+                    );
+                }
+                Ok(())
             }
-            Ok(())
-        }
-        "list-events" => {
-            let events = state::load_events()?;
-            println!("Stored Calendar Events:");
-            for event in events {
-                println!(
-                    "  - {} [{}]",
-                    event.title,
-                    if event.all_day {
-                        "All day"
-                    } else {
-                        &event.time
+            "list-events" => {
+                let events = state::load_events()?;
+                println!("Stored Calendar Events:");
+                for event in events {
+                    println!(
+                        "  - {} [{}]",
+                        event.title,
+                        if event.all_day {
+                            "All day"
+                        } else {
+                            &event.time
+                        }
+                    );
+                    println!("    Date: {}", event.date);
+                    println!("    Calendars: {}", event.calendars.join(", "));
+                    if let Some(loc) = event.location {
+                        println!("    Location: {}", loc);
                     }
-                );
-                println!("    Date: {}", event.date);
-                println!("    Calendars: {}", event.calendars.join(", "));
-                if let Some(loc) = event.location {
-                    println!("    Location: {}", loc);
+                    if let Some(desc) = event.description {
+                        println!("    Description: {}", desc);
+                    }
+                    if let Some(email) = event.email {
+                        println!("    Attendee: {}", email);
+                    }
+                    if let Some(reminder) = event.reminder {
+                        println!("    Reminder: {} minutes before", reminder);
+                    }
+                    println!(); // Empty line between events
                 }
-                if let Some(desc) = event.description {
-                    println!("    Description: {}", desc);
+                Ok(())
+            }
+            "note" => {
+                if args.args.is_empty() {
+                    println!(
+                        "Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]"
+                    );
+                    return Ok(());
                 }
-                if let Some(email) = event.email {
-                    println!("    Attendee: {}", email);
+                let content = args
+                    .flags
+                    .get("--content")
+                    .and_then(|c| c.as_ref())
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
+                let mut config = notes::NoteConfig::new(&args.args[0], content);
+                if let Some(folder) = args.flags.get("--folder") {
+                    config.folder = folder.as_deref();
                 }
-                if let Some(reminder) = event.reminder {
-                    println!("    Reminder: {} minutes before", reminder);
+                notes::create_note(config)
+            }
+            "notes" => notes::list_notes(),
+            "delete-event" => {
+                if args.args.len() < 1 {
+                    println!("Usage: delete-event \"<title>\"");
+                    return Ok(());
                 }
-                println!(); // Empty line between events
+                calendar::delete_event(
+                    &args.args[0],
+                    args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
+                )?;
+                // Also remove from state
+                let mut events = state::load_events()?;
+                events.retain(|e| e.title != args.args[0]);
+                state::StateManager::new()?.save(&events)?;
+                Ok(())
             }
-            Ok(())
-        }
-        "note" => {
-            if args.args.is_empty() {
-                println!("Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
-                return Ok(());
+            "cleanup" => {
+                println!("Cleaning up old items...");
+                state::StateManager::new()?.cleanup_old_items()?;
+                println!("Compacting storage files...");
+                state::StateManager::new()?.vacuum()?;
+                println!("Cleanup complete!");
+                Ok(())
             }
-            let content = args.flags.get("--content")
-                .and_then(|c| c.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            let mut config = notes::NoteConfig::new(&args.args[0], content);
-            if let Some(folder) = args.flags.get("--folder") {
-                config.folder = folder.as_deref();
+            "help" => print_help(),
+            "exit" => {
+                std::process::exit(0);
             }
-            notes::create_note(config)
-        },
-        "notes" => notes::list_notes(),
-        "delete-event" => {
-            if args.args.len() < 1 {
-                println!("Usage: delete-event \"<title>\"");
-                return Ok(());
+            _ => {
+                println!("Unknown command. Type 'ducktape --help' for available commands.");
+                Ok(())
             }
-            calendar::delete_event(&args.args[0], args.args.get(1).map(|s| s.as_str()).unwrap_or(""))?;
-            // Also remove from state
-            let mut events = state::load_events()?;
-            events.retain(|e| e.title != args.args[0]);
-            state::StateManager::new()?.save(&events)?;
-            Ok(())
-        },
-        "cleanup" => {
-            println!("Cleaning up old items...");
-            state::StateManager::new()?.cleanup_old_items()?;
-            println!("Compacting storage files...");
-            state::StateManager::new()?.vacuum()?;
-            println!("Cleanup complete!");
-            Ok(())
-        },
-        "help" => {
-            print_help()
-        }
-        "exit" => {
-            std::process::exit(0);
-        }
-        _ => {
-            println!("Unknown command. Type 'ducktape --help' for available commands.");
-            Ok(())
         }
     }
 }
@@ -343,15 +345,23 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
     let todo_item = state::TodoItem {
         title: args.args[0].clone(),
         notes: args.flags.get("--notes").and_then(|n| n.clone()),
-        lists: args.flags.get("--lists")
-                     .map(|l| l.as_deref().unwrap_or("").split(',').map(|s| s.trim().to_owned()).collect())
-                     .unwrap_or(vec!["Reminders".to_owned()]),
+        lists: args
+            .flags
+            .get("--lists")
+            .map(|l| {
+                l.as_deref()
+                    .unwrap_or("")
+                    .split(',')
+                    .map(|s| s.trim().to_owned())
+                    .collect()
+            })
+            .unwrap_or(vec!["Reminders".to_owned()]),
         reminder_time: args.flags.get("--reminder-time").and_then(|r| r.clone()),
     };
 
     // Use StateManager to save the todo
     state::StateManager::new()?.add(todo_item)?;
-    
+
     Ok(())
 }
 
@@ -409,7 +419,9 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 fn print_help() -> Result<()> {
     println!("DuckTape - Your AI-Powered Command Line Productivity Duck 🦆");
     println!("\nDescription:");
-    println!("  A unified CLI for Apple Calendar, Reminders, and Notes with natural language support");
+    println!(
+        "  A unified CLI for Apple Calendar, Reminders, and Notes with natural language support"
+    );
     println!("  Just type what you want to do - DuckTape's AI will understand!");
     println!("\nNatural Language Examples:");
     println!("  \"schedule a meeting with John tomorrow at 2pm\"");
@@ -482,7 +494,8 @@ mod tests {
 
     #[test]
     fn test_command_args_parse_with_flags() {
-        let input = "ducktape calendar \"Test Event\" 2024-02-21 --all-day --location \"Test Location\"";
+        let input =
+            "ducktape calendar \"Test Event\" 2024-02-21 --all-day --location \"Test Location\"";
         let args = CommandArgs::parse(input).unwrap();
         assert_eq!(args.command, "calendar");
         assert_eq!(args.args[0], "Test Event");

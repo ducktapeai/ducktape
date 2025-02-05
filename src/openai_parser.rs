@@ -5,10 +5,10 @@ use chrono::Local;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde_json::{json, Value};
-use std::collections::LruCache;
 use std::env;
-use std::num::NonZeroUsize;
 use std::sync::Mutex;
+use lru::LruCache;  // Fix: use correct import for LruCache
+use std::num::NonZeroUsize;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
