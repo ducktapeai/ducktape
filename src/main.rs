@@ -293,6 +293,14 @@ fn process_command(command: &str) -> Result<()> {
             state::StateManager::new()?.save(&events)?;
             Ok(())
         },
+        "cleanup" => {
+            println!("Cleaning up old items...");
+            state::StateManager::new()?.cleanup_old_items()?;
+            println!("Compacting storage files...");
+            state::StateManager::new()?.vacuum()?;
+            println!("Cleanup complete!");
+            Ok(())
+        },
         "help" => {
             print_help()
         }
@@ -425,6 +433,7 @@ fn print_help() -> Result<()> {
     println!("\n  Utility:");
     println!("    ducktape search <path> <pattern> - Search for files");
     println!("    ducktape calendar-props - List available calendar properties");
+    println!("    ducktape cleanup - Remove old events and compact storage");
     println!("\nOptions by Command Type:");
     println!("  Calendar Options:");
     println!("    --all-day                  Create an all-day event");

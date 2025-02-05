@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::{DateTime, Local, Duration};
 
 const STATE_DIR: &str = ".ducktape";
 const TODOS_FILE: &str = "todos.json";
@@ -102,16 +104,72 @@ impl StateManager {
         items.push(item);
         self.save(&items)
     }
+
+    pub fn cleanup_old_items(&self) -> Result<()> {
+        // Clean up old calendar events
+        let mut events: Vec<CalendarItem> = self.load()?;
+        let now = Local::now();
+        events.retain(|event| {
+            if let Ok(event_date) = DateTime::parse_from_str(
+                &format!("{} {}", event.date, event.time),
+                "%Y-%m-%d %H:%M"
+            ) {
+                event_date > now
+            } else {
+                true // Keep events with invalid dates
+            }
+        });
+        self.save(&events)?;
+
+        // Clean up old todos
+        let todos: Vec<TodoItem> = self.load()?;
+        let one_month_ago = now - Duration::days(30);
+        let todos: Vec<_> = todos.into_iter()
+            .filter(|todo| {
+                if let Some(time) = &todo.reminder_time {
+                    if let Ok(todo_date) = DateTime::parse_from_str(time, "%Y-%m-%d %H:%M") {
+                        return todo_date > one_month_ago;
+                    }
+                }
+                true // Keep todos without dates
+            })
+            .collect();
+        self.save(&todos)?;
+
+        Ok(())
+    }
+
+    pub fn vacuum(&self) -> Result<()> {
+        // Compact JSON files by removing whitespace
+        for filename in &[TODOS_FILE, EVENTS_FILE, NOTES_FILE] {
+            let path = self.state_dir.join(filename);
+            if path.exists() {
+                let items: serde_json::Value = serde_json::from_reader(
+                    BufReader::new(File::open(&path)?)
+                )?;
+                let file = OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .create(true)
+                    .open(&path)?;
+                serde_json::to_writer(file, &items)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 // Convenience functions for backward compatibility
 pub fn load_todos() -> Result<Vec<TodoItem>> {
-    StateManager::new()?.load()
+    let manager = StateManager::new()?;
+    manager.cleanup_old_items()?;
+    manager.load()
 }
 
-// Remove unused save_events function since it's handled by StateManager
 pub fn load_events() -> Result<Vec<CalendarItem>> {
-    StateManager::new()?.load()
+    let manager = StateManager::new()?;
+    manager.cleanup_old_items()?;
+    manager.load()
 }
 
 // Add convenience function for notes
