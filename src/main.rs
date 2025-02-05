@@ -366,10 +366,16 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 }
 
 fn print_help() -> Result<()> {
-    println!("DuckTape - Your Command Line Productivity Duck 🦆");
+    println!("DuckTape - Your AI-Powered Command Line Productivity Duck 🦆");
     println!("\nDescription:");
-    println!("  A unified CLI for Apple Calendar, Reminders, and Notes");
-    println!("\nUsage:");
+    println!("  A unified CLI for Apple Calendar, Reminders, and Notes with natural language support");
+    println!("  Just type what you want to do - DuckTape's AI will understand!");
+    println!("\nNatural Language Examples:");
+    println!("  \"schedule a meeting with John tomorrow at 2pm\"");
+    println!("  \"remind me to buy groceries next Monday morning\"");
+    println!("  \"take notes about the project meeting\"");
+    println!("  \"add a todo about calling the bank\"");
+    println!("\nOr use traditional commands:");
     println!("  ducktape [command] [options]");
     println!("  ducktape --help | -h");
     println!("\nCommand Groups:");
@@ -403,6 +409,14 @@ fn print_help() -> Result<()> {
     println!("\nGeneral Commands:");
     println!("  ducktape --help (or -h) - Show this help");
     println!("  ducktape exit - Exit the application");
+    println!("\nAI Features:");
+    println!("  - Natural language command processing");
+    println!("  - Smart date/time understanding (\"tomorrow\", \"next Monday\")");
+    println!("  - Context-aware command generation");
+    println!("  - Automatic calendar/list selection");
+    println!("\nEnvironment Setup:");
+    println!("  Export your OpenAI API key:");
+    println!("  export OPENAI_API_KEY='your-api-key-here'");
     println!("\nState Files:");
     println!("  ~/.ducktape/todos.json - Todo items");
     println!("  ~/.ducktape/events.json - Calendar events");
