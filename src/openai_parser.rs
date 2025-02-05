@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::env;
 use chrono::Local;
+#[allow(unused_imports)]
 use crate::calendar;
 
 // Function to get available calendars
@@ -33,6 +34,7 @@ Available commands and their formats:
 
 Calendar:
 ducktape calendar "<title>" <date> <time> "shaun.stuart@hashicorp.com"
+ducktape delete-event "<title>" - Delete events matching title
 
 Todo:
 ducktape todo "<title>" --lists "<list-name>"
@@ -46,6 +48,9 @@ ducktape calendar "Meeting" 2024-02-06 14:00 "shaun.stuart@hashicorp.com"
 
 "Add todo item about domain" ->
 ducktape todo "Check domain settings" --lists "surfergolfer"
+
+"delete the meeting about ASB" ->
+ducktape delete-event "Meeting about ASB"
 
 For multiple commands, each command must be on a separate line and properly formatted.
 Example of multiple commands:
