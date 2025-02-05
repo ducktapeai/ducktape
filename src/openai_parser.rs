@@ -3,37 +3,75 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::env;
 use chrono::Local;
+use crate::calendar;
+
+// Function to get available calendars
+async fn get_available_calendars() -> Result<Vec<String>> {
+    // Execute AppleScript to get calendars
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(r#"tell application "Calendar"
+            set calList to {}
+            repeat with c in calendars
+                copy (name of c) to end of calList
+            end repeat
+            return calList
+        end tell"#)
+        .output()?;
+
+    let calendars_str = String::from_utf8_lossy(&output.stdout);
+    Ok(calendars_str
+        .trim_matches('{')
+        .trim_matches('}')
+        .split(", ")
+        .map(|s| s.trim_matches('"').to_string())
+        .collect())
+}
 
 const SYSTEM_PROMPT: &str = r#"You are a command parser for the DuckTape CLI tool. Convert natural language to DuckTape commands.
 Available commands and their formats:
 
 Calendar:
-ducktape calendar "<title>" <date> <time> [calendar-name] [--location] [--description] [--email] [--all-day]
+ducktape calendar "<title>" <date> <time> "shaun.stuart@hashicorp.com"
 
 Todo:
-ducktape todo "<title>" [--notes] [--lists] [--reminder-time]
+ducktape todo "<title>" --lists "<list-name>"
 
 Notes:
-ducktape note "<title>" --content "<content>" [--folder]
+ducktape note "<title>" --content "<content>" [--folder "<folder>"]
 
 Examples:
-"Schedule a meeting tomorrow at 2pm" -> ducktape calendar "Meeting" 2024-02-06 14:00 "Work"
-"Add grocery shopping to my todo list" -> ducktape todo "Grocery Shopping" --lists "Personal"
-"Write down project ideas" -> ducktape note "Project Ideas" --content "Project brainstorming" --folder "Work"
-"Remind me to call John next Monday" -> ducktape todo "Call John" --reminder-time "2024-02-12 09:00"
+"Schedule a meeting tomorrow at 2pm" ->
+ducktape calendar "Meeting" 2024-02-06 14:00 "shaun.stuart@hashicorp.com"
+
+"Add todo item about domain" ->
+ducktape todo "Check domain settings" --lists "surfergolfer"
+
+For multiple commands, each command must be on a separate line and properly formatted.
+Example of multiple commands:
+"schedule meeting tomorrow and add todo" ->
+ducktape calendar "Team Meeting" 2024-02-06 09:00 "shaun.stuart@hashicorp.com"
+ducktape todo "Follow up on meeting" --lists "Work"
 
 Rules:
-1. Always return only the command, no explanations
-2. Use proper date and time formatting (YYYY-MM-DD HH:MM)
-3. When dates like "tomorrow" or "next Monday" are mentioned, calculate the actual date from the current date context
-4. Ensure all text parameters are properly quoted
-5. For calendar events, default to "Work" calendar if none specified"#;
+1. Always use "shaun.stuart@hashicorp.com" as the calendar name for all calendar events
+2. Use proper date/time format: YYYY-MM-DD HH:MM
+3. Calculate actual dates for relative terms like "tomorrow", "next week"
+4. Quote all text parameters properly
+5. For todos, always use --lists flag with the appropriate list name
+6. Return multiple commands on separate lines
+7. Never include calendar name inside the event title"#;
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
-    // Add current date context to help with relative dates
+    // Get available calendars
+    let calendars = get_available_calendars().await?;
+    let calendar_list = calendars.join("\n- ");
+    let system_prompt = SYSTEM_PROMPT.replace("{available_calendars}", &format!("- {}", calendar_list));
+
+    // Add current date context
     let context = format!("Current date and time: {}", 
         Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, input);
@@ -47,7 +85,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
             "messages": [
                 {
                     "role": "system",
-                    "content": SYSTEM_PROMPT
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
@@ -65,13 +103,45 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     }
 
     let response_json: Value = response.json().await?;
-    let command = response_json["choices"][0]["message"]["content"]
+    let commands = response_json["choices"][0]["message"]["content"]
         .as_str()
         .ok_or_else(|| anyhow!("Invalid response format"))?
         .trim()
         .to_string();
 
-    Ok(command)
+    // Process each command separately
+    let mut results = Vec::new();
+    for cmd in commands.lines() {
+        let trimmed = cmd.trim();
+        if !trimmed.is_empty() {
+            if trimmed.contains("todo") {
+                // Format todo command correctly
+                if trimmed.contains("--lists") {
+                    results.push(trimmed.to_string());
+                } else {
+                    results.push(format!("{} --lists \"surfergolfer\"", trimmed));
+                }
+            } else if trimmed.contains("calendar") {
+                // Ensure proper calendar command format
+                let parts: Vec<&str> = trimmed.split('"').collect();
+                if parts.len() >= 3 {
+                    // Extract title and rest of command
+                    let title = parts[1];
+                    let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
+                    if rest.len() >= 2 {
+                        results.push(format!(
+                            "ducktape calendar \"{}\" {} {} \"shaun.stuart@hashicorp.com\"",
+                            title, rest[0], rest[1]
+                        ));
+                    }
+                }
+            } else {
+                results.push(trimmed.to_string());
+            }
+        }
+    }
+
+    Ok(results.join("\n"))
 }
 
 #[cfg(test)]

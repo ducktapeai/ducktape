@@ -181,9 +181,30 @@ fn process_command(command: &str) -> Result<()> {
     // If the command doesn't start with "ducktape", treat it as natural language
     if !command.trim().starts_with("ducktape") {
         let runtime = tokio::runtime::Runtime::new()?;
-        let ducktape_command = runtime.block_on(crate::openai_parser::parse_natural_language(command))?;
-        println!("🦆 Interpreting as: {}", ducktape_command);  // Show the interpreted command
-        return process_command(&ducktape_command);
+        match runtime.block_on(crate::openai_parser::parse_natural_language(command)) {
+            Ok(commands) => {
+                // Process multiple commands
+                for cmd in commands.lines() {
+                    let trimmed = cmd.trim();
+                    if !trimmed.is_empty() {
+                        println!("🦆 Executing: {}", trimmed);
+                        if let Err(e) = process_command(trimmed) {
+                            println!("❌ Command failed: {}", e);
+                            // Continue with next command even if one fails
+                            continue;
+                        }
+                    }
+                }
+                return Ok(());
+            }
+            Err(e) => {
+                if e.to_string().contains("Please specify which calendar") {
+                    println!("🤔 {}", e);
+                    return Ok(());
+                }
+                return Err(e);
+            }
+        }
     }
 
     let args = CommandArgs::parse(command)?;
