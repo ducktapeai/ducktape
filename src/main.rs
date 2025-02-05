@@ -1,5 +1,6 @@
 mod calendar;
 mod file_search;
+mod notes;
 mod state;
 mod todo; // Add local state module
 
@@ -234,6 +235,22 @@ fn process_command(command: &str) -> Result<()> {
             }
             Ok(())
         }
+        "note" => {
+            if args.args.is_empty() {
+                println!("Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
+                return Ok(());
+            }
+            let content = args.flags.get("--content")
+                .and_then(|c| c.as_ref())
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            let mut config = notes::NoteConfig::new(&args.args[0], content);
+            if let Some(folder) = args.flags.get("--folder") {
+                config.folder = folder.as_deref();
+            }
+            notes::create_note(config)
+        },
+        "notes" => notes::list_notes(),
         "help" => {
             print_help()
         }
@@ -340,38 +357,46 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 }
 
 fn print_help() -> Result<()> {
-    println!("DuckTape - Calendar and Todo Management Tool");
+    println!("DuckTape - Your Command Line Productivity Duck 🦆");
+    println!("\nDescription:");
+    println!("  A unified CLI for Apple Calendar, Reminders, and Notes");
     println!("\nUsage:");
     println!("  ducktape [command] [options]");
     println!("  ducktape --help | -h");
-    println!("\nAvailable commands:");
-    println!("  ducktape search <path> <pattern> - Search for files");
-    println!("  ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create calendar event");
-    println!("  ducktape calendars - List available calendars");
-    println!("  ducktape calendar-props - List available calendar event properties");
-    println!("  ducktape todo \"<title>\" - Create a todo item");
-    println!("  ducktape list-todos - List all stored todo items");
-    println!("  ducktape list-events - List all stored calendar events with details");
-    println!("\nCalendar Event Details:");
-    println!("  - Date and time");
-    println!("  - Calendar assignments");
-    println!("  - Location (if set)");
-    println!("  - Description (if set)");
-    println!("  - Attendees (if any)");
-    println!("  - Reminder settings");
-    println!("\nCalendar Options:");
+    println!("\nCommand Groups:");
+    println!("  Calendar:");
+    println!("    ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create event");
+    println!("    ducktape calendars - List available calendars");
+    println!("    ducktape list-events - Show all calendar events");
+    println!("\n  Todo & Reminders:");
+    println!("    ducktape todo \"<title>\" - Create a todo item");
+    println!("    ducktape list-todos - List all stored todos");
+    println!("\n  Notes:");
+    println!("    ducktape note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
+    println!("    ducktape notes - List all notes");
+    println!("\n  Utility:");
+    println!("    ducktape search <path> <pattern> - Search for files");
+    println!("    ducktape calendar-props - List available calendar properties");
+    println!("\nOptions by Command Type:");
+    println!("  Calendar Options:");
     println!("    --all-day                  Create an all-day event");
     println!("    --location \"<location>\"    Set event location");
     println!("    --description \"<desc>\"     Set event description");
     println!("    --email \"<email>\"         Add attendee");
     println!("    --reminder <minutes>       Set reminder (minutes before event)");
-    println!("\nTodo Options:");
+    println!("\n  Todo Options:");
     println!("    --notes \"<notes>\"         Add notes to the todo");
     println!("    --lists \"<list1,list2>\"   Add to specific lists");
     println!("    --reminder-time \"YYYY-MM-DD HH:MM\"  Set reminder time");
-    println!("\nGeneral commands:");
-    println!("  help - Show this help");
-    println!("  exit - Exit the application");
+    println!("\n  Note Options:");
+    println!("    --content \"<content>\"     Set note content");
+    println!("    --folder \"<folder>\"       Specify note folder");
+    println!("\nGeneral Commands:");
+    println!("  ducktape --help (or -h) - Show this help");
+    println!("  ducktape exit - Exit the application");
+    println!("\nState Files:");
+    println!("  ~/.ducktape/todos.json - Todo items");
+    println!("  ~/.ducktape/events.json - Calendar events");
     Ok(())
 }
 

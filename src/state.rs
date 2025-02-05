@@ -7,6 +7,7 @@ use std::path::PathBuf;
 const STATE_DIR: &str = ".ducktape";
 const TODOS_FILE: &str = "todos.json";
 const EVENTS_FILE: &str = "events.json";
+const NOTES_FILE: &str = "notes.json";
 
 // Trait for items that can be persisted
 pub trait Persistent: Sized + Serialize + for<'de> Deserialize<'de> {
@@ -34,6 +35,14 @@ pub struct CalendarItem {
     pub reminder: Option<i32>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NoteItem {
+    pub title: String,
+    pub content: String,
+    pub folder: Option<String>,
+    pub created_at: String,
+}
+
 impl Persistent for TodoItem {
     fn filename() -> &'static str {
         TODOS_FILE
@@ -43,6 +52,12 @@ impl Persistent for TodoItem {
 impl Persistent for CalendarItem {
     fn filename() -> &'static str {
         EVENTS_FILE
+    }
+}
+
+impl Persistent for NoteItem {
+    fn filename() -> &'static str {
+        NOTES_FILE
     }
 }
 
@@ -96,6 +111,11 @@ pub fn load_todos() -> Result<Vec<TodoItem>> {
 
 // Remove unused save_events function since it's handled by StateManager
 pub fn load_events() -> Result<Vec<CalendarItem>> {
+    StateManager::new()?.load()
+}
+
+// Add convenience function for notes
+pub fn load_notes() -> Result<Vec<NoteItem>> {
     StateManager::new()?.load()
 }
 
