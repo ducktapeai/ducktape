@@ -1,14 +1,15 @@
 # DuckTape
 
-A command-line calendar producitivity tool for macOS.
+A command-line calendar productivity tool for macOS that integrates with Apple's native apps.
 Duct tape fixes anything—just like this tool. No clicks, no distractions, just pure productivity. Stick with what works.
 
 ## Features
 
-- Calendar event management
-- Todo and reminder management
+- Calendar event management with Apple Calendar.app
+- Todo and reminder management with Apple Reminders.app
+- Apple Notes integration
+- Multiple calendar/list support
 - Persistent state storage
-- Multiple calendar support
 - Rich command-line interface
 
 ## Installation
@@ -46,11 +47,6 @@ Create a calendar event:
 >> ducktape calendar "Meeting" 2025-02-21 14:30 "Work" --location "Room 1" --description "Weekly sync"
 ```
 
-List all calendar events:
-```bash
->> ducktape list-events
-```
-
 ### Todo Management
 
 Create a todo item:
@@ -58,9 +54,16 @@ Create a todo item:
 >> ducktape todo "Buy groceries" --notes "Milk, Eggs" --lists "Personal" --reminder-time "2025-02-05 11:00"
 ```
 
-List all todos:
+### Note Management
+
+Create a note:
 ```bash
->> ducktape list-todos
+>> ducktape note "Meeting Notes" --content "Important points..." --folder "Work"
+```
+
+List all notes:
+```bash
+>> ducktape notes
 ```
 
 ### Command Options
@@ -77,6 +80,16 @@ Todo options:
 - `--lists "<list1,list2>"` - Add to specific lists
 - `--reminder-time "YYYY-MM-DD HH:MM"` - Set reminder time
 
+Note options:
+- `--content "<content>"` - Set note content
+- `--folder "<folder>"` - Specify note folder (creates if doesn't exist)
+
+### List and View Commands
+
+- `ducktape list-todos` - Show all stored todos
+- `ducktape list-events` - Show all calendar events with details
+- `ducktape notes` - List all Apple Notes
+
 ### State Management
 
 All data is automatically persisted to:
@@ -87,11 +100,12 @@ All data is automatically persisted to:
 
 - macOS 10.13 or later
 - Rust toolchain
-- Calendar.app and Reminders.app with proper permissions
+- Calendar.app, Reminders.app, and Notes.app with proper permissions
 
 ## Permissions
 
-The application requires access to Calendar.app and Reminders.app. You may need to grant permissions in System Preferences > Security & Privacy > Privacy > Calendar/Reminders.
+The application requires access to Apple's native apps. Grant permissions in:
+System Preferences > Security & Privacy > Privacy > Calendar/Reminders/Notes
 
 ## Contributing
 
