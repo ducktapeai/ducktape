@@ -2,7 +2,8 @@ mod calendar;
 mod file_search;
 mod notes;
 mod state;
-mod todo; // Add local state module
+mod todo;
+mod openai_parser;  // Keep only this one, remove ai_parser
 
 use anyhow::Result;
 use env_logger::Env;
@@ -177,6 +178,14 @@ fn main() -> Result<()> {
 }
 
 fn process_command(command: &str) -> Result<()> {
+    // If the command doesn't start with "ducktape", treat it as natural language
+    if !command.trim().starts_with("ducktape") {
+        let runtime = tokio::runtime::Runtime::new()?;
+        let ducktape_command = runtime.block_on(crate::openai_parser::parse_natural_language(command))?;
+        println!("🦆 Interpreting as: {}", ducktape_command);  // Show the interpreted command
+        return process_command(&ducktape_command);
+    }
+
     let args = CommandArgs::parse(command)?;
 
     match args.command.as_str() {
