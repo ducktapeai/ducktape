@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, Local, Duration};
 
 const STATE_DIR: &str = ".ducktape";
