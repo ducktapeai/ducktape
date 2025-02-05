@@ -384,6 +384,52 @@ pub fn list_event_properties() -> Result<()> {
     }
 }
 
+pub fn delete_event(title: &str, _date: &str) -> Result<()> {
+    let script = format!(
+        r#"tell application "Calendar"
+            try
+                set foundEvents to {{}}
+                repeat with c in calendars
+                    tell c
+                        set matchingEvents to (every event whose summary contains "{0}")
+                        repeat with evt in matchingEvents
+                            copy evt to end of foundEvents
+                        end repeat
+                    end tell
+                end repeat
+                
+                if (count of foundEvents) is 0 then
+                    error "No matching events found for title: {0}"
+                end if
+                
+                repeat with evt in foundEvents
+                    set evtTitle to summary of evt
+                    log "Deleting event: " & evtTitle
+                    delete evt
+                end repeat
+                
+                return "Success: Events deleted"
+            on error errMsg
+                return "Error: " & errMsg
+            end try
+        end tell"#,
+        title
+    );
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()?;
+
+    let result = String::from_utf8_lossy(&output.stdout);
+    if result.contains("Success") {
+        println!("Calendar event(s) deleted containing title: {}", title);
+        Ok(())
+    } else {
+        Err(anyhow!("Failed to delete events: {}", result))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

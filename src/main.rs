@@ -281,6 +281,18 @@ fn process_command(command: &str) -> Result<()> {
             notes::create_note(config)
         },
         "notes" => notes::list_notes(),
+        "delete-event" => {
+            if args.args.len() < 1 {
+                println!("Usage: delete-event \"<title>\"");
+                return Ok(());
+            }
+            calendar::delete_event(&args.args[0], args.args.get(1).map(|s| s.as_str()).unwrap_or(""))?;
+            // Also remove from state
+            let mut events = state::load_events()?;
+            events.retain(|e| e.title != args.args[0]);
+            state::StateManager::new()?.save(&events)?;
+            Ok(())
+        },
         "help" => {
             print_help()
         }
@@ -402,8 +414,8 @@ fn print_help() -> Result<()> {
     println!("\nCommand Groups:");
     println!("  Calendar:");
     println!("    ducktape calendar \"<title>\" <date> <time> [calendar-name...] - Create event");
+    println!("    ducktape delete-event \"<title>\" - Delete matching events");
     println!("    ducktape calendars - List available calendars");
-    println!("    ducktape list-events - Show all calendar events");
     println!("\n  Todo & Reminders:");
     println!("    ducktape todo \"<title>\" - Create a todo item");
     println!("    ducktape list-todos - List all stored todos");
