@@ -1,6 +1,10 @@
 use anyhow::Result;
+use anyhow::anyhow;
 use std::path::PathBuf;
 use std::process::Command;
+use std::fs::{create_dir_all, OpenOptions};
+use std::io::Write;
+use chrono::Local;
 
 #[derive(Debug)]
 pub struct NoteConfig<'a> {
