@@ -201,7 +201,14 @@ Remember to:
         }
     }
 
-    Ok(results.join("\n"))
+    let mut command = results.join("\n");
+
+    // Ensure result command starts with "ducktape "
+    if !command.trim().starts_with("ducktape ") {
+        command = format!("ducktape {}", command);
+    }
+
+    Ok(command)
 }
 
 // Add a helper function to extract email addresses
