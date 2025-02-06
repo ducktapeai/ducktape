@@ -239,6 +239,7 @@ dependencies = [
  "lru",
  "once_cell",
  "pretty_assertions",
+ "regex",
  "reqwest",
  "rustyline",
  "serde",

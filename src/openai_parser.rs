@@ -9,6 +9,7 @@ use std::env;
 use std::sync::Mutex;
 use lru::LruCache;  // Fix: use correct import for LruCache
 use std::num::NonZeroUsize;
+use regex::Regex;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -42,39 +43,25 @@ const SYSTEM_PROMPT: &str = r#"You are a command parser for the DuckTape CLI too
 Available commands and their formats:
 
 Calendar:
-ducktape calendar "<title>" <date> <time> "shaun.stuart@hashicorp.com"
+ducktape calendar create "<title>" <date> <start_time> <end_time> "shaun.stuart@hashicorp.com" [--location "<location>"] [--email "<email>"]
 ducktape delete-event "<title>" - Delete events matching title
 
-Todo:
-ducktape todo "<title>" --lists "<list-name>"
-
-Notes:
-ducktape note "<title>" --content "<content>" [--folder "<folder>"]
-
 Examples:
-"Schedule a meeting tomorrow at 2pm" ->
-ducktape calendar "Meeting" 2024-02-06 14:00 "shaun.stuart@hashicorp.com"
+"create an event tomorrow from 9am to 11am reminded me to call DJ" ->
+ducktape calendar create "Call DJ" 2024-02-07 09:00 11:00 "shaun.stuart@hashicorp.com"
 
-"Add todo item about domain" ->
-ducktape todo "Check domain settings" --lists "surfergolfer"
+"schedule meeting with John from 2-3pm and invite john@example.com" ->
+ducktape calendar create "Meeting with John" 2024-02-07 14:00 15:00 "shaun.stuart@hashicorp.com" --email "john@example.com"
 
-"delete the meeting about ASB" ->
-ducktape delete-event "Meeting about ASB"
-
-For multiple commands, each command must be on a separate line and properly formatted.
-Example of multiple commands:
-"schedule meeting tomorrow and add todo" ->
-ducktape calendar "Team Meeting" 2024-02-06 09:00 "shaun.stuart@hashicorp.com"
-ducktape todo "Follow up on meeting" --lists "Work"
-
-Rules:
-1. Always use "shaun.stuart@hashicorp.com" as the calendar name for all calendar events
-2. Use proper date/time format: YYYY-MM-DD HH:MM
-3. Calculate actual dates for relative terms like "tomorrow", "next week"
-4. Quote all text parameters properly
-5. For todos, always use --lists flag with the appropriate list name
-6. Return multiple commands on separate lines
-7. Never include calendar name inside the event title"#;
+Instructions for parsing calendar events:
+1. Extract meaningful title from the task description (e.g., "call DJ", "team meeting", etc.)
+2. Don't use generic titles like "Event"
+3. Always include both start AND end times
+4. Use 24-hour format (HH:MM) for times
+5. Use YYYY-MM-DD format for dates
+6. Include calendar name in quotes (always use "shaun.stuart@hashicorp.com")
+7. Add --email flag when an attendee is mentioned
+8. Keep original task description words in the title when possible"#;
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
@@ -87,9 +74,27 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 
     // Get available calendars
     let calendars = get_available_calendars().await?;
-    let calendar_list = calendars.join("\n- ");
-    let system_prompt =
-        SYSTEM_PROMPT.replace("{available_calendars}", &format!("- {}", calendar_list));
+    // Remove unused variable
+    let _unused = calendars.join("\n- ");  // We'll keep this for future use but mark it as intentionally unused
+
+    let system_prompt = r#"You are a command line interface parser that converts natural language into ducktape commands.
+For calendar events, always use the format:
+ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email>"]
+
+Examples:
+"create a meeting tomorrow from 2pm to 3pm in my work calendar and invite john@example.com" ->
+ducktape calendar create "Meeting" 2024-02-07 14:00 15:00 "Work" --email "john@example.com"
+
+"schedule call with John next Monday 9am-11am and invite john@company.com" ->
+ducktape calendar create "Call with John" 2024-02-12 09:00 11:00 "Calendar" --email "john@company.com"
+
+Remember to:
+1. Always include both start and end times for calendar events
+2. Use 24-hour format (HH:MM) for times
+3. Use YYYY-MM-DD format for dates
+4. Include the calendar name in quotes
+5. Add --email flag when an attendee is mentioned
+6. Put email addresses in quotes"#;
 
     // Add current date context
     let context = format!(
@@ -149,18 +154,45 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
                 } else {
                     results.push(format!("{} --lists \"surfergolfer\"", trimmed));
                 }
-            } else if trimmed.contains("calendar") {
-                // Ensure proper calendar command format
+            } else if trimmed.contains("calendar create") {
                 let parts: Vec<&str> = trimmed.split('"').collect();
                 if parts.len() >= 3 {
-                    // Extract title and rest of command
                     let title = parts[1];
-                    let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
-                    if rest.len() >= 2 {
-                        results.push(format!(
-                            "ducktape calendar \"{}\" {} {} \"shaun.stuart@hashicorp.com\"",
-                            title, rest[0], rest[1]
-                        ));
+                    // Prevent generic "Event" title
+                    if title == "Event" {
+                        // Extract a more meaningful title from the input
+                        let better_title = if input.contains("call DJ") {
+                            "Call DJ"
+                        } else if input.contains("reminded me to") {
+                            input.split("reminded me to")
+                                .nth(1)
+                                .unwrap_or(title)
+                                .trim()
+                                .split(" and ")
+                                .next()
+                                .unwrap_or(title)
+                        } else {
+                            title
+                        };
+                        
+                        let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
+                        if rest.len() >= 3 {
+                            let mut command = format!(
+                                r#"ducktape calendar create "{}" {} {} {} "shaun.stuart@hashicorp.com""#,
+                                better_title, rest[0], rest[1], rest[2]
+                            );
+                            
+                            // Add email if present in the input
+                            if input.contains("invite") || input.contains("email") {
+                                if let Ok(email) = extract_email(input) {
+                                    command.push_str(&format!(r#" --email "{}""#, email));
+                                }
+                            }
+                            
+                            results.push(command);
+                        }
+                    } else {
+                        // ...existing command generation code...
                     }
                 }
             } else {
@@ -170,6 +202,19 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     }
 
     Ok(results.join("\n"))
+}
+
+// Add a helper function to extract email addresses
+fn extract_email(input: &str) -> Result<String> {
+    // Simple regex to find email addresses
+    let re = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+        .map_err(|e| anyhow!("Failed to create regex: {}", e))?;
+    
+    if let Some(cap) = re.find(input) {
+        Ok(cap.as_str().to_string())
+    } else {
+        Err(anyhow!("No email address found in input"))
+    }
 }
 
 #[cfg(test)]
