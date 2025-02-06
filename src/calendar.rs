@@ -4,9 +4,9 @@ use log::{debug, error};
 use std::process::Command;
 use crate::state::{CalendarItem, StateManager};
 
-/// Duration in seconds for different event types
-const ALL_DAY_DURATION: i64 = 86400;
-const DEFAULT_DURATION: i64 = 3600;
+// Remove unused constants
+// const ALL_DAY_DURATION: i64 = 86400;
+// const DEFAULT_DURATION: i64 = 3600;
 
 /// Custom error type for calendar operations
 #[derive(Debug, thiserror::Error)]
@@ -25,8 +25,10 @@ pub enum CalendarError {
 #[derive(Debug)]
 pub struct EventConfig<'a> {
     pub title: &'a str,
-    pub date: &'a str,
-    pub time: &'a str,
+    pub start_date: &'a str,
+    pub start_time: &'a str,
+    pub end_date: Option<&'a str>,    // New field
+    pub end_time: Option<&'a str>,    // New field
     pub calendars: Vec<&'a str>,  // Changed from Option<&'a str> to Vec<&'a str>
     pub all_day: bool,
     pub location: Option<String>,
@@ -37,11 +39,13 @@ pub struct EventConfig<'a> {
 
 impl<'a> EventConfig<'a> {
     /// Creates a new EventConfig with required fields
-    pub fn new(title: &'a str, date: &'a str, time: &'a str) -> Self {
+    pub fn new(title: &'a str, start_date: &'a str, start_time: &'a str) -> Self {
         Self {
             title,
-            date,
-            time,
+            start_date,
+            start_time,
+            end_date: None,
+            end_time: None,
             calendars: Vec::new(),
             all_day: false,
             location: None,
@@ -122,8 +126,10 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     for calendar in calendars {
         let this_config = EventConfig {
             title: config.title,
-            date: config.date,
-            time: config.time,
+            start_date: config.start_date,
+            start_time: config.start_time,
+            end_date: config.end_date,
+            end_time: config.end_time,
             calendars: vec![calendar],
             all_day: config.all_day,
             location: config.location.clone(),
@@ -144,8 +150,8 @@ pub fn create_event(config: EventConfig) -> Result<()> {
         // Save the event to state
         let calendar_item = CalendarItem {
             title: config.title.to_string(),
-            date: config.date.to_string(),
-            time: config.time.to_string(),
+            date: config.start_date.to_string(),
+            time: config.start_time.to_string(),
             calendars: config.calendars.iter().map(|&s| s.to_string()).collect(),
             all_day: config.all_day,
             location: config.location,
@@ -169,21 +175,41 @@ pub fn create_event(config: EventConfig) -> Result<()> {
 fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
     
-    let datetime = format!("{} {}", config.date, if config.all_day { "00:00" } else { config.time });
-    let dt = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M")
+    // Parse start datetime
+    let start_datetime = format!("{} {}", config.start_date, 
+        if config.all_day { "00:00" } else { config.start_time });
+    let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
 
-    let local_dt: DateTime<Local> = Local::now()
+    // Parse end datetime
+    let end_dt = if let Some(end_time) = config.end_time {
+        let end_datetime = format!("{} {}", config.start_date, end_time);
+        NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
+            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?
+    } else {
+        start_dt + chrono::Duration::hours(1)
+    };
+
+    // Convert to local DateTime
+    let local_start: DateTime<Local> = Local::now()
         .timezone()
-        .from_local_datetime(&dt)
+        .from_local_datetime(&start_dt)
         .single()
-        .ok_or_else(|| anyhow!("Invalid or ambiguous local time"))?;
+        .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?;
+
+    let local_end: DateTime<Local> = Local::now()
+        .timezone()
+        .from_local_datetime(&end_dt)
+        .single()
+        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?;
+
+    // Validate that end time is after start time
+    if local_end <= local_start {
+        return Err(anyhow!("End time must be after start time"));
+    }
 
     // First verify Calendar.app is running
     ensure_calendar_running()?;
-
-    // Use simple duration in seconds: 86400 for all-day, 3600 otherwise.
-    let duration = if config.all_day { ALL_DAY_DURATION } else { DEFAULT_DURATION };
 
     // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
@@ -200,18 +226,15 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         ""
     };
 
-    // Build email code block if provided, using documented Apple syntax
+    // Update the email code block by removing the line setting host name.
     let email_code = if let Some(email_addr) = &config.email {
         format!(
             r#"
-                -- Add attendee
-                tell application "Calendar"
-                    tell newEvent
-                        make new attendee at end with properties {{email:"{}", display name:"{}"}}
-                    end tell
-                end tell"#,
-            email_addr,
-            email_addr  // Using email as display name, could be parameterized further
+                tell newEvent
+                    make new attendee at end with properties {{email:"{0}", display name:"{0}"}}
+                end tell
+        "#,
+            email_addr
         )
     } else {
         String::new()
@@ -245,18 +268,32 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 if targetCal is missing value then
                     error "Calendar '" & calendarName & "' not found"
                 end if
-                -- Set up start date
+                -- Set up start date and end date
                 set startDate to current date
-                set year of startDate to {year}
-                set month of startDate to {month}
-                set day of startDate to {day}
-                set hours of startDate to {hours}
-                set minutes of startDate to {minutes}
+                set endDate to current date
+                
+                -- Configure start date
+                set year of startDate to {start_year}
+                set month of startDate to {start_month}
+                set day of startDate to {start_day}
+                set hours of startDate to {start_hours}
+                set minutes of startDate to {start_minutes}
                 set seconds of startDate to 0
+                
+                -- Configure end date
+                set year of endDate to {end_year}
+                set month of endDate to {end_month}
+                set day of endDate to {end_day}
+                set hours of endDate to {end_hours}
+                set minutes of endDate to {end_minutes}
+                set seconds of endDate to 0
+                
                 -- Build properties and create the event
                 tell targetCal
-                    set newEvent to make new event at end with properties {{summary:"{title}", start date:startDate, end date:(startDate + {duration}), description:"{description}"{extra}}}
-                    {all_day_code}{email_code}{reminder_code}
+                    set newEvent to make new event at end with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
+                    {email_code}
+                    {all_day_code}
+                    {reminder_code}
                 end tell
                 return "Success: Event created"
             on error errMsg
@@ -264,13 +301,17 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             end try
         end tell"#,
         calendar_name = config.calendars[0],
-        year = local_dt.format("%Y"),
-        month = local_dt.format("%-m"),
-        day = local_dt.format("%-d"),
-        hours = local_dt.format("%-H"),
-        minutes = local_dt.format("%-M"),
+        start_year = local_start.format("%Y"),
+        start_month = local_start.format("%-m"),
+        start_day = local_start.format("%-d"),
+        start_hours = local_start.format("%-H"),
+        start_minutes = local_start.format("%-M"),
+        end_year = local_end.format("%Y"),
+        end_month = local_end.format("%-m"),
+        end_day = local_end.format("%-d"),
+        end_hours = local_end.format("%-H"),
+        end_minutes = local_end.format("%-M"),
         title = config.title,
-        duration = duration,
         description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         extra = extra,
         all_day_code = all_day_code,
@@ -287,8 +328,8 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         println!(
             "Calendar event created: {} at {} ({} timezone)",
             config.title,
-            format!("{} {}", config.date, config.time),
-            local_dt.offset()
+            format!("{} {}", config.start_date, config.start_time),
+            local_start.offset()
         );
         Ok(())
     } else {
@@ -438,8 +479,10 @@ mod tests {
     fn create_test_config() -> EventConfig<'static> {
         EventConfig {
             title: "Test Event",
-            date: "2024-02-21",
-            time: "14:30",
+            start_date: "2024-02-21",
+            start_time: "14:30",
+            end_date: None,
+            end_time: None,
             calendars: vec!["Test Calendar"],
             all_day: false,
             location: Some("Test Location".to_string()),
@@ -453,8 +496,8 @@ mod tests {
     fn test_event_config_new() {
         let config = EventConfig::new("Test", "2024-02-21", "14:30");
         assert_eq!(config.title, "Test");
-        assert_eq!(config.date, "2024-02-21");
-        assert_eq!(config.time, "14:30");
+        assert_eq!(config.start_date, "2024-02-21");
+        assert_eq!(config.start_time, "14:30");
         assert!(!config.all_day);
         assert!(config.calendars.is_empty());
         assert!(config.reminder.is_none());
@@ -463,7 +506,7 @@ mod tests {
     #[test]
     fn test_parse_datetime() {
         let config = create_test_config();
-        let datetime = format!("{} {}", config.date, config.time);
+        let datetime = format!("{} {}", config.start_date, config.start_time);
         let result = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M");
         assert!(result.is_ok());
     }
@@ -471,7 +514,7 @@ mod tests {
     #[test]
     fn test_parse_invalid_datetime() {
         let config = EventConfig::new("Test", "invalid-date", "25:00");
-        let datetime = format!("{} {}", config.date, config.time);
+        let datetime = format!("{} {}", config.start_date, config.start_time);
         let result = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M");
         assert!(result.is_err());
     }
@@ -480,8 +523,10 @@ mod tests {
     fn test_calendar_not_found_error() {
         let config = EventConfig {
             title: "Test Event",
-            date: "2024-02-21",
-            time: "14:30",
+            start_date: "2024-02-21",
+            start_time: "14:30",
+            end_date: None,
+            end_time: None,
             calendars: vec!["NonexistentCalendar"],
             all_day: false,
             location: None,
