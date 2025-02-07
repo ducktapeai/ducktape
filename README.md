@@ -80,6 +80,10 @@ export OPENAI_API_KEY='your-api-key-here'
 - Context-aware command generation
 - Automatic calendar/list selection
 
+## Calendar Configuration
+
+If no calendar name is specified in your EventConfig, DuckTape will add the event to the default calendar set in Calendar.app (usually named "Calendar").
+
 ## State Management
 
 All data is automatically persisted to:
