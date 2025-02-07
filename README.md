@@ -2,6 +2,8 @@
 
 Your AI-powered command-line productivity assistant for macOS. DuckTape seamlessly integrates with Apple's native apps while providing natural language interaction.
 
+We coined the term Productivity as AI, Smooth as a Duck "Unlock Productivity with AI—For Everyone, On Every Device" 
+
 ## Features
 
 - **Natural Language Support** - Just type what you want in plain English
