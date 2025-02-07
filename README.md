@@ -21,10 +21,10 @@ We coined the term Productivity as AI, Smooth as a Duck "Unlock Productivity wit
 Natural language commands:
 ```bash
 >> schedule a team meeting tomorrow at 2pm
-🦆 Interpreting as: ducktape calendar create "Team Meeting" 2024-02-06 14:00 15:00 "Work"
+🦆 Interpreting as: ducktape calendar create "Team Meeting" 2025-02-06 14:00 15:00 "Work"
 
 >> remind me to buy groceries next Monday
-🦆 Interpreting as: ducktape todo "Buy groceries" --reminder-time "2024-02-12 09:00"
+🦆 Interpreting as: ducktape todo "Buy groceries" --reminder-time "2025-02-12 09:00"
 
 >> take notes from the project meeting
 🦆 Interpreting as: ducktape note "Project Meeting Notes" --content "Meeting notes" --folder "Work"
@@ -32,8 +32,8 @@ Natural language commands:
 
 Or use traditional commands:
 ```bash
->> ducktape calendar "Meeting" 2024-02-06 14:00 "Work" --location "Room 1"
->> ducktape todo "Buy groceries" --lists "Personal" --reminder-time "2024-02-12 09:00"
+>> ducktape calendar "Meeting" 2025-02-06 14:00 "Work" --location "Room 1"
+>> ducktape todo "Buy groceries" --lists "Personal" --reminder-time "2025-02-12 09:00"
 >> ducktape note "Meeting Notes" --content "Important points" --folder "Work"
 ```
 
