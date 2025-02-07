@@ -114,3 +114,76 @@ Contributions welcome! Feel free to submit issues or pull requests.
 ## License
 
 MIT License - See LICENSE file for details.
+
+## Commands
+
+DuckTape - Your AI-Powered Command Line Productivity Duck 🦆
+
+Description:
+  A unified CLI for Apple Calendar, Reminders, and Notes with natural language support  
+  Just type what you want to do - DuckTape's AI will understand!
+
+Natural Language Examples:
+  "schedule a meeting with John tomorrow at 2pm"  
+  "remind me to buy groceries next Monday morning"  
+  "take notes about the project meeting"  
+  "add a todo about calling the bank"
+
+Or use traditional commands:
+  ducktape [command] [options]  
+  ducktape --help | -h
+
+Command Groups:
+  Calendar:
+    ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] - Create event  
+    ducktape calendar delete "<title>" - Delete matching events  
+    ducktape calendars - List available calendars
+
+  Todo & Reminders:
+    ducktape todo "<title>" - Create a todo item  
+    ducktape list-todos - List all stored todos
+
+  Notes:
+    ducktape note "<title>" --content "<content>" [--folder "<folder>"]  
+    ducktape notes - List all notes
+
+  Utility:
+    ducktape search <path> <pattern> - Search for files  
+    ducktape calendar-props - List available calendar properties  
+    ducktape cleanup - Remove old events and compact storage
+
+Options by Command Type:
+  Calendar Options:
+    --all-day                  Create an all-day event  
+    --location "<location>"    Set event location  
+    --description "<desc>"     Set event description  
+    --email "<email>"          Add attendee  
+    --reminder <minutes>       Set reminder (minutes before event)
+
+  Todo Options:
+    --notes "<notes>"          Add notes to the todo  
+    --lists "<list1,list2>"    Add to specific lists  
+    --reminder-time "YYYY-MM-DD HH:MM"  Set reminder time
+
+  Note Options:
+    --content "<content>"      Set note content  
+    --folder "<folder>"        Specify note folder
+
+General Commands:
+  ducktape --help (or -h) - Show this help  
+  ducktape exit - Exit the application
+
+AI Features:
+  - Natural language command processing  
+  - Smart date/time understanding ("tomorrow", "next Monday")  
+  - Context-aware command generation  
+  - Automatic calendar/list selection
+
+Environment Setup:
+  Export your OpenAI API key:  
+  export OPENAI_API_KEY='your-api-key-here'
+
+State Files:
+  ~/.ducktape/todos.json - Todo items  
+  ~/.ducktape/events.json - Calendar events
+```
