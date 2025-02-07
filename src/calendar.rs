@@ -193,16 +193,12 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         start_dt + chrono::Duration::hours(1)
     };
 
-    // Convert to local DateTime
-    let local_start: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&start_dt)
+    // Convert to local DateTime using the current offset once for both start and end
+    let local_offset = Local::now().offset().clone();
+    let local_start = local_offset.from_local_datetime(&start_dt)
         .single()
         .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?;
-
-    let local_end: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&end_dt)
+    let local_end = local_offset.from_local_datetime(&end_dt)
         .single()
         .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?;
 

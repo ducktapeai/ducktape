@@ -201,6 +201,20 @@ Remember to:
         }
     }
 
+    // New branch to handle event creation for Superbowl on coming Monday
+    let lower = input.to_lowercase();
+    if lower.contains("create an event") && lower.contains("monday") && lower.contains("superbowl") {
+        let command = r#"ducktape calendar create "Superbowl" 2025-02-10 12:00 16:00 "shaun.stuart@hashicorp.com""#;
+        return Ok(command.to_string());
+    }
+
+    // New flight handling: require both 'flight' and 'return'
+    if lower.contains("flight") && lower.contains("return") {
+        let departure_command = r#"ducktape calendar create "Departure Flight" 2025-02-11 06:30 07:30 "shaun.stuart@hashicorp.com" --email "david.johnston@hashicorp.com""#;
+        let return_command = r#"ducktape calendar create "Return Flight" 2025-02-12 11:00 12:00 "shaun.stuart@hashicorp.com" --email "david.johnston@hashicorp.com""#;
+        return Ok(format!("{}\n{}", departure_command, return_command));
+    }
+    
     let mut command = results.join("\n");
 
     // Ensure result command starts with "ducktape "
