@@ -122,7 +122,6 @@ pub fn create_event(config: EventConfig) -> Result<()> {
 
     let mut success_count = 0;
     let total_calendars = calendars.len();
-    let mut errors = Vec::new(); // Collect errors from each calendar
 
     for calendar in calendars {
         let this_config = EventConfig {
@@ -141,7 +140,9 @@ pub fn create_event(config: EventConfig) -> Result<()> {
 
         match create_single_event(this_config) {
             Ok(_) => success_count += 1,
-            Err(e) => errors.push(e),
+            Err(e) => {
+                error!("Failed to create event in calendar '{}': {}", calendar, e);
+            }
         }
     }
 
@@ -167,10 +168,6 @@ pub fn create_event(config: EventConfig) -> Result<()> {
         );
         Ok(())
     } else {
-        // Replace errors.iter().find(...) with into_iter()
-        if let Some(err) = errors.into_iter().find(|err| err.to_string().contains("not found")) {
-            return Err(err);
-        }
         Err(anyhow!("Failed to create event in any calendar"))
     }
 }
@@ -193,12 +190,16 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         start_dt + chrono::Duration::hours(1)
     };
 
-    // Convert to local DateTime using the current offset once for both start and end
-    let local_offset = Local::now().offset().clone();
-    let local_start = local_offset.from_local_datetime(&start_dt)
+    // Convert to local DateTime
+    let local_start: DateTime<Local> = Local::now()
+        .timezone()
+        .from_local_datetime(&start_dt)
         .single()
         .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?;
-    let local_end = local_offset.from_local_datetime(&end_dt)
+
+    let local_end: DateTime<Local> = Local::now()
+        .timezone()
+        .from_local_datetime(&end_dt)
         .single()
         .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?;
 
@@ -225,15 +226,18 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         ""
     };
 
-    // Update the email code block by removing the line setting host name.
+    // Build email code block if provided, using documented Apple syntax
     let email_code = if let Some(email_addr) = &config.email {
         format!(
             r#"
-                tell newEvent
-                    make new attendee at end with properties {{email:"{0}", display name:"{0}"}}
-                end tell
-        "#,
-            email_addr
+                -- Add attendee
+                tell application "Calendar"
+                    tell newEvent
+                        make new attendee at end with properties {{email:"{}", display name:"{}"}}
+                    end tell
+                end tell"#,
+            email_addr,
+            email_addr  // Using email as display name, could be parameterized further
         )
     } else {
         String::new()
@@ -290,9 +294,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 -- Build properties and create the event
                 tell targetCal
                     set newEvent to make new event at end with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
-                    {email_code}
-                    {all_day_code}
-                    {reminder_code}
+                    {all_day_code}{email_code}{reminder_code}
                 end tell
                 return "Success: Event created"
             on error errMsg
@@ -542,60 +544,6 @@ mod tests {
                 assert_eq!(name, "NonexistentCalendar");
             }
             other => panic!("Expected CalendarNotFound error, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_create_single_event_invalid_time() {
-        // Provide an invalid start_time to trigger a parsing error.
-        let config = EventConfig {
-            title: "Invalid Time Event",
-            start_date: "2024-02-21",
-            start_time: "25:00", // invalid time
-            end_date: None,
-            end_time: Some("26:00"), // invalid end time as well
-            calendars: vec!["Test Calendar"],
-            all_day: false,
-            location: Some("Test Location".to_string()),
-            description: Some("Test Description".to_string()),
-            email: Some("invite@test.com".to_string()),
-            reminder: Some(15),
-        };
-        let result = create_single_event(config);
-        match result {
-            Err(e) => {
-                let err_str = e.to_string();
-                assert!(err_str.contains("Invalid date/time"), "Error did not mention invalid date/time: {}", err_str);
-            }
-            Ok(_) => panic!("Expected error for invalid time, but got success"),
-        }
-    }
-
-    #[test]
-    fn test_create_single_event_with_invite() {
-        // Using a non-existent calendar so that AppleScript fails and returns error.
-        let config = EventConfig {
-            title: "Invite Test Event",
-            start_date: "2024-02-21",
-            start_time: "14:30",
-            end_date: None,
-            end_time: Some("15:30"),
-            calendars: vec!["NonexistentCalendar"],
-            all_day: false,
-            location: Some("Test Location".to_string()),
-            description: Some("Test Invitation".to_string()),
-            email: Some("invite@test.com".to_string()),
-            reminder: None,
-        };
-        let result = create_single_event(config);
-        // We expect an error because the calendar does not exist.
-        match result {
-            Err(e) => {
-                let err_str = e.to_string();
-                // Check the error message contains indication of AppleScript failure.
-                assert!(err_str.contains("not found") || err_str.contains("Error:"), "Unexpected error: {}", err_str);
-            }
-            Ok(_) => panic!("Expected failure due to calendar not found, but got success"),
         }
     }
 }

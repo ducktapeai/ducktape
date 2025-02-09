@@ -185,7 +185,7 @@ fn process_command(command: &str) -> Result<()> {
             Ok(commands) => {
                 for cmd in commands.lines() {
                     let trimmed = cmd.trim();
-                    if (!trimmed.is_empty()) {
+                    if !trimmed.is_empty() {
                         println!("🦆 Executing: {}", trimmed);
                         if let Err(e) = process_command(trimmed) {
                             println!("❌ Command failed: {}", e);
@@ -215,7 +215,7 @@ fn process_command(command: &str) -> Result<()> {
                 file_search::search(&args.args[0], &args.args[1])?;
                 Ok(())
             }
-            "calendar" => handle_calendar_command(&args),
+            "calendar" => handle_calendar_command(&args.args),
             "calendars" => calendar::list_calendars(),
             "calendar-props" => calendar::list_event_properties(),
             "todo" => handle_todo_command(args),
@@ -366,45 +366,36 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
     Ok(())
 }
 
-// Updated calendar command handler that uses flags from CommandArgs.
-fn handle_calendar_command(args: &CommandArgs) -> Result<()> {
-    // If a subcommand like "create" is provided, skip it.
-    let params = if let Some(first) = args.args.get(0) {
-        if first == "create" {
-            &args.args[1..]
-        } else {
-            args.args.as_slice()
-        }
-    } else {
-        args.args.as_slice()
-    };
-
-    match params.get(0).map(|s| s.as_str()) {
-        Some(_) => {
-            if params.len() < 4 {
-                println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar] [--location \"<location>\"] [--email \"<email>\"]");
-                println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\" --location \"Room 1\"");
+fn handle_calendar_command(args: &[String]) -> Result<()> {
+    match args.get(0).map(|s| s.as_str()) {
+        Some("create") | None => {
+            if args.len() < 5 {
+                println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
+                println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\"");
                 return Ok(());
             }
-            let title = &params[0];
-            let date = &params[1];
-            let start_time = &params[2];
-            let end_time = &params[3];
-            let calendar = params.get(4).map(|s| s.as_str()).unwrap_or("Calendar");
+            let title = &args[1];
+            let date = &args[2];
+            let start_time = &args[3];
+            let end_time = &args[4];
+            let calendar = args.get(5).map(|s| s.as_str());
 
-            let mut config = calendar::EventConfig::new(title, date, start_time);
+            let mut config = EventConfig::new(title, date, start_time);
             config.end_time = Some(end_time);
-            config.calendars = vec![calendar];
-
-            if let Some(email) = args.flags.get("--email").and_then(|o| o.as_ref()) {
-                config.email = Some(email.clone());
+            if let Some(cal) = calendar {
+                config.calendars = vec![cal];
             }
-            if let Some(location) = args.flags.get("--location").and_then(|o| o.as_ref()) {
-                config.location = Some(location.clone());
-            }
-            calendar::create_event(config)
+            create_event(config)
         }
-        None => {
+        Some("delete") => {
+            if args.len() < 2 {
+                println!("Usage: calendar delete <title>");
+                return Ok(());
+            }
+            let title = &args[1];
+            delete_event(title, "")
+        }
+        _ => {
             println!("Unknown calendar command. Use 'calendar create' or 'calendar delete'.");
             Ok(())
         }
