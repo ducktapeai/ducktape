@@ -43,25 +43,39 @@ const SYSTEM_PROMPT: &str = r#"You are a command parser for the DuckTape CLI too
 Available commands and their formats:
 
 Calendar:
-ducktape calendar create "<title>" <date> <start_time> <end_time> "shaun.stuart@hashicorp.com" [--location "<location>"] [--email "<email>"]
+ducktape calendar "<title>" <date> <time> "shaun.stuart@hashicorp.com"
 ducktape delete-event "<title>" - Delete events matching title
 
+Todo:
+ducktape todo "<title>" --lists "<list-name>"
+
+Notes:
+ducktape note "<title>" --content "<content>" [--folder "<folder>"]
+
 Examples:
-"create an event tomorrow from 9am to 11am reminded me to call DJ" ->
-ducktape calendar create "Call DJ" 2024-02-07 09:00 11:00 "shaun.stuart@hashicorp.com"
+"Schedule a meeting tomorrow at 2pm" ->
+ducktape calendar "Meeting" 2024-02-06 14:00 "shaun.stuart@hashicorp.com"
 
-"schedule meeting with John from 2-3pm and invite john@example.com" ->
-ducktape calendar create "Meeting with John" 2024-02-07 14:00 15:00 "shaun.stuart@hashicorp.com" --email "john@example.com"
+"Add todo item about domain" ->
+ducktape todo "Check domain settings" --lists "surfergolfer"
 
-Instructions for parsing calendar events:
-1. Extract meaningful title from the task description (e.g., "call DJ", "team meeting", etc.)
-2. Don't use generic titles like "Event"
-3. Always include both start AND end times
-4. Use 24-hour format (HH:MM) for times
-5. Use YYYY-MM-DD format for dates
-6. Include calendar name in quotes (always use "shaun.stuart@hashicorp.com")
-7. Add --email flag when an attendee is mentioned
-8. Keep original task description words in the title when possible"#;
+"delete the meeting about ASB" ->
+ducktape delete-event "Meeting about ASB"
+
+For multiple commands, each command must be on a separate line and properly formatted.
+Example of multiple commands:
+"schedule meeting tomorrow and add todo" ->
+ducktape calendar "Team Meeting" 2024-02-06 09:00 "shaun.stuart@hashicorp.com"
+ducktape todo "Follow up on meeting" --lists "Work"
+
+Rules:
+1. Always use "shaun.stuart@hashicorp.com" as the calendar name for all calendar events
+2. Use proper date/time format: YYYY-MM-DD HH:MM
+3. Calculate actual dates for relative terms like "tomorrow", "next week"
+4. Quote all text parameters properly
+5. For todos, always use --lists flag with the appropriate list name
+6. Return multiple commands on separate lines
+7. Never include calendar name inside the event title"#;
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
@@ -158,41 +172,20 @@ Remember to:
                 let parts: Vec<&str> = trimmed.split('"').collect();
                 if parts.len() >= 3 {
                     let title = parts[1];
-                    // Prevent generic "Event" title
-                    if title == "Event" {
-                        // Extract a more meaningful title from the input
-                        let better_title = if input.contains("call DJ") {
-                            "Call DJ"
-                        } else if input.contains("reminded me to") {
-                            input.split("reminded me to")
-                                .nth(1)
-                                .unwrap_or(title)
-                                .trim()
-                                .split(" and ")
-                                .next()
-                                .unwrap_or(title)
-                        } else {
-                            title
-                        };
+                    let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
+                    if rest.len() >= 3 {
+                        let mut command = format!(
+                            r#"ducktape calendar create "{}" {} {} {} "shaun.stuart@hashicorp.com""#,
+                            title, rest[0], rest[1], rest[2]
+                        );
                         
-                        let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
-                        if rest.len() >= 3 {
-                            let mut command = format!(
-                                r#"ducktape calendar create "{}" {} {} {} "shaun.stuart@hashicorp.com""#,
-                                better_title, rest[0], rest[1], rest[2]
-                            );
-                            
-                            // Add email if present in the input
-                            if input.contains("invite") || input.contains("email") {
-                                if let Ok(email) = extract_email(input) {
-                                    command.push_str(&format!(r#" --email "{}""#, email));
-                                }
-                            }
-                            
-                            results.push(command);
+                        // Add email if present in the input
+                        if input.contains("invite") || input.contains("email") {
+                            let email = extract_email(input)?;
+                            command.push_str(&format!(r#" --email "{}""#, email));
                         }
-                    } else {
-                        // ...existing command generation code...
+                        
+                        results.push(command);
                     }
                 }
             } else {
@@ -201,28 +194,7 @@ Remember to:
         }
     }
 
-    // New branch to handle event creation for Superbowl on coming Monday
-    let lower = input.to_lowercase();
-    if lower.contains("create an event") && lower.contains("monday") && lower.contains("superbowl") {
-        let command = r#"ducktape calendar create "Superbowl" 2025-02-10 12:00 16:00 "shaun.stuart@hashicorp.com""#;
-        return Ok(command.to_string());
-    }
-
-    // New flight handling: require both 'flight' and 'return'
-    if lower.contains("flight") && lower.contains("return") {
-        let departure_command = r#"ducktape calendar create "Departure Flight" 2025-02-11 06:30 07:30 "shaun.stuart@hashicorp.com" --email "david.johnston@hashicorp.com""#;
-        let return_command = r#"ducktape calendar create "Return Flight" 2025-02-12 11:00 12:00 "shaun.stuart@hashicorp.com" --email "david.johnston@hashicorp.com""#;
-        return Ok(format!("{}\n{}", departure_command, return_command));
-    }
-    
-    let mut command = results.join("\n");
-
-    // Ensure result command starts with "ducktape "
-    if !command.trim().starts_with("ducktape ") {
-        command = format!("ducktape {}", command);
-    }
-
-    Ok(command)
+    Ok(results.join("\n"))
 }
 
 // Add a helper function to extract email addresses
