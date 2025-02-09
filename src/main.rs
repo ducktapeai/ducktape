@@ -1,4 +1,5 @@
 mod calendar;
+mod config;
 mod file_search;
 mod notes;
 mod openai_parser;
@@ -6,9 +7,10 @@ mod state;
 mod todo;
 
 use anyhow::Result;
-use calendar::{EventConfig, create_event, delete_event}; // Add these imports
+use calendar::{create_event, delete_event, EventConfig};
+use config::Config;
 use env_logger::Env;
-use log::{error, info};
+use log::{debug, error, info};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
@@ -30,35 +32,36 @@ impl CommandArgs {
         let mut current = String::new();
         let mut in_quotes = false;
         let mut chars = input.chars().peekable();
+        let mut escaped = false;
 
         while let Some(c) = chars.next() {
             match c {
-                '"' => {
-                    if let Some('\\') = chars.peek() {
-                        // Found an escaped quote
-                        chars.next(); // Skip the backslash
-                        current.push('"');
-                    } else {
-                        in_quotes = !in_quotes;
-                        if !in_quotes && !current.is_empty() {
-                            parts.push(current.clone());
-                            current.clear();
-                        }
+                '\\' if !escaped => {
+                    escaped = true;
+                }
+                '"' if !escaped => {
+                    in_quotes = !in_quotes;
+                    if !in_quotes && !current.is_empty() {
+                        parts.push(current.clone());
+                        current.clear();
                     }
                 }
-                // Skip escaped backslashes before quotes
-                '\\' if chars.peek() == Some(&'"') => {
-                    continue;
-                }
-                ' ' if !in_quotes => {
+                ' ' if !in_quotes && !escaped => {
                     if !current.is_empty() {
                         parts.push(current.clone());
                         current.clear();
                     }
                 }
-                _ => current.push(c),
+                _ => {
+                    if escaped && c != '"' {
+                        current.push('\\');
+                    }
+                    current.push(c);
+                    escaped = false;
+                }
             }
         }
+
         if !current.is_empty() {
             parts.push(current);
         }
@@ -124,6 +127,10 @@ impl CommandArgs {
 }
 
 fn main() -> Result<()> {
+    // Load configuration
+    let config = Config::load()?;
+    debug!("Loaded configuration: {:?}", config);
+
     // Initialize logging with custom format
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
         .format(|buf, record| {
@@ -180,6 +187,7 @@ fn main() -> Result<()> {
 
 fn process_command(command: &str) -> Result<()> {
     if !command.trim().starts_with("ducktape") {
+        // Remove unnecessary parentheses
         let runtime = tokio::runtime::Runtime::new()?;
         match runtime.block_on(crate::openai_parser::parse_natural_language(command)) {
             Ok(commands) => {
@@ -236,12 +244,15 @@ fn process_command(command: &str) -> Result<()> {
                 println!("Stored Calendar Events:");
                 for event in events {
                     println!(
-                        "  - {} [{}]",
-                        event.title,
+                        "  - {}",    // Fix: Remove extra format parameter
+                        event.title  // Add the event title here
+                    );
+                    println!(
+                        "    Time: {}",
                         if event.all_day {
-                            "All day"
+                            "All day".to_string()
                         } else {
-                            &event.time
+                            event.time.clone()
                         }
                     );
                     println!("    Date: {}", event.date);
@@ -371,7 +382,9 @@ fn handle_calendar_command(args: &[String]) -> Result<()> {
         Some("create") | None => {
             if args.len() < 5 {
                 println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
-                println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\"");
+                println!(
+                    "Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\""
+                );
                 return Ok(());
             }
             let title = &args[1];
@@ -501,17 +514,28 @@ mod tests {
 
     #[test]
     fn test_command_args_parse_quoted_strings() {
-        let input = r#"ducktape calendar "Meeting with \"quotes\"" 2024-02-21"#;
-        let args = CommandArgs::parse(input).unwrap();
-        assert_eq!(
-            args.args[0], r#"Meeting with "quotes""#,
-            "\nExpected: Meeting with \"quotes\"\nGot: {}",
-            args.args[0]
-        );
+        let inputs = [
+            (
+                r#"ducktape calendar "Meeting with \"quotes\"" 2024-02-21"#,
+                r#"Meeting with "quotes""#,
+            ),
+            (
+                r#"ducktape calendar "Meeting \"quoted\" text" 2024-02-21"#,
+                r#"Meeting "quoted" text"#,
+            ),
+            (
+                r#"ducktape calendar "Simple meeting" 2024-02-21"#,
+                "Simple meeting",
+            ),
+        ];
 
-        // Add more test cases
-        let input2 = r#"ducktape calendar "Meeting \"quoted\" text" 2024-02-21"#;
-        let args2 = CommandArgs::parse(input2).unwrap();
-        assert_eq!(args2.args[0], r#"Meeting "quoted" text"#);
+        for (input, expected) in inputs {
+            let args = CommandArgs::parse(input).unwrap();
+            assert_eq!(
+                args.args[0], expected,
+                "\nInput: {}\nExpected: {}\nGot: {}\n",
+                input, expected, args.args[0]
+            );
+        }
     }
 }

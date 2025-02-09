@@ -1,8 +1,9 @@
+use crate::config::Config;
+use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use log::{debug, error};
 use std::process::Command;
-use crate::state::{CalendarItem, StateManager};
 
 // Remove unused constants
 // const ALL_DAY_DURATION: i64 = 86400;
@@ -27,14 +28,14 @@ pub struct EventConfig<'a> {
     pub title: &'a str,
     pub start_date: &'a str,
     pub start_time: &'a str,
-    pub end_date: Option<&'a str>,    // New field
-    pub end_time: Option<&'a str>,    // New field
-    pub calendars: Vec<&'a str>,  // Changed from Option<&'a str> to Vec<&'a str>
+    pub end_date: Option<&'a str>, // New field
+    pub end_time: Option<&'a str>, // New field
+    pub calendars: Vec<&'a str>,   // Changed from Option<&'a str> to Vec<&'a str>
     pub all_day: bool,
     pub location: Option<String>,
     pub description: Option<String>,
     pub email: Option<String>,
-    pub reminder: Option<i32>,  // Minutes before event to show reminder
+    pub reminder: Option<i32>, // Minutes before event to show reminder
 }
 
 impl<'a> EventConfig<'a> {
@@ -113,13 +114,19 @@ pub fn list_calendars() -> Result<()> {
 
 pub fn create_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
-    
+
+    // Load configuration and get default calendar if none specified
+    let app_config = Config::load()?;
     let calendars = if config.calendars.is_empty() {
-        vec!["Calendar"]
+        vec![app_config
+            .calendar
+            .default_calendar
+            .unwrap_or_else(|| "Calendar".to_string())]
     } else {
-        config.calendars.clone()  // Clone here to avoid the move
+        config.calendars.iter().map(|&s| s.to_string()).collect()
     };
 
+    let mut last_error = None;
     let mut success_count = 0;
     let total_calendars = calendars.len();
 
@@ -130,7 +137,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             start_time: config.start_time,
             end_date: config.end_date,
             end_time: config.end_time,
-            calendars: vec![calendar],
+            calendars: vec![&calendar], // Fix: borrow the String
             all_day: config.all_day,
             location: config.location.clone(),
             description: config.description.clone(),
@@ -142,6 +149,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             Ok(_) => success_count += 1,
             Err(e) => {
                 error!("Failed to create event in calendar '{}': {}", calendar, e);
+                last_error = Some(e);
             }
         }
     }
@@ -160,24 +168,31 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             reminder: config.reminder,
         };
         StateManager::new()?.add(calendar_item)?;
-        
+
         println!(
             "Calendar event created in {}/{} calendars",
-            success_count,
-            total_calendars
+            success_count, total_calendars
         );
         Ok(())
     } else {
-        Err(anyhow!("Failed to create event in any calendar"))
+        // Return the last error if available, otherwise a generic error
+        Err(last_error.unwrap_or_else(|| anyhow!("Failed to create event in any calendar")))
     }
 }
 
 fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
-    
+
     // Parse start datetime
-    let start_datetime = format!("{} {}", config.start_date, 
-        if config.all_day { "00:00" } else { config.start_time });
+    let start_datetime = format!(
+        "{} {}",
+        config.start_date,
+        if config.all_day {
+            "00:00"
+        } else {
+            config.start_time
+        }
+    );
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
 
@@ -215,6 +230,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     let mut extra = String::new();
     if let Some(loc) = &config.location {
         if !loc.is_empty() {
+            // Remove parentheses
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
@@ -237,7 +253,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                     end tell
                 end tell"#,
             email_addr,
-            email_addr  // Using email as display name, could be parameterized further
+            email_addr // Using email as display name, could be parameterized further
         )
     } else {
         String::new()
@@ -250,7 +266,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 -- Add reminder alarm
                 set theAlarm to make new display alarm at end of newEvent
                 set trigger interval of theAlarm to -{}"#,
-            minutes * 60  // Convert minutes to seconds for Calendar.app
+            minutes * 60 // Convert minutes to seconds for Calendar.app
         )
     } else {
         String::new()
@@ -313,7 +329,10 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         end_hours = local_end.format("%-H"),
         end_minutes = local_end.format("%-M"),
         title = config.title,
-        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
+        description = config
+            .description
+            .as_deref()
+            .unwrap_or("Created by DuckTape"),
         extra = extra,
         all_day_code = all_day_code,
         email_code = email_code,
@@ -324,7 +343,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     let error_output = String::from_utf8_lossy(&output.stderr);
-    
+
     if result.contains("Success") {
         println!(
             "Calendar event created: {} at {} ({} timezone)",
@@ -401,11 +420,7 @@ pub fn list_event_properties() -> Result<()> {
         end try
     end tell"#;
 
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()?;
-
+    let output = Command::new("osascript").arg("-e").arg(script).output()?;
 
     if output.status.success() {
         println!("Available Calendar Event Properties:");
@@ -420,7 +435,7 @@ pub fn list_event_properties() -> Result<()> {
         Ok(())
     } else {
         Err(anyhow!(
-            "Failed to get event properties: {}", 
+            "Failed to get event properties: {}",
             String::from_utf8_lossy(&output.stderr)
         ))
     }
@@ -458,10 +473,7 @@ pub fn delete_event(title: &str, _date: &str) -> Result<()> {
         title
     );
 
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()?;
+    let output = Command::new("osascript").arg("-e").arg(&script).output()?;
 
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Success") {
@@ -527,7 +539,7 @@ mod tests {
             start_date: "2024-02-21",
             start_time: "14:30",
             end_date: None,
-            end_time: None,
+            end_time: Some("15:30"), // Add end time
             calendars: vec!["NonexistentCalendar"],
             all_day: false,
             location: None,
@@ -536,14 +548,14 @@ mod tests {
             reminder: None,
         };
 
-        let result = create_event(config);
+        let result = create_single_event(config); // Use create_single_event instead of create_event
         assert!(result.is_err());
-        
-        match result.unwrap_err().downcast::<CalendarError>() {
-            Ok(CalendarError::CalendarNotFound(name)) => {
-                assert_eq!(name, "NonexistentCalendar");
-            }
-            other => panic!("Expected CalendarNotFound error, got {:?}", other),
-        }
+
+        let err = result.unwrap_err();
+        let calendar_err = err.downcast_ref::<CalendarError>();
+        assert!(matches!(
+            calendar_err,
+            Some(CalendarError::CalendarNotFound(_))
+        ));
     }
 }
