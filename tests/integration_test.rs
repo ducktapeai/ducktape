@@ -1,52 +1,76 @@
 use anyhow::Result;
-use ducktape::state::{StateManager, TodoItem, CalendarItem};
+use ducktape::state::{CalendarItem, StateManager, TodoItem};
+use std::env;
+use std::fs;
+use tempfile::tempdir;
+
+fn setup_test_env() -> Result<(tempfile::TempDir, StateManager)> {
+    // Create a temporary directory for state
+    let temp_dir = tempdir()?;
+
+    // Set up the home directory for the test
+    env::set_var("HOME", temp_dir.path());
+
+    // Create .ducktape directory
+    let ducktape_dir = temp_dir.path().join(".ducktape");
+    fs::create_dir_all(&ducktape_dir)?;
+
+    // Initialize state manager
+    let state_manager = StateManager::new()?;
+
+    Ok((temp_dir, state_manager))
+}
 
 #[test]
 fn test_calendar_operations() -> Result<()> {
-    let manager = StateManager::new()?;
-    
-    // Test calendar event creation and storage
+    let (_temp_dir, state_manager) = setup_test_env()?;
+
+    // Create a test event
     let event = CalendarItem {
-        title: "Test Event".to_string(),
-        date: "2025-02-21".to_string(),
+        title: "Meeting Title".to_string(),
+        date: "2024-02-21".to_string(),
         time: "14:30".to_string(),
-        calendars: vec!["Calendar".to_string()],
+        calendars: vec!["Test Calendar".to_string()],
         all_day: false,
-        location: Some("Test Location".to_string()),
-        description: Some("Test Description".to_string()),
+        location: None,
+        description: None,
         email: None,
-        reminder: Some(30),
+        reminder: None,
     };
-    
-    manager.add(event)?;
-    
-    let events: Vec<CalendarItem> = manager.load()?;
-    assert!(!events.is_empty());
-    assert_eq!(events[0].title, "Test Event");
-    
+
+    // Save the event and verify it was saved
+    state_manager.add(event.clone())?;
+    let events = state_manager.load::<CalendarItem>()?;
+    assert!(!events.is_empty(), "No events found after adding one");
+    assert_eq!(events[0].title, "Meeting Title");
+    assert_eq!(events[0].date, "2024-02-21");
+
     Ok(())
 }
 
 #[test]
 fn test_todo_operations() -> Result<()> {
-    let manager = StateManager::new()?;
-    
-    // Test todo creation and storage
+    let (_temp_dir, state_manager) = setup_test_env()?;
+
+    // Create a test todo
     let todo = TodoItem {
-        title: "Test Todo".to_string(),
-        notes: Some("Test Notes".to_string()),
-        lists: vec!["Test List".to_string()],
-        reminder_time: Some("2025-02-21 14:30".to_string()),
+        title: "Buy Groceries".to_string(),
+        notes: Some("Milk, bread, eggs".to_string()),
+        lists: vec!["Shopping".to_string()],
+        reminder_time: None,
     };
-    
-    manager.add(todo)?;
-    
-    let todos: Vec<TodoItem> = manager.load()?;
-    assert!(!todos.is_empty());
-    assert_eq!(todos[0].title, "Test Todo");
-    
+
+    // Save the todo and verify it was saved
+    state_manager.add(todo.clone())?;
+    let todos = state_manager.load::<TodoItem>()?;
+    assert!(!todos.is_empty(), "No todos found after adding one");
+    let first_todo = &todos[0];
+    assert_eq!(first_todo.title, "Buy Groceries");
+    assert!(
+        !first_todo.lists.is_empty(),
+        "Todo should have at least one list"
+    );
+    assert_eq!(first_todo.lists[0], "Shopping");
+
     Ok(())
 }
-
-// Remove the CommandArgs test since it's now an implementation detail
-// and should be tested in the main.rs unit tests

@@ -1,9 +1,9 @@
 use anyhow::Result;
+use chrono::{DateTime, Duration, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
-use chrono::{DateTime, Local, Duration};
 
 const STATE_DIR: &str = ".ducktape";
 const TODOS_FILE: &str = "todos.json";
@@ -15,7 +15,8 @@ pub trait Persistent: Sized + Serialize + for<'de> Deserialize<'de> {
     fn filename() -> &'static str;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+// Make the structs public and cloneable
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TodoItem {
     pub title: String,
     pub notes: Option<String>,
@@ -23,7 +24,8 @@ pub struct TodoItem {
     pub reminder_time: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+// Make the structs public and cloneable
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CalendarItem {
     pub title: String,
     pub date: String,
@@ -36,7 +38,7 @@ pub struct CalendarItem {
     pub reminder: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteItem {
     pub title: String,
     pub content: String,
@@ -92,7 +94,7 @@ impl StateManager {
             .create(true)
             .truncate(true)
             .open(path)?;
-        
+
         let writer = BufWriter::new(file);
         serde_json::to_writer_pretty(writer, items)?;
         Ok(())
@@ -111,7 +113,7 @@ impl StateManager {
         events.retain(|event| {
             if let Ok(event_date) = DateTime::parse_from_str(
                 &format!("{} {}", event.date, event.time),
-                "%Y-%m-%d %H:%M"
+                "%Y-%m-%d %H:%M",
             ) {
                 event_date > now
             } else {
@@ -123,7 +125,8 @@ impl StateManager {
         // Clean up old todos
         let todos: Vec<TodoItem> = self.load()?;
         let one_month_ago = now - Duration::days(30);
-        let todos: Vec<_> = todos.into_iter()
+        let todos: Vec<_> = todos
+            .into_iter()
             .filter(|todo| {
                 if let Some(time) = &todo.reminder_time {
                     if let Ok(todo_date) = DateTime::parse_from_str(time, "%Y-%m-%d %H:%M") {
@@ -143,9 +146,8 @@ impl StateManager {
         for filename in &[TODOS_FILE, EVENTS_FILE, NOTES_FILE] {
             let path = self.state_dir.join(filename);
             if path.exists() {
-                let items: serde_json::Value = serde_json::from_reader(
-                    BufReader::new(File::open(&path)?)
-                )?;
+                let items: serde_json::Value =
+                    serde_json::from_reader(BufReader::new(File::open(&path)?))?;
                 let file = OpenOptions::new()
                     .write(true)
                     .truncate(true)
@@ -171,7 +173,7 @@ pub fn load_events() -> Result<Vec<CalendarItem>> {
     manager.load()
 }
 
-// Add convenience function for notes
+#[allow(dead_code)] // Add this attribute since we might use this function later
 pub fn load_notes() -> Result<Vec<NoteItem>> {
     StateManager::new()?.load()
 }
@@ -179,8 +181,8 @@ pub fn load_notes() -> Result<Vec<NoteItem>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::env;
+    use tempfile::tempdir;
 
     #[test]
     fn test_state_manager() -> Result<()> {
@@ -224,4 +226,3 @@ mod tests {
         Ok(())
     }
 }
-
