@@ -76,13 +76,7 @@ pub fn list_calendars() -> Result<()> {
             set output to {}
             repeat with aCal in calendars
                 set calInfo to name of aCal
-                try
-                    tell aCal
-                        if account is not missing value then
-                            set calInfo to calInfo & " (Account: " & (title of account) & ")"
-                        end if
-                    end tell
-                end try
+                -- Removed block referencing 'account'
                 copy calInfo to end of output
             end repeat
             return output
@@ -242,23 +236,6 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         ""
     };
 
-    // Build email code block if provided, using documented Apple syntax
-    let email_code = if let Some(email_addr) = &config.email {
-        format!(
-            r#"
-                -- Add attendee
-                tell application "Calendar"
-                    tell newEvent
-                        make new attendee at end with properties {{email:"{}", display name:"{}"}}
-                    end tell
-                end tell"#,
-            email_addr,
-            email_addr // Using email as display name, could be parameterized further
-        )
-    } else {
-        String::new()
-    };
-
     // Build reminder code block if provided
     let reminder_code = if let Some(minutes) = config.reminder {
         format!(
@@ -267,6 +244,21 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 set theAlarm to make new display alarm at end of newEvent
                 set trigger interval of theAlarm to -{}"#,
             minutes * 60 // Convert minutes to seconds for Calendar.app
+        )
+    } else {
+        String::new()
+    };
+
+    // Build the email attendee code
+    let email_setup = if let Some(email) = &config.email {
+        format!(
+            r#"
+                -- Create attendee list with email
+                set attendeeList to {{}}
+                set attendeeEmail to "{0}"
+                set newAttendee to make new attendee at end with properties {{email: attendeeEmail, display name: attendeeEmail}}
+                copy newAttendee to end of attendeeList"#,
+            email
         )
     } else {
         String::new()
@@ -284,9 +276,9 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                         exit repeat
                     end if
                 end repeat
-                if targetCal is missing value then
-                    error "Calendar '" & calendarName & "' not found"
-                end if
+
+                {email_setup}
+                
                 -- Set up start date and end date
                 set startDate to current date
                 set endDate to current date
@@ -307,10 +299,21 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 set minutes of endDate to {end_minutes}
                 set seconds of endDate to 0
                 
-                -- Build properties and create the event
+                -- Create event with all properties
                 tell targetCal
-                    set newEvent to make new event at end with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
-                    {all_day_code}{email_code}{reminder_code}
+                    set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
+                    {all_day_code}
+                    {reminder_code}
+                    
+                    -- Add attendee if email was specified
+                    if {has_email} then
+                        tell newEvent
+                            make new attendee at end with properties {{email: attendeeEmail, display name: attendeeEmail}}
+                        end tell
+                    end if
+                    
+                    -- Force save all changes
+                    save
                 end tell
                 return "Success: Event created"
             on error errMsg
@@ -335,8 +338,9 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             .unwrap_or("Created by DuckTape"),
         extra = extra,
         all_day_code = all_day_code,
-        email_code = email_code,
-        reminder_code = reminder_code
+        reminder_code = reminder_code,
+        has_email = config.email.is_some(),
+        email_setup = email_setup
     );
 
     println!("Debug: Generated AppleScript:\n{}", script);

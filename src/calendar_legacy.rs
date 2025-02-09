@@ -1,0 +1,25 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    // ...existing code from your snippet...pub fn list_event_properties() -> Result<()> {}    // ...existing code from your snippet...) -> Result<()> {    email: Option<String>,    description: Option<String>,    location: Option<String>,    all_day: bool,    calendar_id: Option<&str>,    time: &str,    date: &str,    title: &str,pub fn create_event(}    // ...existing code from your snippet...pub fn list_calendars() -> Result<()> {use std::process::Command;use chrono::{DateTime, Local, NaiveDateTime, TimeZone};use anyhow::{anyhow, Result};
