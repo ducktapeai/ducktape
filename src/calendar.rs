@@ -254,10 +254,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         format!(
             r#"
                 -- Create attendee list with email
-                set attendeeList to {{}}
-                set attendeeEmail to "{0}"
-                set newAttendee to make new attendee at end with properties {{email: attendeeEmail, display name: attendeeEmail}}
-                copy newAttendee to end of attendeeList"#,
+                set attendeeEmail to "{0}""#,
             email
         )
     } else {
@@ -307,9 +304,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                     
                     -- Add attendee if email was specified
                     if {has_email} then
-                        tell newEvent
-                            make new attendee at end with properties {{email: attendeeEmail, display name: attendeeEmail}}
-                        end tell
+                        make new attendee at end of attendees of newEvent with properties {{email:attendeeEmail}}
                     end if
                     
                     -- Force save all changes
