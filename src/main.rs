@@ -223,7 +223,7 @@ fn process_command(command: &str) -> Result<()> {
                 file_search::search(&args.args[0], &args.args[1])?;
                 Ok(())
             }
-            "calendar" => handle_calendar_command(&args.args),
+            "calendar" => handle_calendar_command(args),
             "calendars" => calendar::list_calendars(),
             "calendar-props" => calendar::list_event_properties(),
             "todo" => handle_todo_command(args),
@@ -377,35 +377,37 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
     Ok(())
 }
 
-fn handle_calendar_command(args: &[String]) -> Result<()> {
-    match args.get(0).map(|s| s.as_str()) {
+fn handle_calendar_command(args: CommandArgs) -> Result<()> {
+    match args.args.get(0).map(|s| s.as_str()) {
         Some("create") | None => {
-            if args.len() < 5 {
+            if args.args.len() < 5 {
                 println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
                 println!(
                     "Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\""
                 );
                 return Ok(());
             }
-            let title = &args[1];
-            let date = &args[2];
-            let start_time = &args[3];
-            let end_time = &args[4];
-            let calendar = args.get(5).map(|s| s.as_str());
-
+            let title = &args.args[1];
+            let date = &args.args[2];
+            let start_time = &args.args[3];
+            let end_time = &args.args[4];
+            let calendar = args.args.get(5).map(|s| s.as_str());
             let mut config = EventConfig::new(title, date, start_time);
             config.end_time = Some(end_time);
             if let Some(cal) = calendar {
                 config.calendars = vec![cal];
             }
+            if let Some(email) = args.flags.get("--email") {
+                config.email = email.clone();
+            }
             create_event(config)
         }
         Some("delete") => {
-            if args.len() < 2 {
+            if args.args.len() < 2 {
                 println!("Usage: calendar delete <title>");
                 return Ok(());
             }
-            let title = &args[1];
+            let title = &args.args[1];
             delete_event(title, "")
         }
         _ => {
