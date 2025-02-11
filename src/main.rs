@@ -187,30 +187,20 @@ fn main() -> Result<()> {
 
 fn process_command(command: &str) -> Result<()> {
     if !command.trim().starts_with("ducktape") {
-        // Remove unnecessary parentheses
         let runtime = tokio::runtime::Runtime::new()?;
-        match runtime.block_on(crate::openai_parser::parse_natural_language(command)) {
-            Ok(commands) => {
-                for cmd in commands.lines() {
-                    let trimmed = cmd.trim();
-                    if !trimmed.is_empty() {
-                        println!("🦆 Executing: {}", trimmed);
-                        if let Err(e) = process_command(trimmed) {
-                            println!("❌ Command failed: {}", e);
-                            // Continue with next command even if one fails
-                            continue;
-                        }
-                    }
-                }
-                return Ok(());
-            }
-            Err(e) => {
-                if e.to_string().contains("Please specify which calendar") {
-                    println!("🤔 {}", e);
-                    return Ok(());
-                }
-                return Err(e);
-            }
+        let response = runtime.block_on(crate::openai_parser::parse_natural_language(command))?;
+        if response.to_lowercase().contains("please provide") {
+            println!("{}", response);
+            // Prompt user for missing details.
+            let mut rl = rustyline::DefaultEditor::new()?;
+            let additional = rl.readline(">> Additional details: ")?;
+            let combined = format!("{} {}", command, additional);
+            let new_response = runtime.block_on(crate::openai_parser::parse_natural_language(&combined))?;
+            println!("{}", new_response);
+            return Ok(());
+        } else {
+            println!("{}", response);
+            return Ok(());
         }
     } else {
         let args = CommandArgs::parse(command)?;
@@ -322,7 +312,7 @@ fn process_command(command: &str) -> Result<()> {
             }
             _ => {
                 println!("Unknown command. Type 'ducktape --help' for available commands.");
-                Ok(())
+                return Ok(());
             }
         }
     }
@@ -380,19 +370,19 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
 fn handle_calendar_command(args: CommandArgs) -> Result<()> {
     match args.args.get(0).map(|s| s.as_str()) {
         Some("create") | None => {
-            if args.args.len() < 5 {
+            // Require at least: "create" + title + date + start_time + end_time = 5 tokens minimum
+            if args.args.len() < 6 {
                 println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
-                println!(
-                    "Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\""
-                );
+                println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\"");
                 return Ok(());
             }
+            // Adjust indices: args.args[0] is "create"
             let title = &args.args[1];
             let date = &args.args[2];
             let start_time = &args.args[3];
             let end_time = &args.args[4];
             let calendar = args.args.get(5).map(|s| s.as_str());
-            let mut config = EventConfig::new(title, date, start_time);
+            let mut config = calendar::EventConfig::new(title, date, start_time);
             config.end_time = Some(end_time);
             if let Some(cal) = calendar {
                 config.calendars = vec![cal];
@@ -400,7 +390,7 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
             if let Some(email) = args.flags.get("--email") {
                 config.email = email.clone();
             }
-            create_event(config)
+            calendar::create_event(config)
         }
         Some("delete") => {
             if args.args.len() < 2 {
@@ -408,7 +398,7 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                 return Ok(());
             }
             let title = &args.args[1];
-            delete_event(title, "")
+            calendar::delete_event(title, "")
         }
         _ => {
             println!("Unknown calendar command. Use 'calendar create' or 'calendar delete'.");

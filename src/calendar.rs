@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
-use log::{debug, error};
+use log::{debug, error, info}; // Import the info macro
 use std::process::Command;
 
 // Remove unused constants
@@ -224,14 +224,13 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     let mut extra = String::new();
     if let Some(loc) = &config.location {
         if !loc.is_empty() {
-            // Remove parentheses
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
 
     // Set up a separate code block for marking the event as an all-day event.
     let all_day_code = if config.all_day {
-        "\n                set allday event of newEvent to true"
+        "\n                    set allday event of newEvent to true"
     } else {
         ""
     };
@@ -240,9 +239,9 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     let reminder_code = if let Some(minutes) = config.reminder {
         format!(
             r#"
-                -- Add reminder alarm
-                set theAlarm to make new display alarm at end of newEvent
-                set trigger interval of theAlarm to -{}"#,
+                    -- Add reminder alarm
+                    set theAlarm to make new display alarm at end of newEvent
+                    set trigger interval of theAlarm to -{}"#,
             minutes * 60 // Convert minutes to seconds for Calendar.app
         )
     } else {
@@ -251,32 +250,37 @@ fn create_single_event(config: EventConfig) -> Result<()> {
 
     // Build the email attendee code
     let email_setup = if let Some(email) = &config.email {
-        format!(
+         format!(
             r#"
-                -- Create attendee list with email
-                set attendeeEmail to "{0}""#,
+                    -- Add attendee with email
+                    set attendeeEmail to "{0}"
+                    make new attendee at end of attendees of newEvent with properties {{email:attendeeEmail}}"#,
             email
         )
     } else {
         String::new()
     };
 
+    // Build updated AppleScript with proper attendee handling
     let script = format!(
         r#"tell application "Calendar"
             try
-                -- Find calendar
                 set calendarName to "{calendar_name}"
                 set targetCal to missing value
+                
+                -- Find the target calendar
                 repeat with c in calendars
                     if name of c is calendarName then
                         set targetCal to c
                         exit repeat
                     end if
                 end repeat
-
-                {email_setup}
                 
-                -- Set up start date and end date
+                if targetCal is missing value then
+                    error "Calendar '" & calendarName & "' not found"
+                end if
+
+                -- Create the event dates
                 set startDate to current date
                 set endDate to current date
                 
@@ -295,21 +299,21 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 set hours of endDate to {end_hours}
                 set minutes of endDate to {end_minutes}
                 set seconds of endDate to 0
-                
-                -- Create event with all properties
+
                 tell targetCal
+                    -- Create the event
                     set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
+                    
                     {all_day_code}
                     {reminder_code}
                     
-                    -- Add attendee if email was specified
-                    if {has_email} then
-                        make new attendee at end of attendees of newEvent with properties {{email:attendeeEmail}}
-                    end if
-                    
-                    -- Force save all changes
-                    save
+                    -- Add attendee if specified
+                    {attendee_code}
                 end tell
+                
+                save
+                reload calendars
+                
                 return "Success: Event created"
             on error errMsg
                 return "Error: " & errMsg
@@ -327,47 +331,46 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         end_hours = local_end.format("%-H"),
         end_minutes = local_end.format("%-M"),
         title = config.title,
-        description = config
-            .description
-            .as_deref()
-            .unwrap_or("Created by DuckTape"),
+        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         extra = extra,
         all_day_code = all_day_code,
         reminder_code = reminder_code,
-        has_email = config.email.is_some(),
-        email_setup = email_setup
+        attendee_code = if let Some(email) = &config.email {
+            format!(r#"
+                    -- Add attendee with email
+                    tell newEvent
+                        make new attendee at end of attendees with properties {{email:"{}"}}
+                    end tell"#, 
+                email
+            )
+        } else {
+            String::new()
+        }
     );
 
-    println!("Debug: Generated AppleScript:\n{}", script);
+    debug!("Generated AppleScript:\n{}", script);
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     let error_output = String::from_utf8_lossy(&output.stderr);
 
     if result.contains("Success") {
-        println!(
+        info!(
             "Calendar event created: {} at {} ({} timezone)",
             config.title,
             format!("{} {}", config.start_date, config.start_time),
             local_start.offset()
         );
+        if config.email.is_some() {
+            info!("Added attendee: {}", config.email.as_ref().unwrap());
+        }
         Ok(())
     } else {
-        // First check for calendar not found error
+        error!("AppleScript returned error. STDOUT: {} | STDERR: {}", result, error_output);
         if result.contains("Calendar '") && result.contains("' not found") {
             if let Some(cal_id) = config.calendars.get(0) {
                 return Err(CalendarError::CalendarNotFound(cal_id.to_string()).into());
             }
         }
-
-        // Log debug information
-        if let Some(cal_id) = config.calendars.get(0) {
-            debug!("Attempted to find calendar matching '{}'", cal_id);
-        }
-        if !error_output.is_empty() {
-            debug!("AppleScript error: {}", error_output);
-        }
-
-        // Return appropriate error
         Err(if result.is_empty() {
             CalendarError::ScriptError("Unknown error occurred".to_string()).into()
         } else {
@@ -376,7 +379,6 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     }
 }
 
-/// Ensures Calendar.app is running and ready
 fn ensure_calendar_running() -> Result<()> {
     let check_script = r#"tell application "Calendar" to if it is running then return true"#;
     let check = Command::new("osascript")
@@ -524,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_invalid_datetime() {
+    fn test_invalid_datetime() {
         let config = EventConfig::new("Test", "invalid-date", "25:00");
         let datetime = format!("{} {}", config.start_date, config.start_time);
         let result = NaiveDateTime::parse_from_str(&datetime, "%Y-%m-%d %H:%M");
