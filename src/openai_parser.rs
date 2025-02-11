@@ -2,7 +2,7 @@
 use crate::calendar;
 use crate::config::Config;
 use anyhow::{anyhow, Result};
-use chrono::{Local, Timelike}; // Add Timelike trait
+use chrono::{Local, Timelike, NaiveTime}; // Remove Datelike
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -58,6 +58,8 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         .unwrap_or_else(|| "Calendar".to_string());
 
     let current_date = Local::now();
+    let current_hour = current_date.hour();
+    let current_minute = current_date.minute();
     let system_prompt = format!(
         r#"You are a command line interface parser that converts natural language into ducktape commands.
 Current time is: {}
@@ -82,7 +84,7 @@ Rules:
         available_calendars.join(", "),
         default_calendar,
         current_date.format("%Y-%m-%d"),
-        (current_date.hour() + 1).min(23),
+        (current_hour + 1).min(23),
         available_calendars.join(", ")
     );
 
@@ -146,50 +148,116 @@ Rules:
                 }
             } else if trimmed.contains("calendar create") {
                 let parts: Vec<&str> = trimmed.split('"').collect();
-                if parts.len() >= 3 {
-                    let title = parts[1];
-                    let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
-                    if rest.len() >= 3 {
-                        // Enhanced calendar selection logic
-                        let requested_calendar = if input.to_lowercase().contains("kids calendar")
-                            || input.to_lowercase().contains("kids calander")
-                            || input.to_lowercase().contains("children")
-                            || input.to_lowercase().contains("to my kids")
-                        {
-                            "KIDS"
-                        } else if input.to_lowercase().contains("work calendar")
-                            || input.to_lowercase().contains("work calander")
-                        {
-                            "Work"
-                        } else if input.to_lowercase().contains("home calendar")
-                            || input.to_lowercase().contains("home calander")
-                        {
-                            "Home"
+                if parts.len() < 3 {
+                    // Not enough details; ask clarifying questions.
+                    results.push("Please provide the event title, date, start and end time, and desired calendar.".to_string());
+                    continue;
+                }
+                let title = parts[1];
+                let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
+                if rest.len() < 3 {
+                    // Incomplete event info; ask for clarification.
+                    results.push("Your event details seem incomplete. Could you specify the event title, date, start time, end time, and calendar?".to_string());
+                    continue;
+                }
+                
+                let requested_calendar = if input.to_lowercase().contains("kids calendar")
+                    || input.to_lowercase().contains("kids calander")
+                    || input.to_lowercase().contains("children")
+                    || input.to_lowercase().contains("to my kids")
+                {
+                    "KIDS"
+                } else if input.to_lowercase().contains("work calendar")
+                    || input.to_lowercase().contains("work calander")
+                {
+                    "Work"
+                } else if input.to_lowercase().contains("home calendar")
+                    || input.to_lowercase().contains("home calander")
+                {
+                    "Home"
+                } else {
+                    &default_calendar
+                };
+
+                if rest.len() >= 3 {
+                    // Enhanced calendar selection logic
+                    // Check if the specified time is in the past and adjust date if needed
+                    let start_time = rest[1];
+                    let parsed_time_result = NaiveTime::parse_from_str(start_time, "%H:%M");
+
+                    match parsed_time_result {
+                        Ok(parsed_time) => {
+                            let start_hour: u32 = parsed_time.hour();
+                            let start_minute: u32 = parsed_time.minute();
+
+                            let event_datetime = current_date
+                                .date_naive()
+                                .and_time(NaiveTime::from_hms_opt(start_hour, start_minute, 0).unwrap());
+
+                            if event_datetime < current_date.naive_local() {
+                                let tomorrow = current_date.date_naive().succ_opt().unwrap();
+                                log::info!("Event time {} has passed today; adjusting date to {}", start_time, tomorrow);
+                                let command = format!(
+                                    r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                                    title,
+                                    tomorrow.format("%Y-%m-%d"),
+                                    rest[1],
+                                    rest[2],
+                                    requested_calendar
+                                );
+                                results.push(command);
+                                continue;
+                            }
+                        }
+                        Err(_) => {
+                            log::warn!("Could not parse time {}", start_time);
+                        }
+                    }
+
+                    let command = format!(
+                        r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                        title, rest[0], rest[1], rest[2], requested_calendar
+                    );
+
+                    // Add email if present in the input
+                    let mut command = if input.contains("invite") || input.contains("email") {
+                        if let Ok(email) = extract_email(input) {
+                            format!(r#"{} --email "{}""#, command, email)
                         } else {
-                            &default_calendar
-                        };
-
-                        // Validate that the calendar exists
-                        if !available_calendars.iter().any(|c| c == requested_calendar) {
-                            return Err(anyhow!(
-                                "Calendar '{}' not found. Available calendars: {}",
-                                requested_calendar,
-                                available_calendars.join(", ")
-                            ));
+                            command
                         }
+                    } else {
+                        command
+                    };
 
-                        let mut command = format!(
-                            r#"ducktape calendar create "{}" {} {} {} "{}""#,
-                            title, rest[0], rest[1], rest[2], requested_calendar
-                        );
+                    results.push(command);
+                } else if rest.len() == 2 {
+                    // Handle case where end time is not provided
+                    let start_time = rest[1];
+                    let parsed_time_result = NaiveTime::parse_from_str(start_time, "%H:%M");
+                    
+                    match parsed_time_result {
+                        Ok(parsed_time) => {
+                            let start_hour: u32 = parsed_time.hour(); // Define start_hour here
+                            let start_minute: u32 = parsed_time.minute();
 
-                        // Add email if present in the input
-                        if input.contains("invite") || input.contains("email") {
-                            let email = extract_email(input)?;
-                            command.push_str(&format!(r#" --email "{}""#, email));
+                            let event_datetime = current_date
+                                .date_naive()
+                                .and_time(NaiveTime::from_hms_opt(start_hour, start_minute, 0).unwrap());
+
+                            if event_datetime < current_date.naive_local() {
+                                return Err(anyhow!("The event time you specified has already passed. Please provide a future time for the event."));
+                            }
+                            let end_time = format!("{}:00", (start_hour + 1) % 24);
+                            let command = format!(
+                                r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                                title, rest[0], start_time, end_time, requested_calendar
+                            );
+                            results.push(command);
                         }
-
-                        results.push(command);
+                        Err(_) => {
+                            log::warn!("Could not parse time {}", start_time);
+                        }
                     }
                 }
             } else {
