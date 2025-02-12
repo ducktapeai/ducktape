@@ -1,0 +1,7 @@
+# Ignore the ducktape.code-workspace file
+ducktape.code-workspace
+
+# Other files and directories to ignore
+target/
+*.rs.bk
+*.log
