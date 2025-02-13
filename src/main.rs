@@ -28,10 +28,19 @@ struct CommandArgs {
 
 impl CommandArgs {
     fn parse(input: &str) -> Result<Self> {
+        // Normalize input by replacing non-breaking spaces and multiple spaces with a single space
+        let normalized_input = input
+            .replace('\u{a0}', " ")  // Replace non-breaking spaces
+            .split_whitespace()  // Split on whitespace and normalize
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        debug!("Normalized input: {}", normalized_input);
+
         let mut parts = Vec::new();
         let mut current = String::new();
         let mut in_quotes = false;
-        let mut chars = input.chars().peekable();
+        let mut chars = normalized_input.chars().peekable();
         let mut escaped = false;
 
         while let Some(c) = chars.next() {
@@ -70,8 +79,10 @@ impl CommandArgs {
             return Err(anyhow::anyhow!("No command provided"));
         }
 
+        debug!("Parsed parts after normalization: {:?}", parts);
+
         // Special case for help command
-        if parts.len() == 1 && (parts[0] == "--help" || parts[0] == "-h") {
+        if parts.len() == 1 && (parts[0].eq_ignore_ascii_case("--help") || parts[0].eq_ignore_ascii_case("-h")) {
             return Ok(CommandArgs {
                 command: "help".to_string(),
                 args: vec![],
@@ -79,8 +90,10 @@ impl CommandArgs {
             });
         }
 
-        // Check for and remove "ducktape" prefix
-        if parts[0] != "ducktape" {
+        // Check for and remove "ducktape" prefix, being more lenient with case and whitespace
+        let first_part = parts[0].trim();
+        if !first_part.eq_ignore_ascii_case("ducktape") {
+            debug!("First part '{}' does not match 'ducktape'", first_part);
             return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
         }
         parts.remove(0); // Remove "ducktape"
@@ -89,16 +102,7 @@ impl CommandArgs {
             return Err(anyhow::anyhow!("No command provided after 'ducktape'"));
         }
 
-        // Check if the first argument after "ducktape" is a help flag
-        if parts[0] == "--help" || parts[0] == "-h" {
-            return Ok(CommandArgs {
-                command: "help".to_string(),
-                args: vec![],
-                flags: std::collections::HashMap::new(),
-            });
-        }
-
-        let command = parts.remove(0);
+        let command = parts.remove(0).to_lowercase();
         let mut args = Vec::new();
         let mut flags = std::collections::HashMap::new();
         let mut i = 0;
@@ -117,6 +121,8 @@ impl CommandArgs {
             }
             i += 1;
         }
+
+        debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, args, flags);
 
         Ok(CommandArgs {
             command,
@@ -186,7 +192,8 @@ fn main() -> Result<()> {
 }
 
 fn process_command(command: &str) -> Result<()> {
-    if !command.trim().starts_with("ducktape") {
+    // Case-insensitive check for ducktape prefix
+    if !command.trim().to_lowercase().starts_with("ducktape") {
         let runtime = tokio::runtime::Runtime::new()?;
         let response = runtime.block_on(crate::openai_parser::parse_natural_language(command))?;
         if response.to_lowercase().contains("please provide") {
@@ -202,118 +209,118 @@ fn process_command(command: &str) -> Result<()> {
             println!("{}", response);
             return Ok(());
         }
-    } else {
-        let args = CommandArgs::parse(command)?;
-        match args.command.as_str() {
-            "search" => {
-                if args.args.len() < 2 {
-                    println!("Usage: search <path> <pattern>");
-                    return Ok(());
-                }
-                file_search::search(&args.args[0], &args.args[1])?;
-                Ok(())
-            }
-            "calendar" => handle_calendar_command(args),
-            "calendars" => calendar::list_calendars(),
-            "calendar-props" => calendar::list_event_properties(),
-            "todo" => handle_todo_command(args),
-            "list-todos" => {
-                let todos = state::load_todos()?;
-                println!("Stored Todo Items:");
-                for item in todos {
-                    println!(
-                        "  - {} [{}]",
-                        item.title,
-                        item.reminder_time.as_deref().unwrap_or("No reminder")
-                    );
-                }
-                Ok(())
-            }
-            "list-events" => {
-                let events = state::load_events()?;
-                println!("Stored Calendar Events:");
-                for event in events {
-                    println!(
-                        "  - {}",    // Fix: Remove extra format parameter
-                        event.title  // Add the event title here
-                    );
-                    println!(
-                        "    Time: {}",
-                        if event.all_day {
-                            "All day".to_string()
-                        } else {
-                            event.time.clone()
-                        }
-                    );
-                    println!("    Date: {}", event.date);
-                    println!("    Calendars: {}", event.calendars.join(", "));
-                    if let Some(loc) = event.location {
-                        println!("    Location: {}", loc);
-                    }
-                    if let Some(desc) = event.description {
-                        println!("    Description: {}", desc);
-                    }
-                    if let Some(email) = event.email {
-                        println!("    Attendee: {}", email);
-                    }
-                    if let Some(reminder) = event.reminder {
-                        println!("    Reminder: {} minutes before", reminder);
-                    }
-                    println!(); // Empty line between events
-                }
-                Ok(())
-            }
-            "note" => {
-                if args.args.is_empty() {
-                    println!(
-                        "Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]"
-                    );
-                    return Ok(());
-                }
-                let content = args
-                    .flags
-                    .get("--content")
-                    .and_then(|c| c.as_ref())
-                    .map(|s| s.as_str())
-                    .unwrap_or("");
-                let mut config = notes::NoteConfig::new(&args.args[0], content);
-                if let Some(folder) = args.flags.get("--folder") {
-                    config.folder = folder.as_deref();
-                }
-                notes::create_note(config)
-            }
-            "notes" => notes::list_notes(),
-            "delete-event" => {
-                if args.args.len() < 1 {
-                    println!("Usage: delete-event \"<title>\"");
-                    return Ok(());
-                }
-                calendar::delete_event(
-                    &args.args[0],
-                    args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
-                )?;
-                // Also remove from state
-                let mut events = state::load_events()?;
-                events.retain(|e| e.title != args.args[0]);
-                state::StateManager::new()?.save(&events)?;
-                Ok(())
-            }
-            "cleanup" => {
-                println!("Cleaning up old items...");
-                state::StateManager::new()?.cleanup_old_items()?;
-                println!("Compacting storage files...");
-                state::StateManager::new()?.vacuum()?;
-                println!("Cleanup complete!");
-                Ok(())
-            }
-            "help" => print_help(),
-            "exit" => {
-                std::process::exit(0);
-            }
-            _ => {
-                println!("Unknown command. Type 'ducktape --help' for available commands.");
+    }
+    
+    let args = CommandArgs::parse(command)?;
+    match args.command.as_str() {
+        "search" => {
+            if args.args.len() < 2 {
+                println!("Usage: search <path> <pattern>");
                 return Ok(());
             }
+            file_search::search(&args.args[0], &args.args[1])?;
+            Ok(())
+        }
+        "calendar" => handle_calendar_command(args),
+        "calendars" => calendar::list_calendars(),
+        "calendar-props" => calendar::list_event_properties(),
+        "todo" => handle_todo_command(args),
+        "list-todos" => {
+            let todos = state::load_todos()?;
+            println!("Stored Todo Items:");
+            for item in todos {
+                println!(
+                    "  - {} [{}]",
+                    item.title,
+                    item.reminder_time.as_deref().unwrap_or("No reminder")
+                );
+            }
+            Ok(())
+        }
+        "list-events" => {
+            let events = state::load_events()?;
+            println!("Stored Calendar Events:");
+            for event in events {
+                println!(
+                    "  - {}",    // Fix: Remove extra format parameter
+                    event.title  // Add the event title here
+                );
+                println!(
+                    "    Time: {}",
+                    if event.all_day {
+                        "All day".to_string()
+                    } else {
+                        event.time.clone()
+                    }
+                );
+                println!("    Date: {}", event.date);
+                println!("    Calendars: {}", event.calendars.join(", "));
+                if let Some(loc) = event.location {
+                    println!("    Location: {}", loc);
+                }
+                if let Some(desc) = event.description {
+                    println!("    Description: {}", desc);
+                }
+                if let Some(email) = event.email {
+                    println!("    Attendee: {}", email);
+                }
+                if let Some(reminder) = event.reminder {
+                    println!("    Reminder: {} minutes before", reminder);
+                }
+                println!(); // Empty line between events
+            }
+            Ok(())
+        }
+        "note" => {
+            if args.args.is_empty() {
+                println!(
+                    "Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]"
+                );
+                return Ok(());
+            }
+            let content = args
+                .flags
+                .get("--content")
+                .and_then(|c| c.as_ref())
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            let mut config = notes::NoteConfig::new(&args.args[0], content);
+            if let Some(folder) = args.flags.get("--folder") {
+                config.folder = folder.as_deref();
+            }
+            notes::create_note(config)
+        }
+        "notes" => notes::list_notes(),
+        "delete-event" => {
+            if args.args.len() < 1 {
+                println!("Usage: delete-event \"<title>\"");
+                return Ok(());
+            }
+            calendar::delete_event(
+                &args.args[0],
+                args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
+            )?;
+            // Also remove from state
+            let mut events = state::load_events()?;
+            events.retain(|e| e.title != args.args[0]);
+            state::StateManager::new()?.save(&events)?;
+            Ok(())
+        }
+        "cleanup" => {
+            println!("Cleaning up old items...");
+            state::StateManager::new()?.cleanup_old_items()?;
+            println!("Compacting storage files...");
+            state::StateManager::new()?.vacuum()?;
+            println!("Cleanup complete!");
+            Ok(())
+        }
+        "help" => print_help(),
+        "exit" => {
+            std::process::exit(0);
+        }
+        _ => {
+            println!("Unknown command. Type 'ducktape --help' for available commands.");
+            return Ok(());
         }
     }
 }
@@ -368,28 +375,44 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
 }
 
 fn handle_calendar_command(args: CommandArgs) -> Result<()> {
-    match args.args.get(0).map(|s| s.as_str()) {
-        Some("create") | None => {
-            // Require at least: "create" + title + date + start_time + end_time = 5 tokens minimum
-            if args.args.len() < 6 {
+    match args.args.get(0).map(|s| s.to_lowercase()).as_deref() {
+        Some("create") => {
+            // Require at least: "create" + title + date + start_time + end_time = 5 args
+            if args.args.len() < 5 {
                 println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
                 println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\"");
                 return Ok(());
             }
-            // Adjust indices: args.args[0] is "create"
-            let title = &args.args[1];
-            let date = &args.args[2];
-            let start_time = &args.args[3];
-            let end_time = &args.args[4];
-            let calendar = args.args.get(5).map(|s| s.as_str());
-            let mut config = calendar::EventConfig::new(title, date, start_time);
-            config.end_time = Some(end_time);
-            if let Some(cal) = calendar {
-                config.calendars = vec![cal];
+
+            let title = args.args[1].trim_matches('"').to_string();
+            let date = args.args[2].trim().to_string();
+            let start_time = args.args[3].trim().to_string();
+            let end_time = args.args[4].trim().to_string();
+            
+            let mut config = calendar::EventConfig::new(&title, &date, &start_time);
+            config.end_time = Some(&end_time);
+            
+            // Set calendar if provided, trimming any quotes
+            if let Some(calendar) = args.args.get(5) {
+                let calendar = calendar.trim_matches('"');
+                debug!("Using calendar: {}", calendar);
+                config.calendars = vec![calendar];
             }
-            if let Some(email) = args.flags.get("--email") {
-                config.email = email.clone();
+            
+            // Handle email addresses - split on commas and trim whitespace and quotes
+            if let Some(emails) = args.flags.get("--email") {
+                if let Some(email_str) = emails {
+                    let emails: Vec<String> = email_str
+                        .trim_matches('"')
+                        .split(',')
+                        .map(|e| e.trim().to_string())
+                        .filter(|e| !e.is_empty())
+                        .collect();
+                    debug!("Parsed email addresses: {:?}", emails);
+                    config.emails = emails;
+                }
             }
+            
             calendar::create_event(config)
         }
         Some("delete") => {
@@ -398,7 +421,11 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                 return Ok(());
             }
             let title = &args.args[1];
-            calendar::delete_event(title, "")
+            calendar::delete_event(title, args.args.get(2).map(|s| s.as_str()).unwrap_or(""))?;
+            let mut events = state::load_events()?;
+            events.retain(|e| e.title != args.args[1]);
+            state::StateManager::new()?.save(&events)?;
+            Ok(())
         }
         _ => {
             println!("Unknown calendar command. Use 'calendar create' or 'calendar delete'.");
@@ -442,7 +469,7 @@ fn print_help() -> Result<()> {
     println!("    --all-day                  Create an all-day event");
     println!("    --location \"<location>\"    Set event location");
     println!("    --description \"<desc>\"     Set event description");
-    println!("    --email \"<email>\"         Add attendee");
+    println!("    --email \"<email1>,<email2>\"  Add multiple attendees (comma-separated)");
     println!("    --reminder <minutes>       Set reminder (minutes before event)");
     println!("\n  Todo Options:");
     println!("    --notes \"<notes>\"         Add notes to the todo");
