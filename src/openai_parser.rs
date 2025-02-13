@@ -3,7 +3,7 @@ use crate::calendar;
 use crate::config::Config;
 use anyhow::{anyhow, Result};
 use chrono::{Local, Timelike, NaiveTime}; // Remove Datelike
-use log::{debug, error, info}; // Add debug to the log imports
+use log::debug; // Only keep the debug import since others are unused
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
 use regex::Regex;

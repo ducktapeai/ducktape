@@ -108,39 +108,70 @@ pub fn list_calendars() -> Result<()> {
 
 pub fn create_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
+    
+    // First verify Calendar.app is running and get available calendars
+    ensure_calendar_running()?;
+    
+    // Get list of available calendars first
+    let available_calendars = get_available_calendars()?;
+    debug!("Available calendars: {:?}", available_calendars);
 
     // Load configuration and get default calendar if none specified
     let app_config = Config::load()?;
-    let calendars = if config.calendars.is_empty() {
+    let requested_calendars = if config.calendars.is_empty() {
         vec![app_config
             .calendar
             .default_calendar
             .unwrap_or_else(|| "Calendar".to_string())]
     } else {
-        config.calendars.iter().map(|&s| s.to_string()).collect()
+        // Validate that specified calendars exist
+        let requested: Vec<String> = config.calendars.iter().map(|&s| s.to_string()).collect();
+        let valid_calendars: Vec<String> = requested
+            .into_iter()
+            .filter(|cal| {
+                let exists = available_calendars.iter().any(|available| available.eq_ignore_ascii_case(cal));
+                if !exists {
+                    error!("Calendar '{}' not found in available calendars", cal);
+                }
+                exists
+            })
+            .collect();
+
+        if valid_calendars.is_empty() {
+            return Err(anyhow!("None of the specified calendars were found. Available calendars: {}", 
+                available_calendars.join(", ")));
+        }
+        valid_calendars
     };
 
     let mut last_error = None;
     let mut success_count = 0;
-    let total_calendars = calendars.len();
+    let total_calendars = requested_calendars.len();
 
-    for calendar in calendars {
+    // Clone the calendars Vec before the loop
+    let calendars_for_state = requested_calendars.clone();
+
+    for calendar in requested_calendars {
+        info!("Attempting to create event in calendar: {}", calendar);
         let this_config = EventConfig {
             title: config.title,
             start_date: config.start_date,
             start_time: config.start_time,
             end_date: config.end_date,
             end_time: config.end_time,
-            calendars: vec![&calendar], // Fix: borrow the String
+            calendars: vec![&calendar],
             all_day: config.all_day,
             location: config.location.clone(),
             description: config.description.clone(),
-            emails: config.emails.clone(),  // Clone emails
+            emails: config.emails.clone(),
             reminder: config.reminder,
         };
-
+        
         match create_single_event(this_config) {
-            Ok(_) => success_count += 1,
+            Ok(_) => {
+                success_count += 1;
+                info!("Successfully created event in calendar '{}'", calendar);
+            }
             Err(e) => {
                 error!("Failed to create event in calendar '{}': {}", calendar, e);
                 last_error = Some(e);
@@ -149,12 +180,12 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     }
 
     if success_count > 0 {
-        // Save the event to state
+        // Save the event to state using the cloned calendars
         let calendar_item = CalendarItem {
             title: config.title.to_string(),
             date: config.start_date.to_string(),
             time: config.start_time.to_string(),
-            calendars: config.calendars.iter().map(|&s| s.to_string()).collect(),
+            calendars: calendars_for_state,  // Use the cloned Vec here
             all_day: config.all_day,
             location: config.location,
             description: config.description,
@@ -166,15 +197,44 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             reminder: config.reminder,
         };
         StateManager::new()?.add(calendar_item)?;
-
-        println!(
+        info!(
             "Calendar event created in {}/{} calendars",
             success_count, total_calendars
         );
         Ok(())
     } else {
-        // Return the last error if available, otherwise a generic error
         Err(last_error.unwrap_or_else(|| anyhow!("Failed to create event in any calendar")))
+    }
+}
+
+fn get_available_calendars() -> Result<Vec<String>> {
+    let script = r#"tell application "Calendar"
+        try
+            set output to {}
+            repeat with aCal in calendars
+                set calInfo to name of aCal
+                copy calInfo to end of output
+            end repeat
+            return output
+        on error errMsg
+            error "Failed to list calendars: " & errMsg
+        end try
+    end tell"#;
+
+    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+    if output.status.success() {
+        let calendars = String::from_utf8_lossy(&output.stdout);
+        Ok(calendars
+            .trim_matches('{')
+            .trim_matches('}')
+            .split(", ")
+            .map(|s| s.trim_matches('"').to_string())
+            .collect())
+    } else {
+        Err(anyhow!(
+            "Failed to get available calendars: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ))
     }
 }
 
@@ -355,7 +415,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         }
         Err(if error_output.is_empty() && result.is_empty() {
             CalendarError::ScriptError("Unknown error occurred".to_string()).into()
-        } else if !error_output.is_empty() {
+        } else if !error_output.is_empty() {  // Changed isEmpty() to is_empty()
             CalendarError::ScriptError(error_output.to_string()).into()
         } else {
             CalendarError::ScriptError(result.to_string()).into()
