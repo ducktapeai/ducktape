@@ -34,7 +34,7 @@ pub struct EventConfig<'a> {
     pub all_day: bool,
     pub location: Option<String>,
     pub description: Option<String>,
-    pub email: Option<String>,
+    pub emails: Vec<String>,  // Changed from Option<String> to Vec<String>
     pub reminder: Option<i32>, // Minutes before event to show reminder
 }
 
@@ -51,7 +51,7 @@ impl<'a> EventConfig<'a> {
             all_day: false,
             location: None,
             description: None,
-            email: None,
+            emails: Vec::new(),  // Initialize empty vector
             reminder: None,
         }
     }
@@ -135,7 +135,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             all_day: config.all_day,
             location: config.location.clone(),
             description: config.description.clone(),
-            email: config.email.clone(),
+            emails: config.emails.clone(),  // Clone emails
             reminder: config.reminder,
         };
 
@@ -158,7 +158,11 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             all_day: config.all_day,
             location: config.location,
             description: config.description,
-            email: config.email,
+            email: if !config.emails.is_empty() {
+                Some(config.emails.join(", "))
+            } else {
+                None
+            },
             reminder: config.reminder,
         };
         StateManager::new()?.add(calendar_item)?;
@@ -228,95 +232,75 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         }
     }
 
-    // Set up a separate code block for marking the event as an all-day event.
-    let all_day_code = if config.all_day {
-        "\n                    set allday event of newEvent to true"
-    } else {
-        ""
-    };
+    // Build attendees code with improved logging and error handling
+    let mut attendees_code = String::new();
+    if !config.emails.is_empty() {
+        attendees_code.push_str("\n                    -- Add attendees");
+        for email in &config.emails {
+            info!("Adding attendee: {}", email);
+            attendees_code.push_str(&format!(r#"
+                    try
+                        make new attendee at end of attendees of newEvent with properties {{email:"{0}"}}
+                        log "Successfully added attendee: {0}"
+                    on error errMsg
+                        log "Failed to add attendee {0}: " & errMsg
+                        error "Failed to add attendee {0}: " & errMsg
+                    end try"#,
+                email
+            ));
+        }
+    }
 
-    // Build reminder code block if provided
-    let reminder_code = if let Some(minutes) = config.reminder {
-        format!(
-            r#"
-                    -- Add reminder alarm
-                    set theAlarm to make new display alarm at end of newEvent
-                    set trigger interval of theAlarm to -{}"#,
-            minutes * 60 // Convert minutes to seconds for Calendar.app
-        )
-    } else {
-        String::new()
-    };
-
-    // Build the email attendee code
-    let email_setup = if let Some(email) = &config.email {
-         format!(
-            r#"
-                    -- Add attendee with email
-                    set attendeeEmail to "{0}"
-                    make new attendee at end of attendees of newEvent with properties {{email:attendeeEmail}}"#,
-            email
-        )
-    } else {
-        String::new()
-    };
-
-    // Build updated AppleScript with proper attendee handling
+    // Build the AppleScript with improved error handling and logging
     let script = format!(
         r#"tell application "Calendar"
             try
-                set calendarName to "{calendar_name}"
-                set targetCal to missing value
-                
-                -- Find the target calendar
-                repeat with c in calendars
-                    if name of c is calendarName then
-                        set targetCal to c
-                        exit repeat
-                    end if
-                end repeat
-                
-                if targetCal is missing value then
-                    error "Calendar '" & calendarName & "' not found"
+                -- Find calendar and ensure it exists
+                if not (exists calendar "{calendar_name}") then
+                    error "Calendar '{calendar_name}' not found"
                 end if
 
-                -- Create the event dates
-                set startDate to current date
-                set endDate to current date
-                
-                -- Configure start date
-                set year of startDate to {start_year}
-                set month of startDate to {start_month}
-                set day of startDate to {start_day}
-                set hours of startDate to {start_hours}
-                set minutes of startDate to {start_minutes}
-                set seconds of startDate to 0
-                
-                -- Configure end date
-                set year of endDate to {end_year}
-                set month of endDate to {end_month}
-                set day of endDate to {end_day}
-                set hours of endDate to {end_hours}
-                set minutes of endDate to {end_minutes}
-                set seconds of endDate to 0
+                tell calendar "{calendar_name}"
+                    -- Create event dates
+                    set startDate to current date
+                    set year of startDate to {start_year}
+                    set month of startDate to {start_month}
+                    set day of startDate to {start_day}
+                    set hours of startDate to {start_hours}
+                    set minutes of startDate to {start_minutes}
+                    set seconds of startDate to 0
 
-                tell targetCal
-                    -- Create the event
+                    set endDate to current date
+                    set year of endDate to {end_year}
+                    set month of endDate to {end_month}
+                    set day of endDate to {end_day}
+                    set hours of endDate to {end_hours}
+                    set minutes of endDate to {end_minutes}
+                    set seconds of endDate to 0
+
+                    -- Create new event with logging
+                    log "Creating event: {title}"
                     set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
-                    
+                    log "Event created successfully"
+
                     {all_day_code}
                     {reminder_code}
                     
-                    -- Add attendee if specified
-                    {attendee_code}
+                    -- Add attendees with error handling
+                    {attendees_code}
+
+                    -- Save changes
+                    save
+                    log "Event saved with attendees"
                 end tell
-                
-                save
+
+                -- Force calendar refresh
                 reload calendars
                 
                 return "Success: Event created"
             on error errMsg
-                return "Error: " & errMsg
+                log errMsg
+                error "Failed to create event: " & errMsg
             end try
         end tell"#,
         calendar_name = config.calendars[0],
@@ -333,19 +317,17 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         title = config.title,
         description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         extra = extra,
-        all_day_code = all_day_code,
-        reminder_code = reminder_code,
-        attendee_code = if let Some(email) = &config.email {
-            format!(r#"
-                    -- Add attendee with email
-                    tell newEvent
-                        make new attendee at end of attendees with properties {{email:"{}"}}
-                    end tell"#, 
-                email
+        all_day_code = if config.all_day { "\n                    set allday event of newEvent to true" } else { "" },
+        reminder_code = if let Some(minutes) = config.reminder {
+            format!(
+                r#"
+                    -- Add reminder alarm
+                    set theAlarm to make new display alarm at end of newEvent
+                    set trigger interval of theAlarm to -{}"#,
+                minutes * 60
             )
-        } else {
-            String::new()
-        }
+        } else { String::new() },
+        attendees_code = attendees_code
     );
 
     debug!("Generated AppleScript:\n{}", script);
@@ -360,19 +342,21 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             format!("{} {}", config.start_date, config.start_time),
             local_start.offset()
         );
-        if config.email.is_some() {
-            info!("Added attendee: {}", config.email.as_ref().unwrap());
+        if !config.emails.is_empty() {
+            info!("Added {} attendees: {}", config.emails.len(), config.emails.join(", "));
         }
         Ok(())
     } else {
-        error!("AppleScript returned error. STDOUT: {} | STDERR: {}", result, error_output);
+        error!("AppleScript error: STDOUT: {} | STDERR: {}", result, error_output);
         if result.contains("Calendar '") && result.contains("' not found") {
             if let Some(cal_id) = config.calendars.get(0) {
                 return Err(CalendarError::CalendarNotFound(cal_id.to_string()).into());
             }
         }
-        Err(if result.is_empty() {
+        Err(if error_output.is_empty() && result.is_empty() {
             CalendarError::ScriptError("Unknown error occurred".to_string()).into()
+        } else if !error_output.is_empty() {
+            CalendarError::ScriptError(error_output.to_string()).into()
         } else {
             CalendarError::ScriptError(result.to_string()).into()
         })
@@ -501,7 +485,7 @@ mod tests {
             all_day: false,
             location: Some("Test Location".to_string()),
             description: Some("Test Description".to_string()),
-            email: Some("test@example.com".to_string()),
+            emails: vec!["test@example.com".to_string()],  // Use vector for emails
             reminder: Some(30),
         }
     }
@@ -545,7 +529,7 @@ mod tests {
             all_day: false,
             location: None,
             description: None,
-            email: None,
+            emails: Vec::new(),  // Initialize empty vector
             reminder: None,
         };
 
