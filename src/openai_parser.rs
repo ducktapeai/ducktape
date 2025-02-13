@@ -3,6 +3,7 @@ use crate::calendar;
 use crate::config::Config;
 use anyhow::{anyhow, Result};
 use chrono::{Local, Timelike, NaiveTime}; // Remove Datelike
+use log::{debug, error, info}; // Add debug to the log imports
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -59,7 +60,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 
     let current_date = Local::now();
     let current_hour = current_date.hour();
-    let current_minute = current_date.minute();
+    let _current_minute = current_date.minute(); // Prefix with underscore
     let system_prompt = format!(
         r#"You are a command line interface parser that converts natural language into ducktape commands.
 Current time is: {}
@@ -198,7 +199,7 @@ Rules:
                                 let tomorrow = current_date.date_naive().succ_opt().unwrap();
                                 log::info!("Event time {} has passed today; adjusting date to {}", start_time, tomorrow);
                                 let command = format!(
-                                    r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                                    r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
                                     title,
                                     tomorrow.format("%Y-%m-%d"),
                                     rest[1],
@@ -215,14 +216,16 @@ Rules:
                     }
 
                     let command = format!(
-                        r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                        r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
                         title, rest[0], rest[1], rest[2], requested_calendar
                     );
 
                     // Add email if present in the input
-                    let mut command = if input.contains("invite") || input.contains("email") {
-                        if let Ok(email) = extract_email(input) {
-                            format!(r#"{} --email "{}""#, command, email)
+                    let command = if input.contains("invite") || input.contains("email") {
+                        if let Ok(emails) = extract_emails(input) {
+                            debug!("Found email addresses: {:?}", emails);
+                            let email_str = emails.join(",");
+                            format!(r#"{} --email "{}""#, command, email_str)
                         } else {
                             command
                         }
@@ -250,7 +253,7 @@ Rules:
                             }
                             let end_time = format!("{}:00", (start_hour + 1) % 24);
                             let command = format!(
-                                r#"ducktape calendar create "{}" {} {} {} "{}""#,
+                                r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
                                 title, rest[0], start_time, end_time, requested_calendar
                             );
                             results.push(command);
@@ -269,16 +272,28 @@ Rules:
     Ok(results.join("\n"))
 }
 
-// Add a helper function to extract email addresses
-fn extract_email(input: &str) -> Result<String> {
-    // Simple regex to find email addresses
+// Update extract_emails to better handle multiple emails
+fn extract_emails(input: &str) -> Result<Vec<String>> {
     let re = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
         .map_err(|e| anyhow!("Failed to create regex: {}", e))?;
-
-    if let Some(cap) = re.find(input) {
-        Ok(cap.as_str().to_string())
+    
+    let emails: Vec<String> = input
+        .split(|c| c == ',' || c == ' ')
+        .filter_map(|part| {
+            let part = part.trim();
+            if re.is_match(part) {
+                Some(part.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    if !emails.is_empty() {
+        debug!("Extracted emails: {:?}", emails);
+        Ok(emails)
     } else {
-        Err(anyhow!("No email address found in input"))
+        Err(anyhow!("No email addresses found in input"))
     }
 }
 
