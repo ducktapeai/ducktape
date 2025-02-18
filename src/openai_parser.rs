@@ -68,7 +68,7 @@ Available calendars: {}
 Default calendar: {}
 
 For calendar events, use the format:
-ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>"
+ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"]
 
 Rules:
 1. If no date is specified, use today's date ({})
@@ -80,7 +80,9 @@ Rules:
 7. If input mentions "kids" or "children", use the "KIDS" calendar
 8. If input mentions "work", use the "Work" calendar
 9. If no calendar is specified, use the default calendar
-10. Available calendars are: {}"#,
+10. Available calendars are: {}
+11. If input mentions inviting, sending to, or emailing someone, extract their email and add it with --email
+12. Multiple email addresses should be comma-separated"#,
         current_date.format("%Y-%m-%d %H:%M"),
         available_calendars.join(", "),
         default_calendar,
@@ -88,6 +90,14 @@ Rules:
         (current_hour + 1).min(23),
         available_calendars.join(", ")
     );
+
+    // Add email extraction early
+    let mut extracted_emails = Vec::new();
+    if input.contains("invite") || input.contains("email") || input.contains("send to") {
+        if let Ok(emails) = extract_emails(input) {
+            extracted_emails = emails;
+        }
+    }
 
     // Add current date context
     let context = format!(
@@ -150,19 +160,28 @@ Rules:
             } else if trimmed.contains("calendar create") {
                 let parts: Vec<&str> = trimmed.split('"').collect();
                 if parts.len() < 3 {
-                    // Not enough details; ask clarifying questions.
                     results.push("Please provide the event title, date, start and end time, and desired calendar.".to_string());
                     continue;
                 }
                 let title = parts[1];
                 let rest: Vec<&str> = parts[2].trim().split_whitespace().collect();
                 if rest.len() < 3 {
-                    // Incomplete event info; ask for clarification.
                     results.push("Your event details seem incomplete. Could you specify the event title, date, start time, end time, and calendar?".to_string());
                     continue;
                 }
-                
-                let requested_calendar = if input.to_lowercase().contains("kids calendar")
+
+                // Extract any email addresses from the input
+                let mut email_str = String::new();
+                if let Ok(emails) = extract_emails(input) {
+                    if !emails.is_empty() {
+                        email_str = emails.join(",");
+                    }
+                }
+
+                // Improved calendar selection logic
+                let requested_calendar = if input.to_lowercase().contains("shaun.stuart@hashicorp.com") {
+                    "shaun.stuart@hashicorp.com"
+                } else if input.to_lowercase().contains("kids calendar")
                     || input.to_lowercase().contains("kids calander")
                     || input.to_lowercase().contains("children")
                     || input.to_lowercase().contains("to my kids")
@@ -177,91 +196,21 @@ Rules:
                 {
                     "Home"
                 } else {
-                    &default_calendar
+                    "shaun.stuart@hashicorp.com" // Set this as default calendar
                 };
 
                 if rest.len() >= 3 {
-                    // Enhanced calendar selection logic
-                    // Check if the specified time is in the past and adjust date if needed
-                    let start_time = rest[1];
-                    let parsed_time_result = NaiveTime::parse_from_str(start_time, "%H:%M");
-
-                    match parsed_time_result {
-                        Ok(parsed_time) => {
-                            let start_hour: u32 = parsed_time.hour();
-                            let start_minute: u32 = parsed_time.minute();
-
-                            let event_datetime = current_date
-                                .date_naive()
-                                .and_time(NaiveTime::from_hms_opt(start_hour, start_minute, 0).unwrap());
-
-                            if event_datetime < current_date.naive_local() {
-                                let tomorrow = current_date.date_naive().succ_opt().unwrap();
-                                log::info!("Event time {} has passed today; adjusting date to {}", start_time, tomorrow);
-                                let command = format!(
-                                    r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
-                                    title,
-                                    tomorrow.format("%Y-%m-%d"),
-                                    rest[1],
-                                    rest[2],
-                                    requested_calendar
-                                );
-                                results.push(command);
-                                continue;
-                            }
-                        }
-                        Err(_) => {
-                            log::warn!("Could not parse time {}", start_time);
-                        }
-                    }
-
-                    let command = format!(
-                        r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
+                    let mut command = format!(
+                        r#"ducktape calendar create "{}" {} {} {} "{}""#,
                         title, rest[0], rest[1], rest[2], requested_calendar
                     );
 
-                    // Add email if present in the input
-                    let command = if input.contains("invite") || input.contains("email") {
-                        if let Ok(emails) = extract_emails(input) {
-                            debug!("Found email addresses: {:?}", emails);
-                            let email_str = emails.join(",");
-                            format!(r#"{} --email "{}""#, command, email_str)
-                        } else {
-                            command
-                        }
-                    } else {
-                        command
-                    };
+                    // Always add the email parameter if we found any emails
+                    if !email_str.is_empty() {
+                        command = format!(r#"{} --email "{}""#, command, email_str);
+                    }
 
                     results.push(command);
-                } else if rest.len() == 2 {
-                    // Handle case where end time is not provided
-                    let start_time = rest[1];
-                    let parsed_time_result = NaiveTime::parse_from_str(start_time, "%H:%M");
-                    
-                    match parsed_time_result {
-                        Ok(parsed_time) => {
-                            let start_hour: u32 = parsed_time.hour(); // Define start_hour here
-                            let start_minute: u32 = parsed_time.minute();
-
-                            let event_datetime = current_date
-                                .date_naive()
-                                .and_time(NaiveTime::from_hms_opt(start_hour, start_minute, 0).unwrap());
-
-                            if event_datetime < current_date.naive_local() {
-                                return Err(anyhow!("The event time you specified has already passed. Please provide a future time for the event."));
-                            }
-                            let end_time = format!("{}:00", (start_hour + 1) % 24);
-                            let command = format!(
-                                r#"ducktape calendar create \"{}\" {} {} {} \"{}\""#,
-                                title, rest[0], start_time, end_time, requested_calendar
-                            );
-                            results.push(command);
-                        }
-                        Err(_) => {
-                            log::warn!("Could not parse time {}", start_time);
-                        }
-                    }
                 }
             } else {
                 results.push(trimmed.to_string());
@@ -272,28 +221,27 @@ Rules:
     Ok(results.join("\n"))
 }
 
-// Update extract_emails to better handle multiple emails
+// Enhanced email extraction
 fn extract_emails(input: &str) -> Result<Vec<String>> {
     let re = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
         .map_err(|e| anyhow!("Failed to create regex: {}", e))?;
     
-    let emails: Vec<String> = input
-        .split(|c| c == ',' || c == ' ')
-        .filter_map(|part| {
-            let part = part.trim();
-            if re.is_match(part) {
-                Some(part.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
+    let mut emails = Vec::new();
+    
+    // Split by common separators
+    for part in input.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
+        let part = part.trim();
+        if re.is_match(part) {
+            emails.push(part.to_string());
+        }
+    }
     
     if !emails.is_empty() {
         debug!("Extracted emails: {:?}", emails);
         Ok(emails)
     } else {
-        Err(anyhow!("No email addresses found in input"))
+        // Instead of error, return empty vec to allow event creation without attendees
+        Ok(Vec::new())
     }
 }
 
