@@ -204,10 +204,12 @@ fn process_command(command: &str) -> Result<()> {
             let combined = format!("{} {}", command, additional);
             let new_response = runtime.block_on(crate::openai_parser::parse_natural_language(&combined))?;
             println!("{}", new_response);
-            return Ok(());
+            // Execute the generated command
+            return process_command(&new_response);
         } else {
             println!("{}", response);
-            return Ok(());
+            // Execute the generated command
+            return process_command(&response);
         }
     }
     
