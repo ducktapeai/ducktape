@@ -7,7 +7,6 @@ mod state;
 mod todo;
 
 use anyhow::Result;
-use calendar::{create_event, delete_event, EventConfig};
 use config::Config;
 use env_logger::Env;
 use log::{debug, error, info};
@@ -412,6 +411,23 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                         .collect();
                     debug!("Parsed email addresses: {:?}", emails);
                     config.emails = emails;
+                }
+            }
+
+            // Handle contact names if provided
+            if let Some(contacts) = args.flags.get("--contacts") {
+                if let Some(contact_str) = contacts {
+                    let contact_names: Vec<&str> = contact_str
+                        .trim_matches('"')
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    
+                    if !contact_names.is_empty() {
+                        debug!("Looking up contacts: {:?}", contact_names);
+                        return calendar::create_event_with_contacts(config, &contact_names);
+                    }
                 }
             }
             
