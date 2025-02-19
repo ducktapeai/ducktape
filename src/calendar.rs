@@ -287,7 +287,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
     if let Some(loc) = &config.location {
-        if !loc.is_empty() {
+        if !loc.is_empty() {  // Remove unnecessary parentheses
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
@@ -296,9 +296,12 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     let mut attendees_code = String::new();
     if !config.emails.is_empty() {
         attendees_code.push_str("\n                    -- Add attendees");
+        let mut added_emails = Vec::new();
         for email in &config.emails {
-            info!("Adding attendee: {}", email);
-            attendees_code.push_str(&format!(r#"
+            let email = email.trim();
+            if !added_emails.contains(&email) {
+                info!("Adding attendee: {}", email);
+                attendees_code.push_str(&format!(r#"
                     try
                         make new attendee at end of attendees of newEvent with properties {{email:"{0}"}}
                         log "Successfully added attendee: {0}"
@@ -306,8 +309,10 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                         log "Failed to add attendee {0}: " & errMsg
                         error "Failed to add attendee {0}: " & errMsg
                     end try"#,
-                email
-            ));
+                    email
+                ));
+                added_emails.push(email);
+            }
         }
     }
 
@@ -403,7 +408,8 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             local_start.offset()
         );
         if !config.emails.is_empty() {
-            info!("Added {} attendees: {}", config.emails.len(), config.emails.join(", "));
+            let formatted_emails = config.emails.join(", ");
+            info!("Added {} attendee(s): {}", config.emails.len(), formatted_emails);
         }
         Ok(())
     } else {
@@ -527,6 +533,102 @@ pub fn delete_event(title: &str, _date: &str) -> Result<()> {
     } else {
         Err(anyhow!("Failed to delete events: {}", result))
     }
+}
+
+/// Lookup a contact by name and return their email addresses
+pub fn lookup_contact(name: &str) -> Result<Vec<String>> {
+    let script = format!(
+        r#"tell application "Contacts"
+            set the_emails to {{}}
+            
+            try
+                set the_people to (every person whose name contains "{}")
+                repeat with the_person in the_people
+                    if exists email of the_person then
+                        repeat with the_email in (get every email of the_person)
+                            if value of the_email is not missing value then
+                                set the end of the_emails to (value of the_email as text)
+                            end if
+                        end repeat
+                    end if
+                end repeat
+                
+                return the_emails
+            on error errMsg
+                log "Error looking up contact: " & errMsg
+                return {{}}
+            end try
+        end tell"#,
+        name.replace("\"", "\\\"")
+    );
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
+
+    if output.status.success() {
+        let emails = String::from_utf8_lossy(&output.stdout);
+        debug!("Raw contact lookup output: {}", emails);
+        
+        let email_list: Vec<String> = emails
+            .trim_matches('{')
+            .trim_matches('}')
+            .split(", ")
+            .filter(|s| !s.is_empty() && !s.contains("missing value"))
+            .map(|s| s.trim_matches('"').trim().to_string())
+            .collect();
+        
+        if email_list.is_empty() {
+            debug!("No emails found for contact '{}'", name);
+        } else {
+            debug!("Found {} email(s) for '{}': {:?}", email_list.len(), name, email_list);
+        }
+        
+        Ok(email_list)
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        error!("Contact lookup error: {}", error);
+        Ok(Vec::new())
+    }
+}
+
+/// Enhanced event creation with contact lookup
+pub fn create_event_with_contacts(mut config: EventConfig, contact_names: &[&str]) -> Result<()> {
+    // Look up emails for each contact name
+    let mut found_emails = Vec::new();
+    for name in contact_names {
+        match lookup_contact(name) {
+            Ok(emails) => {
+                if emails.is_empty() {
+                    debug!("No email found for contact: {}", name);
+                } else {
+                    found_emails.extend(emails.into_iter().map(|e| e.trim().to_string()));
+                }
+            }
+            Err(e) => {
+                error!("Failed to lookup contact {}: {}", name, e);
+            }
+        }
+    }
+
+    // Add found emails to config
+    if !found_emails.is_empty() {
+        debug!("Adding {} found email(s) to event", found_emails.len());
+        config.emails.extend(found_emails);
+        
+        // Deduplicate and clean emails
+        config.emails = config.emails
+            .into_iter()
+            .map(|e| e.trim().to_string())
+            .collect::<Vec<_>>();
+        config.emails.sort_unstable();
+        config.emails.dedup();
+    }
+
+    // Create the event with the updated config
+    create_event(config)
 }
 
 #[cfg(test)]

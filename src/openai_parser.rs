@@ -2,7 +2,7 @@
 use crate::calendar;
 use crate::config::Config;
 use anyhow::{anyhow, Result};
-use chrono::{Local, Timelike, NaiveTime}; // Remove Datelike
+use chrono::{Local, Timelike}; // Remove NaiveTime since it's unused
 use log::debug; // Only keep the debug import since others are unused
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
@@ -68,7 +68,7 @@ Available calendars: {}
 Default calendar: {}
 
 For calendar events, use the format:
-ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"]
+ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"] [--contacts "<name1>,<name2>"]
 
 Rules:
 1. If no date is specified, use today's date ({})
@@ -81,8 +81,10 @@ Rules:
 8. If input mentions "work", use the "Work" calendar
 9. If no calendar is specified, use the default calendar
 10. Available calendars are: {}
-11. If input mentions inviting, sending to, or emailing someone, extract their email and add it with --email
-12. Multiple email addresses should be comma-separated"#,
+11. If input mentions meeting/scheduling with someone's name, add their name to --contacts
+12. If input mentions inviting, sending to, or emailing someone@domain.com, add it with --email
+13. Multiple email addresses should be comma-separated
+14. Multiple contact names should be comma-separated"#,
         current_date.format("%Y-%m-%d %H:%M"),
         available_calendars.join(", "),
         default_calendar,
@@ -91,12 +93,9 @@ Rules:
         available_calendars.join(", ")
     );
 
-    // Add email extraction early
-    let mut extracted_emails = Vec::new();
+    // Remove unused extracted_emails variable and direct email extraction
     if input.contains("invite") || input.contains("email") || input.contains("send to") {
-        if let Ok(emails) = extract_emails(input) {
-            extracted_emails = emails;
-        }
+        debug!("Email context detected in input");
     }
 
     // Add current date context
@@ -179,7 +178,10 @@ Rules:
                 }
 
                 // Improved calendar selection logic
-                let requested_calendar = if input.to_lowercase().contains("shaun.stuart@hashicorp.com") {
+                let requested_calendar = if input.to_lowercase().contains("shaun.stuart@hashicorp.com") 
+                    || input.to_lowercase().contains("my calendar")
+                    || input.to_lowercase().contains("in calendar")
+                {
                     "shaun.stuart@hashicorp.com"
                 } else if input.to_lowercase().contains("kids calendar")
                     || input.to_lowercase().contains("kids calander")
@@ -196,7 +198,8 @@ Rules:
                 {
                     "Home"
                 } else {
-                    "shaun.stuart@hashicorp.com" // Set this as default calendar
+                    // Always default to user's primary calendar
+                    "shaun.stuart@hashicorp.com"
                 };
 
                 if rest.len() >= 3 {
@@ -208,6 +211,42 @@ Rules:
                     // Always add the email parameter if we found any emails
                     if !email_str.is_empty() {
                         command = format!(r#"{} --email "{}""#, command, email_str);
+                    }
+
+                    // Extract potential contact names from input more accurately
+                    if input.contains(" with ") || input.contains(" to ") {
+                        let mut contact_names = Vec::new();
+                        let text_to_parse = if input.contains(" with ") {
+                            input.split(" with ").nth(1)
+                        } else {
+                            input.split(" to ").nth(1)
+                        };
+
+                        if let Some(after_word) = text_to_parse {
+                            // Extract names until we hit certain stop words
+                            let name_part = after_word
+                                .split(|c: char| c == ',' || c == ';' || c == '.' || c == ' ')
+                                .take_while(|&word| {
+                                    let word = word.trim().to_lowercase();
+                                    !word.contains("@") && 
+                                    !word.contains("about") &&
+                                    !word.contains("regarding") &&
+                                    !word.contains("concerning") &&
+                                    !["at", "on", "tomorrow", "today", "am", "pm", ""].contains(&word.as_str())
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                                .trim()
+                                .to_string();
+                            
+                            if !name_part.is_empty() {
+                                contact_names.push(name_part);
+                            }
+                        }
+                        
+                        if !contact_names.is_empty() {
+                            command = format!(r#"{} --contacts "{}"#, command, contact_names.join(","));
+                        }
                     }
 
                     results.push(command);
