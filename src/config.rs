@@ -12,6 +12,8 @@ pub struct Config {
     pub todo: TodoConfig,
     #[serde(default)]
     pub notes: NotesConfig,
+    #[serde(default)]
+    pub language_model: LanguageModelConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -32,6 +34,25 @@ pub struct NotesConfig {
     pub default_folder: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LLMProvider {
+    OpenAI,
+    Grok,
+    DeepSeek,
+}
+
+impl Default for LLMProvider {
+    fn default() -> Self {
+        LLMProvider::OpenAI
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct LanguageModelConfig {
+    pub provider: LLMProvider,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -47,6 +68,7 @@ impl Default for Config {
             notes: NotesConfig {
                 default_folder: None,
             },
+            language_model: LanguageModelConfig::default(),
         }
     }
 }
@@ -105,13 +127,14 @@ mod tests {
         );
         assert_eq!(config.calendar.default_reminder_minutes, Some(15));
         assert_eq!(config.todo.default_list, Some("Reminders".to_string()));
+        assert!(matches!(config.language_model.provider, LLMProvider::OpenAI));
     }
 
     #[test]
     fn test_config_save_load() -> Result<()> {
         // Create temporary directory
         let temp_dir = tempdir()?;
-        let _config_path = temp_dir.path().join("config.toml");  // Add underscore to unused variable
+        let _config_path = temp_dir.path().join("config.toml");
 
         // Set up temporary config directory
         env::set_var("XDG_CONFIG_HOME", temp_dir.path());
