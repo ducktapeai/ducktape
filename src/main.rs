@@ -1,21 +1,22 @@
 mod calendar;
 mod config;
+mod deepseek_parser;
 mod file_search;
+mod grok_parser;
 mod notes;
 mod openai_parser;
 mod state;
 mod todo;
 
 use anyhow::Result;
-use config::Config;
+use config::{Config, LLMProvider};
 use env_logger::Env;
 use log::{debug, error, info};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
-
-// Remove ducktape imports since we're using local modules
-// use ducktape::state;
-// use ducktape::todo::TodoConfig;
+use std::future::Future;
+use std::pin::Pin;
+use tokio;
 
 /// Command line arguments structure
 #[derive(Debug)]
@@ -29,12 +30,25 @@ impl CommandArgs {
     fn parse(input: &str) -> Result<Self> {
         // Normalize input by replacing non-breaking spaces and multiple spaces with a single space
         let normalized_input = input
-            .replace('\u{a0}', " ")  // Replace non-breaking spaces
-            .split_whitespace()  // Split on whitespace and normalize
+            .replace('\u{a0}', " ")
+            .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ");
 
         debug!("Normalized input: {}", normalized_input);
+
+        // Special case for help commands
+        if normalized_input.eq_ignore_ascii_case("help") || 
+           normalized_input.eq_ignore_ascii_case("ducktape help") ||
+           normalized_input.eq_ignore_ascii_case("ducktape --help") ||
+           normalized_input.eq_ignore_ascii_case("ducktape -h") ||
+           normalized_input.eq_ignore_ascii_case("ducktape --h") {
+            return Ok(CommandArgs {
+                command: "help".to_string(),
+                args: vec![],
+                flags: std::collections::HashMap::new(),
+            });
+        }
 
         let mut parts = Vec::new();
         let mut current = String::new();
@@ -74,7 +88,7 @@ impl CommandArgs {
             parts.push(current);
         }
 
-        if parts.is_empty() {
+        if parts.is_empty() {  // Fix isEmpty to is_empty
             return Err(anyhow::anyhow!("No command provided"));
         }
 
@@ -131,7 +145,8 @@ impl CommandArgs {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // Load configuration
     let config = Config::load()?;
     debug!("Loaded configuration: {:?}", config);
@@ -169,7 +184,7 @@ fn main() -> Result<()> {
         match readline {
             Ok(line) => {
                 let _ = rl.add_history_entry(line.as_str());
-                if let Err(err) = process_command(&line) {
+                if let Err(err) = process_command(&line).await {  // Add .await here
                     error!("Failed to process command: {:?}", err);
                 }
             }
@@ -190,140 +205,217 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn process_command(command: &str) -> Result<()> {
-    // Case-insensitive check for ducktape prefix
-    if !command.trim().to_lowercase().starts_with("ducktape") {
-        let runtime = tokio::runtime::Runtime::new()?;
-        let response = runtime.block_on(crate::openai_parser::parse_natural_language(command))?;
-        if response.to_lowercase().contains("please provide") {
-            println!("{}", response);
-            // Prompt user for missing details.
-            let mut rl = rustyline::DefaultEditor::new()?;
-            let additional = rl.readline(">> Additional details: ")?;
-            let combined = format!("{} {}", command, additional);
-            let new_response = runtime.block_on(crate::openai_parser::parse_natural_language(&combined))?;
-            println!("{}", new_response);
-            // Execute the generated command
-            return process_command(&new_response);
-        } else {
-            println!("{}", response);
-            // Execute the generated command
-            return process_command(&response);
-        }
-    }
-    
-    let args = CommandArgs::parse(command)?;
-    match args.command.as_str() {
-        "search" => {
-            if args.args.len() < 2 {
-                println!("Usage: search <path> <pattern>");
-                return Ok(());
-            }
-            file_search::search(&args.args[0], &args.args[1])?;
-            Ok(())
-        }
-        "calendar" => handle_calendar_command(args),
-        "calendars" => calendar::list_calendars(),
-        "calendar-props" => calendar::list_event_properties(),
-        "todo" => handle_todo_command(args),
-        "list-todos" => {
-            let todos = state::load_todos()?;
-            println!("Stored Todo Items:");
-            for item in todos {
-                println!(
-                    "  - {} [{}]",
-                    item.title,
-                    item.reminder_time.as_deref().unwrap_or("No reminder")
-                );
-            }
-            Ok(())
-        }
-        "list-events" => {
-            let events = state::load_events()?;
-            println!("Stored Calendar Events:");
-            for event in events {
-                println!(
-                    "  - {}",    // Fix: Remove extra format parameter
-                    event.title  // Add the event title here
-                );
-                println!(
-                    "    Time: {}",
-                    if event.all_day {
-                        "All day".to_string()
+// Fix recursive async function with boxing
+fn process_command(command: &str) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
+    Box::pin(async move {
+        // Case-insensitive check for ducktape prefix
+        if !command.trim().to_lowercase().starts_with("ducktape") {
+            let config = Config::load()?;
+            
+            let response = match config.language_model.provider {
+                LLMProvider::OpenAI => crate::openai_parser::parse_natural_language(command).await,
+                LLMProvider::Grok => crate::grok_parser::parse_natural_language(command).await,
+                LLMProvider::DeepSeek => crate::deepseek_parser::parse_natural_language(command).await,
+            };
+
+            match response {
+                Ok(parsed_command) => {
+                    if parsed_command.to_lowercase().contains("please provide") {
+                        println!("{}", parsed_command);
+                        let mut rl = rustyline::DefaultEditor::new()?;
+                        let additional = rl.readline(">> Additional details: ")?;
+                        let combined = format!("{} {}", command, additional);
+                        
+                        let new_response = match config.language_model.provider {
+                            LLMProvider::OpenAI => crate::openai_parser::parse_natural_language(&combined).await?,
+                            LLMProvider::Grok => crate::grok_parser::parse_natural_language(&combined).await?,
+                            LLMProvider::DeepSeek => crate::deepseek_parser::parse_natural_language(&combined).await?,
+                        };
+                        
+                        println!("{}", new_response);
+                        process_command(&new_response).await
                     } else {
-                        event.time.clone()
+                        println!("{}", parsed_command);
+                        process_command(&parsed_command).await
                     }
-                );
-                println!("    Date: {}", event.date);
-                println!("    Calendars: {}", event.calendars.join(", "));
-                if let Some(loc) = event.location {
-                    println!("    Location: {}", loc);
                 }
-                if let Some(desc) = event.description {
-                    println!("    Description: {}", desc);
+                Err(e) => Err(e),
+            }
+        } else {
+            let args = CommandArgs::parse(command)?;
+            match args.command.as_str() {
+                "config" => {
+                    if args.args.is_empty() {
+                        println!("Usage: ducktape config <setting> <value>");
+                        println!("Available settings:");
+                        println!("  llm - Set the language model provider");
+                        println!("\nExample: ducktape config llm grok");
+                        return Ok(());
+                    }
+                    
+                    match args.args[0].as_str() {
+                        "show" => {
+                            let config = Config::load()?;
+                            println!("\nCurrent Configuration:");
+                            println!("  Language Model Provider: {:?}", config.language_model.provider);
+                            println!("\nCalendar Settings:");
+                            println!("  Default Calendar: {}", config.calendar.default_calendar.as_deref().unwrap_or("None"));
+                            println!("  Default Reminder: {} minutes", config.calendar.default_reminder_minutes.unwrap_or(15));
+                            println!("  Default Duration: {} minutes", config.calendar.default_duration_minutes.unwrap_or(60));
+                            println!("\nTodo Settings:");
+                            println!("  Default List: {}", config.todo.default_list.as_deref().unwrap_or("None"));
+                            println!("  Default Reminder: {}", if config.todo.default_reminder { "Enabled" } else { "Disabled" });
+                            println!("\nNotes Settings:");
+                            println!("  Default Folder: {}", config.notes.default_folder.as_deref().unwrap_or("None"));
+                            return Ok(());
+                        },
+                        "llm" => {
+                            if args.args.len() < 2 {
+                                println!("Usage: ducktape config llm <provider>");
+                                println!("Available providers: openai, grok, deepseek");
+                                println!("\nExample: ducktape config llm grok");
+                                return Ok(());
+                            }
+                            
+                            let provider = match args.args[1].to_lowercase().as_str() {
+                                "openai" => LLMProvider::OpenAI,
+                                "grok" => LLMProvider::Grok,
+                                "deepseek" => LLMProvider::DeepSeek,
+                                _ => {
+                                    println!("Error: Invalid provider '{}'", args.args[1]);
+                                    println!("Available providers: openai, grok, deepseek");
+                                    println!("\nExample: ducktape config llm grok");
+                                    return Ok(());
+                                }
+                            };
+                            
+                            let mut config = Config::load()?;
+                            config.language_model.provider = provider;
+                            config.save()?;
+                            println!("Language model provider updated to: {}", args.args[1]);
+                            return Ok(());
+                        }
+                        _ => {
+                            println!("Unknown config setting '{}'. Available settings:", args.args[0]);
+                            println!("  llm - Set the language model provider");
+                            println!("  show - Display current configuration");
+                            println!("\nExample: ducktape config llm grok");
+                            return Ok(());
+                        }
+                    }
                 }
-                if let Some(email) = event.email {
-                    println!("    Attendee: {}", email);
+                "search" => {
+                    if args.args.len() < 2 {
+                        println!("Usage: search <path> <pattern>");
+                        return Ok(());
+                    }
+                    file_search::search(&args.args[0], &args.args[1])?;
+                    Ok(())
                 }
-                if let Some(reminder) = event.reminder {
-                    println!("    Reminder: {} minutes before", reminder);
+                "calendar" => handle_calendar_command(args),
+                "calendars" => calendar::list_calendars(),
+                "calendar-props" => calendar::list_event_properties(),
+                "todo" => handle_todo_command(args),
+                "list-todos" => {
+                    let todos = state::load_todos()?;
+                    println!("Stored Todo Items:");
+                    for item in todos {
+                        println!(
+                            "  - {} [{}]",
+                            item.title,
+                            item.reminder_time.as_deref().unwrap_or("No reminder")
+                        );
+                    }
+                    Ok(())
                 }
-                println!(); // Empty line between events
+                "list-events" => {
+                    let events = state::load_events()?;
+                    println!("Stored Calendar Events:");
+                    for event in events {
+                        println!(
+                            "  - {}",    // Fix: Remove extra format parameter
+                            event.title  // Add the event title here
+                        );
+                        println!(
+                            "    Time: {}",
+                            if event.all_day {
+                                "All day".to_string()
+                            } else {
+                                event.time.clone()
+                            }
+                        );
+                        println!("    Date: {}", event.date);
+                        println!("    Calendars: {}", event.calendars.join(", "));
+                        if let Some(loc) = event.location {
+                            println!("    Location: {}", loc);
+                        }
+                        if let Some(desc) = event.description {
+                            println!("    Description: {}", desc);
+                        }
+                        if let Some(email) = event.email {
+                            println!("    Attendee: {}", email);
+                        }
+                        if let Some(reminder) = event.reminder {
+                            println!("    Reminder: {} minutes before", reminder);
+                        }
+                        println!(); // Empty line between events
+                    }
+                    Ok(())
+                }
+                "note" => {
+                    if args.args.is_empty() {
+                        println!(
+                            "Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]"
+                        );
+                        return Ok(());
+                    }
+                    let content = args
+                        .flags
+                        .get("--content")
+                        .and_then(|c| c.as_ref())
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    let mut config = notes::NoteConfig::new(&args.args[0], content);
+                    if let Some(folder) = args.flags.get("--folder") {
+                        config.folder = folder.as_deref();
+                    }
+                    notes::create_note(config)
+                }
+                "notes" => notes::list_notes(),
+                "delete-event" => {
+                    if args.args.len() < 1 {
+                        println!("Usage: delete-event \"<title>\"");
+                        return Ok(());
+                    }
+                    calendar::delete_event(
+                        &args.args[0],
+                        args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
+                    )?;
+                    // Also remove from state
+                    let mut events = state::load_events()?;
+                    events.retain(|e| e.title != args.args[0]);
+                    state::StateManager::new()?.save(&events)?;
+                    Ok(())
+                }
+                "cleanup" => {
+                    println!("Cleaning up old items...");
+                    state::StateManager::new()?.cleanup_old_items()?;
+                    println!("Compacting storage files...");
+                    state::StateManager::new()?.vacuum()?;
+                    println!("Cleanup complete!");
+                    Ok(())
+                }
+                "help" => print_help(),
+                "exit" => {
+                    std::process::exit(0);
+                }
+                _ => {
+                    println!("Unknown command. Type 'ducktape --help' for available commands.");
+                    return Ok(());
+                }
             }
-            Ok(())
         }
-        "note" => {
-            if args.args.is_empty() {
-                println!(
-                    "Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]"
-                );
-                return Ok(());
-            }
-            let content = args
-                .flags
-                .get("--content")
-                .and_then(|c| c.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            let mut config = notes::NoteConfig::new(&args.args[0], content);
-            if let Some(folder) = args.flags.get("--folder") {
-                config.folder = folder.as_deref();
-            }
-            notes::create_note(config)
-        }
-        "notes" => notes::list_notes(),
-        "delete-event" => {
-            if args.args.len() < 1 {
-                println!("Usage: delete-event \"<title>\"");
-                return Ok(());
-            }
-            calendar::delete_event(
-                &args.args[0],
-                args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
-            )?;
-            // Also remove from state
-            let mut events = state::load_events()?;
-            events.retain(|e| e.title != args.args[0]);
-            state::StateManager::new()?.save(&events)?;
-            Ok(())
-        }
-        "cleanup" => {
-            println!("Cleaning up old items...");
-            state::StateManager::new()?.cleanup_old_items()?;
-            println!("Compacting storage files...");
-            state::StateManager::new()?.vacuum()?;
-            println!("Cleanup complete!");
-            Ok(())
-        }
-        "help" => print_help(),
-        "exit" => {
-            std::process::exit(0);
-        }
-        _ => {
-            println!("Unknown command. Type 'ducktape --help' for available commands.");
-            return Ok(());
-        }
-    }
+    })
 }
 
 // Modify the todo handler to save state after creating a todo
@@ -454,62 +546,50 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 
 fn print_help() -> Result<()> {
     println!("DuckTape - Your AI-Powered Command Line Productivity Duck 🦆");
-    println!("\nDescription:");
-    println!(
-        "  A unified CLI for Apple Calendar, Reminders, and Notes with natural language support"
-    );
-    println!("  Just type what you want to do - DuckTape's AI will understand!");
+    println!("\nUsage:");
+    println!("  1. Natural Language: Just type what you want to do");
+    println!("  2. Command Mode: ducktape <command> [options]");
+    
     println!("\nNatural Language Examples:");
-    println!("  \"schedule a meeting with John tomorrow at 2pm\"");
-    println!("  \"remind me to buy groceries next Monday morning\"");
-    println!("  \"take notes about the project meeting\"");
-    println!("  \"add a todo about calling the bank\"");
-    println!("\nOr use traditional commands:");
-    println!("  ducktape [command] [options]");
-    println!("  ducktape --help | -h");
-    println!("\nCommand Groups:");
-    println!("  Calendar:");
-    println!("    ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar] - Create event");
-    println!("    ducktape calendar delete \"<title>\" - Delete matching events");
-    println!("    ducktape calendars - List available calendars");
-    println!("\n  Todo & Reminders:");
-    println!("    ducktape todo \"<title>\" - Create a todo item");
-    println!("    ducktape list-todos - List all stored todos");
-    println!("\n  Notes:");
-    println!("    ducktape note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
-    println!("    ducktape notes - List all notes");
-    println!("\n  Utility:");
-    println!("    ducktape search <path> <pattern> - Search for files");
-    println!("    ducktape calendar-props - List available calendar properties");
-    println!("    ducktape cleanup - Remove old events and compact storage");
-    println!("\nOptions by Command Type:");
-    println!("  Calendar Options:");
-    println!("    --all-day                  Create an all-day event");
-    println!("    --location \"<location>\"    Set event location");
-    println!("    --description \"<desc>\"     Set event description");
-    println!("    --email \"<email1>,<email2>\"  Add multiple attendees (comma-separated)");
-    println!("    --reminder <minutes>       Set reminder (minutes before event)");
-    println!("\n  Todo Options:");
-    println!("    --notes \"<notes>\"         Add notes to the todo");
-    println!("    --lists \"<list1,list2>\"   Add to specific lists");
-    println!("    --reminder-time \"YYYY-MM-DD HH:MM\"  Set reminder time");
-    println!("\n  Note Options:");
-    println!("    --content \"<content>\"     Set note content");
-    println!("    --folder \"<folder>\"       Specify note folder");
-    println!("\nGeneral Commands:");
-    println!("  ducktape --help (or -h) - Show this help");
-    println!("  ducktape exit - Exit the application");
-    println!("\nAI Features:");
-    println!("  - Natural language command processing");
-    println!("  - Smart date/time understanding (\"tomorrow\", \"next Monday\")");
-    println!("  - Context-aware command generation");
-    println!("  - Automatic calendar/list selection");
-    println!("\nEnvironment Setup:");
-    println!("  Export your OpenAI API key:");
-    println!("  export OPENAI_API_KEY='your-api-key-here'");
-    println!("\nState Files:");
-    println!("  ~/.ducktape/todos.json - Todo items");
-    println!("  ~/.ducktape/events.json - Calendar events");
+    println!("  \"create a meeting with John tomorrow at 2pm\"");
+    println!("  \"add a todo to buy groceries next Monday\"");
+    println!("  \"make a note about the project requirements\"");
+    println!("  \"schedule kids dentist appointment on March 15th at 10am\"");
+    
+    println!("\nConfiguration:");
+    println!("  ducktape config llm <provider>   Switch language model provider");
+    println!("  ducktape config show             Show current settings");
+    println!("Available Providers:");
+    println!("  - openai    (default, requires OPENAI_API_KEY)");
+    println!("  - grok      (requires XAI_API_KEY)");
+    println!("  - deepseek  (requires DEEPSEEK_API_KEY)");
+    
+    println!("\nCalendar Commands:");
+    println!("  ducktape calendar create \"<title>\" <date> <start> <end> [calendar]");
+    println!("  ducktape calendar delete \"<title>\"");
+    println!("  ducktape calendars               List available calendars");
+    println!("  ducktape calendar-props          Show calendar properties");
+    
+    println!("\nTodo Commands:");
+    println!("  ducktape todo \"<title>\" [--notes \"<notes>\"] [--lists \"list1,list2\"]");
+    println!("  ducktape list-todos              Show all todos");
+    
+    println!("\nNotes Commands:");
+    println!("  ducktape note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
+    println!("  ducktape notes                   List all notes");
+    
+    println!("\nUtility Commands:");
+    println!("  ducktape list-events            Show all calendar events");
+    println!("  ducktape cleanup                Remove old items and compact storage");
+    println!("  ducktape config show            Display current configuration");
+    println!("  ducktape help                   Show this help message");
+    
+    println!("\nTips:");
+    println!("  - Dates can be in YYYY-MM-DD format");
+    println!("  - Times should be in 24-hour format (HH:MM)");
+    println!("  - Use quotes around titles and text with spaces");
+    println!("  - Set your preferred calendar with: ducktape config calendar <name>");
+
     Ok(())
 }
 
