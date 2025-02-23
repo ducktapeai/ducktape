@@ -287,32 +287,27 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
     if let Some(loc) = &config.location {
-        if !loc.is_empty() {  // Remove unnecessary parentheses
+        if !loc.is_empty() {
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
 
-    // Build attendees code with improved logging and error handling
-    let mut attendees_code = String::new();
+    // Build attendees code block with proper error handling
+    let mut attendees_block = String::new();
     if !config.emails.is_empty() {
-        attendees_code.push_str("\n                    -- Add attendees");
-        let mut added_emails = Vec::new();
+        info!("Adding {} attendee(s): {}", config.emails.len(), config.emails.join(", "));
         for email in &config.emails {
-            let email = email.trim();
-            if !added_emails.contains(&email) {
-                info!("Adding attendee: {}", email);
-                attendees_code.push_str(&format!(r#"
+            attendees_block.push_str(&format!(r#"
                     try
-                        make new attendee at end of attendees of newEvent with properties {{email:"{0}"}}
-                        log "Successfully added attendee: {0}"
+                        tell newEvent
+                            make new attendee with properties {{email:"{}"}}
+                        end tell
+                        log "Successfully added attendee: {}"
                     on error errMsg
-                        log "Failed to add attendee {0}: " & errMsg
-                        error "Failed to add attendee {0}: " & errMsg
+                        log "Failed to add attendee {}: " & errMsg
                     end try"#,
-                    email
-                ));
-                added_emails.push(email);
-            }
+                email, email, email
+            ));
         }
     }
 
@@ -352,7 +347,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                     {reminder_code}
                     
                     -- Add attendees with error handling
-                    {attendees_code}
+                    {attendees_block}
 
                     -- Save changes
                     save
@@ -369,6 +364,8 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             end try
         end tell"#,
         calendar_name = config.calendars[0],
+        title = config.title,
+        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
@@ -379,8 +376,6 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         end_day = local_end.format("%-d"),
         end_hours = local_end.format("%-H"),
         end_minutes = local_end.format("%-M"),
-        title = config.title,
-        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         extra = extra,
         all_day_code = if config.all_day { "\n                    set allday event of newEvent to true" } else { "" },
         reminder_code = if let Some(minutes) = config.reminder {
@@ -392,7 +387,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 minutes * 60
             )
         } else { String::new() },
-        attendees_code = attendees_code
+        attendees_block = attendees_block
     );
 
     debug!("Generated AppleScript:\n{}", script);
@@ -408,8 +403,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             local_start.offset()
         );
         if !config.emails.is_empty() {
-            let formatted_emails = config.emails.join(", ");
-            info!("Added {} attendee(s): {}", config.emails.len(), formatted_emails);
+            info!("Added {} attendees: {}", config.emails.len(), config.emails.join(", "));
         }
         Ok(())
     } else {
@@ -421,7 +415,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         }
         Err(if error_output.is_empty() && result.is_empty() {
             CalendarError::ScriptError("Unknown error occurred".to_string()).into()
-        } else if !error_output.is_empty() {  // Changed isEmpty() to is_empty()
+        } else if !error_output.is_empty() {
             CalendarError::ScriptError(error_output.to_string()).into()
         } else {
             CalendarError::ScriptError(result.to_string()).into()
