@@ -1,9 +1,11 @@
 use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Tz;  // Add timezone support
 use log::{debug, error, info}; // Import the info macro
 use std::process::Command;
+use std::str::FromStr;
 
 // Remove unused constants
 // const ALL_DAY_DURATION: i64 = 86400;
@@ -36,6 +38,7 @@ pub struct EventConfig<'a> {
     pub description: Option<String>,
     pub emails: Vec<String>,  // Changed from Option<String> to Vec<String>
     pub reminder: Option<i32>, // Minutes before event to show reminder
+    pub timezone: Option<String>,  // Add timezone field
 }
 
 impl<'a> EventConfig<'a> {
@@ -53,7 +56,14 @@ impl<'a> EventConfig<'a> {
             description: None,
             emails: Vec::new(),  // Initialize empty vector
             reminder: None,
+            timezone: None,  // Initialize timezone as None
         }
+    }
+
+    /// Set the timezone for the event
+    pub fn with_timezone(mut self, timezone: &str) -> Self {
+        self.timezone = Some(timezone.to_string());
+        self
     }
 }
 
@@ -165,6 +175,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             description: config.description.clone(),
             emails: config.emails.clone(),
             reminder: config.reminder,
+            timezone: config.timezone.clone(),
         };
         
         match create_single_event(this_config) {
@@ -241,7 +252,7 @@ fn get_available_calendars() -> Result<Vec<String>> {
 fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
 
-    // Parse start datetime
+    // Parse start datetime with timezone handling
     let start_datetime = format!(
         "{} {}",
         config.start_date,
@@ -251,33 +262,72 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             config.start_time
         }
     );
+    
+    // Parse the base datetime
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
 
-    // Parse end datetime
-    let end_dt = if let Some(end_time) = config.end_time {
-        let end_datetime = format!("{} {}", config.start_date, end_time);
-        NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
-            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?
+    // Handle timezone conversion if specified
+    let local_start: DateTime<Local> = if let Some(tz_str) = config.timezone.as_deref() {
+        match Tz::from_str(tz_str) {
+            Ok(tz) => {
+                let tz_dt = tz.from_local_datetime(&start_dt)
+                    .single()
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous start time in timezone {}", tz_str))?;
+                tz_dt.with_timezone(&Local)
+            }
+            Err(_) => {
+                error!("Invalid timezone specified: {}. Using local timezone.", tz_str);
+                Local::now()
+                    .timezone()
+                    .from_local_datetime(&start_dt)
+                    .single()
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
+            }
+        }
     } else {
-        start_dt + chrono::Duration::hours(1)
+        Local::now()
+            .timezone()
+            .from_local_datetime(&start_dt)
+            .single()
+            .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
 
-    // Convert to local DateTime
-    let local_start: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&start_dt)
-        .single()
-        .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?;
-
-    let local_end: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&end_dt)
-        .single()
-        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?;
+    // Parse end datetime with similar timezone handling
+    let end_dt = if let Some(end_time) = config.end_time {
+        let end_datetime = format!("{} {}", config.start_date, end_time);
+        let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
+            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
+        
+        if let Some(tz_str) = config.timezone.as_deref() {
+            match Tz::from_str(tz_str) {
+                Ok(tz) => {
+                    let tz_dt = tz.from_local_datetime(&naive_end)
+                        .single()
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time in timezone {}", tz_str))?;
+                    tz_dt.with_timezone(&Local)
+                }
+                Err(_) => {
+                    Local::now()
+                        .timezone()
+                        .from_local_datetime(&naive_end)
+                        .single()
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+                }
+            }
+        } else {
+            Local::now()
+                .timezone()
+                .from_local_datetime(&naive_end)
+                .single()
+                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+        }
+    } else {
+        local_start + chrono::Duration::hours(1)
+    };
 
     // Validate that end time is after start time
-    if local_end <= local_start {
+    if end_dt <= local_start {
         return Err(anyhow!("End time must be after start time"));
     }
 
@@ -371,11 +421,11 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         start_day = local_start.format("%-d"),
         start_hours = local_start.format("%-H"),
         start_minutes = local_start.format("%-M"),
-        end_year = local_end.format("%Y"),
-        end_month = local_end.format("%-m"),
-        end_day = local_end.format("%-d"),
-        end_hours = local_end.format("%-H"),
-        end_minutes = local_end.format("%-M"),
+        end_year = end_dt.format("%Y"),
+        end_month = end_dt.format("%-m"),
+        end_day = end_dt.format("%-d"),
+        end_hours = end_dt.format("%-H"),
+        end_minutes = end_dt.format("%-M"),
         extra = extra,
         all_day_code = if config.all_day { "\n                    set allday event of newEvent to true" } else { "" },
         reminder_code = if let Some(minutes) = config.reminder {
@@ -643,6 +693,7 @@ mod tests {
             description: Some("Test Description".to_string()),
             emails: vec!["test@example.com".to_string()],  // Use vector for emails
             reminder: Some(30),
+            timezone: None,
         }
     }
 
@@ -687,6 +738,7 @@ mod tests {
             description: None,
             emails: Vec::new(),  // Initialize empty vector
             reminder: None,
+            timezone: None,
         };
 
         let result = create_single_event(config); // Use create_single_event instead of create_event
