@@ -10,11 +10,18 @@ DuckTape is an AI-powered command-line interface that makes it easy to manage yo
 
 1. Ensure you have Rust installed
 2. Clone this repository
-3. Export your OpenAI API key:
+
+For OpenAI, export your API key:
 ```bash
-export OPENAI_API_KEY='your-api-key-here'
+export OPENAI_API_KEY='your-openai-api-key-here'
 ```
-4. Build and run:
+
+For Grok (XAI), export your XAI API key:
+```bash
+export XAI_API_KEY='your-xai-api-key-here'
+```
+
+3. Build and run:
 ```bash
 cargo build
 cargo run
