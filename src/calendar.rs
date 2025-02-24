@@ -1,9 +1,11 @@
 use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
+use chrono_tz::Tz;  // Add timezone support
 use log::{debug, error, info}; // Import the info macro
 use std::process::Command;
+use std::str::FromStr;
 
 // Remove unused constants
 // const ALL_DAY_DURATION: i64 = 86400;
@@ -36,6 +38,7 @@ pub struct EventConfig<'a> {
     pub description: Option<String>,
     pub emails: Vec<String>,  // Changed from Option<String> to Vec<String>
     pub reminder: Option<i32>, // Minutes before event to show reminder
+    pub timezone: Option<String>,  // Add timezone field
 }
 
 impl<'a> EventConfig<'a> {
@@ -53,7 +56,14 @@ impl<'a> EventConfig<'a> {
             description: None,
             emails: Vec::new(),  // Initialize empty vector
             reminder: None,
+            timezone: None,  // Initialize timezone as None
         }
+    }
+
+    /// Set the timezone for the event
+    pub fn with_timezone(mut self, timezone: &str) -> Self {
+        self.timezone = Some(timezone.to_string());
+        self
     }
 }
 
@@ -165,6 +175,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             description: config.description.clone(),
             emails: config.emails.clone(),
             reminder: config.reminder,
+            timezone: config.timezone.clone(),
         };
         
         match create_single_event(this_config) {
@@ -241,7 +252,7 @@ fn get_available_calendars() -> Result<Vec<String>> {
 fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
 
-    // Parse start datetime
+    // Parse start datetime with timezone handling
     let start_datetime = format!(
         "{} {}",
         config.start_date,
@@ -251,33 +262,72 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             config.start_time
         }
     );
+    
+    // Parse the base datetime
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
 
-    // Parse end datetime
-    let end_dt = if let Some(end_time) = config.end_time {
-        let end_datetime = format!("{} {}", config.start_date, end_time);
-        NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
-            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?
+    // Handle timezone conversion if specified
+    let local_start: DateTime<Local> = if let Some(tz_str) = config.timezone.as_deref() {
+        match Tz::from_str(tz_str) {
+            Ok(tz) => {
+                let tz_dt = tz.from_local_datetime(&start_dt)
+                    .single()
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous start time in timezone {}", tz_str))?;
+                tz_dt.with_timezone(&Local)
+            }
+            Err(_) => {
+                error!("Invalid timezone specified: {}. Using local timezone.", tz_str);
+                Local::now()
+                    .timezone()
+                    .from_local_datetime(&start_dt)
+                    .single()
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
+            }
+        }
     } else {
-        start_dt + chrono::Duration::hours(1)
+        Local::now()
+            .timezone()
+            .from_local_datetime(&start_dt)
+            .single()
+            .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
 
-    // Convert to local DateTime
-    let local_start: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&start_dt)
-        .single()
-        .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?;
-
-    let local_end: DateTime<Local> = Local::now()
-        .timezone()
-        .from_local_datetime(&end_dt)
-        .single()
-        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?;
+    // Parse end datetime with similar timezone handling
+    let end_dt = if let Some(end_time) = config.end_time {
+        let end_datetime = format!("{} {}", config.start_date, end_time);
+        let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
+            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
+        
+        if let Some(tz_str) = config.timezone.as_deref() {
+            match Tz::from_str(tz_str) {
+                Ok(tz) => {
+                    let tz_dt = tz.from_local_datetime(&naive_end)
+                        .single()
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time in timezone {}", tz_str))?;
+                    tz_dt.with_timezone(&Local)
+                }
+                Err(_) => {
+                    Local::now()
+                        .timezone()
+                        .from_local_datetime(&naive_end)
+                        .single()
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+                }
+            }
+        } else {
+            Local::now()
+                .timezone()
+                .from_local_datetime(&naive_end)
+                .single()
+                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+        }
+    } else {
+        local_start + chrono::Duration::hours(1)
+    };
 
     // Validate that end time is after start time
-    if local_end <= local_start {
+    if end_dt <= local_start {
         return Err(anyhow!("End time must be after start time"));
     }
 
@@ -287,32 +337,27 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
     if let Some(loc) = &config.location {
-        if !loc.is_empty() {  // Remove unnecessary parentheses
+        if !loc.is_empty() {
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
 
-    // Build attendees code with improved logging and error handling
-    let mut attendees_code = String::new();
+    // Build attendees code block with proper error handling
+    let mut attendees_block = String::new();
     if !config.emails.is_empty() {
-        attendees_code.push_str("\n                    -- Add attendees");
-        let mut added_emails = Vec::new();
+        info!("Adding {} attendee(s): {}", config.emails.len(), config.emails.join(", "));
         for email in &config.emails {
-            let email = email.trim();
-            if !added_emails.contains(&email) {
-                info!("Adding attendee: {}", email);
-                attendees_code.push_str(&format!(r#"
+            attendees_block.push_str(&format!(r#"
                     try
-                        make new attendee at end of attendees of newEvent with properties {{email:"{0}"}}
-                        log "Successfully added attendee: {0}"
+                        tell newEvent
+                            make new attendee with properties {{email:"{}"}}
+                        end tell
+                        log "Successfully added attendee: {}"
                     on error errMsg
-                        log "Failed to add attendee {0}: " & errMsg
-                        error "Failed to add attendee {0}: " & errMsg
+                        log "Failed to add attendee {}: " & errMsg
                     end try"#,
-                    email
-                ));
-                added_emails.push(email);
-            }
+                email, email, email
+            ));
         }
     }
 
@@ -352,7 +397,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                     {reminder_code}
                     
                     -- Add attendees with error handling
-                    {attendees_code}
+                    {attendees_block}
 
                     -- Save changes
                     save
@@ -369,18 +414,18 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             end try
         end tell"#,
         calendar_name = config.calendars[0],
+        title = config.title,
+        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
         start_hours = local_start.format("%-H"),
         start_minutes = local_start.format("%-M"),
-        end_year = local_end.format("%Y"),
-        end_month = local_end.format("%-m"),
-        end_day = local_end.format("%-d"),
-        end_hours = local_end.format("%-H"),
-        end_minutes = local_end.format("%-M"),
-        title = config.title,
-        description = config.description.as_deref().unwrap_or("Created by DuckTape"),
+        end_year = end_dt.format("%Y"),
+        end_month = end_dt.format("%-m"),
+        end_day = end_dt.format("%-d"),
+        end_hours = end_dt.format("%-H"),
+        end_minutes = end_dt.format("%-M"),
         extra = extra,
         all_day_code = if config.all_day { "\n                    set allday event of newEvent to true" } else { "" },
         reminder_code = if let Some(minutes) = config.reminder {
@@ -392,7 +437,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
                 minutes * 60
             )
         } else { String::new() },
-        attendees_code = attendees_code
+        attendees_block = attendees_block
     );
 
     debug!("Generated AppleScript:\n{}", script);
@@ -408,8 +453,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             local_start.offset()
         );
         if !config.emails.is_empty() {
-            let formatted_emails = config.emails.join(", ");
-            info!("Added {} attendee(s): {}", config.emails.len(), formatted_emails);
+            info!("Added {} attendees: {}", config.emails.len(), config.emails.join(", "));
         }
         Ok(())
     } else {
@@ -421,7 +465,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         }
         Err(if error_output.is_empty() && result.is_empty() {
             CalendarError::ScriptError("Unknown error occurred".to_string()).into()
-        } else if !error_output.is_empty() {  // Changed isEmpty() to is_empty()
+        } else if !error_output.is_empty() {
             CalendarError::ScriptError(error_output.to_string()).into()
         } else {
             CalendarError::ScriptError(result.to_string()).into()
@@ -649,6 +693,7 @@ mod tests {
             description: Some("Test Description".to_string()),
             emails: vec!["test@example.com".to_string()],  // Use vector for emails
             reminder: Some(30),
+            timezone: None,
         }
     }
 
@@ -693,6 +738,7 @@ mod tests {
             description: None,
             emails: Vec::new(),  // Initialize empty vector
             reminder: None,
+            timezone: None,
         };
 
         let result = create_single_event(config); // Use create_single_event instead of create_event
