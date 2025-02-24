@@ -421,7 +421,7 @@ fn process_command(command: &str) -> Pin<Box<dyn Future<Output = Result<()>> + '
 // Modify the todo handler to save state after creating a todo
 fn handle_todo_command(args: CommandArgs) -> Result<()> {
     if args.args.is_empty() {
-        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"<list1>,<list2>,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]");
+        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"list1,list2,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]");
         return Ok(());
     }
     let mut config = todo::TodoConfig::new(&args.args[0]);
@@ -536,9 +536,21 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
             events.retain(|e| e.title != args.args[1]);
             state::StateManager::new()?.save(&events)?;
             Ok(())
-        }
+        },
+        Some("set-default") => {
+            if args.args.len() < 2 {
+                println!("Usage: ducktape calendar set-default \"<name>\"");
+                return Ok(());
+            }
+            let default_calendar = args.args[1].trim_matches('"').to_string();
+            let mut config = Config::load()?;
+            config.calendar.default_calendar = Some(default_calendar);
+            config.save()?;
+            println!("Default calendar updated.");
+            Ok(())
+        },
         _ => {
-            println!("Unknown calendar command. Use 'calendar create' or 'calendar delete'.");
+            println!("Unknown calendar command. Use 'calendar create', 'calendar delete', or 'calendar set-default'.");
             Ok(())
         }
     }
@@ -546,17 +558,20 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 
 fn print_help() -> Result<()> {
     println!("DuckTape - Your AI-Powered Command Line Productivity Duck 🦆");
-    println!("\nUsage:");
+    println!("
+Usage:");
     println!("  1. Natural Language: Just type what you want to do");
     println!("  2. Command Mode: ducktape <command> [options]");
     
-    println!("\nNatural Language Examples:");
+    println!("
+Natural Language Examples:");
     println!("  \"create a meeting with John tomorrow at 2pm\"");
     println!("  \"add a todo to buy groceries next Monday\"");
     println!("  \"make a note about the project requirements\"");
     println!("  \"schedule kids dentist appointment on March 15th at 10am\"");
     
-    println!("\nConfiguration:");
+    println!("
+Configuration:");
     println!("  ducktape config llm <provider>   Switch language model provider");
     println!("  ducktape config show             Show current settings");
     println!("Available Providers:");
@@ -564,32 +579,37 @@ fn print_help() -> Result<()> {
     println!("  - grok      (requires XAI_API_KEY)");
     println!("  - deepseek  (requires DEEPSEEK_API_KEY)");
     
-    println!("\nCalendar Commands:");
+    println!("
+Calendar Commands:");
     println!("  ducktape calendar create \"<title>\" <date> <start> <end> [calendar]");
     println!("  ducktape calendar delete \"<title>\"");
+    println!("  ducktape calendar set-default \"<name>\"   Set the default calendar");
     println!("  ducktape calendars               List available calendars");
     println!("  ducktape calendar-props          Show calendar properties");
     
-    println!("\nTodo Commands:");
+    println!("
+Todo Commands:");
     println!("  ducktape todo \"<title>\" [--notes \"<notes>\"] [--lists \"list1,list2\"]");
     println!("  ducktape list-todos              Show all todos");
     
-    println!("\nNotes Commands:");
+    println!("
+Notes Commands:");
     println!("  ducktape note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
     println!("  ducktape notes                   List all notes");
     
-    println!("\nUtility Commands:");
+    println!("
+Utility Commands:");
     println!("  ducktape list-events            Show all calendar events");
     println!("  ducktape cleanup                Remove old items and compact storage");
     println!("  ducktape config show            Display current configuration");
     println!("  ducktape help                   Show this help message");
     
-    println!("\nTips:");
+    println!("
+Tips:");
     println!("  - Dates can be in YYYY-MM-DD format");
     println!("  - Times should be in 24-hour format (HH:MM)");
     println!("  - Use quotes around titles and text with spaces");
-    println!("  - Set your preferred calendar with: ducktape config calendar <name>");
-
+    println!("  - Set your preferred calendar with: ducktape calendar set-default \"<name>\"");
     Ok(())
 }
 
