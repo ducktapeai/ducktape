@@ -34,7 +34,7 @@ Just type what you want to do:
 - "remind me to buy groceries next Monday morning"
 - "take notes about the project meeting"
 - "add a todo about calling the bank"
-- "create an event for 7pm tonight to my KIDS calendar inviting shaun.stuart@gmail.com"
+- "create an event for 7pm tonight to my KIDS calendar inviting joe.blogs@gmail.com"
 
 ## Command Reference
 
