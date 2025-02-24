@@ -84,7 +84,9 @@ Rules:
 11. If input mentions meeting/scheduling with someone's name, add their name to --contacts
 12. If input mentions inviting, sending to, or emailing someone@domain.com, add it with --email
 13. Multiple email addresses should be comma-separated
-14. Multiple contact names should be comma-separated"#,
+14. Multiple contact names should be comma-separated
+15. Ignore phrases like 'to say', 'saying', 'that says' when determining contacts
+16. Focus on actual person names when identifying contacts"#,
         current_date.format("%Y-%m-%d %H:%M"),
         available_calendars.join(", "),
         default_calendar,

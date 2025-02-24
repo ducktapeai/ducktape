@@ -10,7 +10,7 @@ async fn integration_test_create_event_with_invite() -> Result<()> {
     config.calendars = vec!["NonexistentCalendar"];
     config.location = Some("Integration Room".to_string());
     config.description = Some("Integration Test Event".to_string());
-    config.email = Some("integration@test.com".to_string());
+    config.emails = vec!["integration@test.com".to_string()];
 
     let result = calendar::create_event(config);
 

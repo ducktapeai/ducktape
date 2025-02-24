@@ -42,6 +42,9 @@ ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --e
 # Delete events
 ducktape calendar delete "<title>"
 
+# Set the default calendar (if no calendar is specified in event creation, this calendar will be used)
+ducktape calendar set-default "<name>"
+
 # List available calendars
 ducktape calendars
 
