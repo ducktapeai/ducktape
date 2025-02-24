@@ -62,30 +62,28 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Build system prompt similar to OpenAI but adapted for Grok
     let system_prompt = format!(
         r#"You are a command line interface parser that converts natural language into ducktape commands.
-Current time is: {}
-Available calendars: {}
-Default calendar: {}
-
+Current time is: {current_time}
+Available calendars: {calendars}
+Default calendar: {default_cal}
 For calendar events, use the format:
 ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"] [--contacts "<name1>,<name2>"]
-
 Rules:
-1. If no date is specified, use today's date ({})
-2. If no time is specified, use next available hour ({:02}:00) for start time and add 1 hour for end time
-3. Use 24-hour format (HH:MM) for times
-4. Use YYYY-MM-DD format for dates
-5. Always include both start and end times
-6. If calendar is specified in input, use that exact calendar name
-7. If input mentions "kids" or "children", use the "KIDS" calendar
-8. If input mentions "work", use the "Work" calendar
-9. If no calendar is specified, use the default calendar
-10. Available calendars are: {}"#,
-        current_date.format("%Y-%m-%d %H:%M"),
-        available_calendars.join(", "),
-        default_calendar,
-        current_date.format("%Y-%m-%d"),
-        (current_hour + 1).min(23),
-        available_calendars.join(", ")
+1. If no date is specified, use today's date ({today}).
+2. If no time is specified, use the next available hour ({next_hour}:00) for start time and add 1 hour for end time.
+3. Use 24-hour format (HH:MM) for times.
+4. Use YYYY-MM-DD format for dates.
+5. Always include both start and end times.
+6. If a calendar is specified in input, use that exact calendar name.
+7. If input mentions "kids" or "children", use the "KIDS" calendar.
+8. If input mentions "work", use the "Work" calendar.
+9. If no calendar is specified, use the default calendar.
+10. Available calendars are: {calendars}.
+11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names."#,
+        current_time = current_date.format("%Y-%m-%d %H:%M"),
+        calendars = available_calendars.join(", "),
+        default_cal = default_calendar,
+        today = current_date.format("%Y-%m-%d"),
+        next_hour = (current_hour + 1).min(23)
     );
 
     let context = format!(
