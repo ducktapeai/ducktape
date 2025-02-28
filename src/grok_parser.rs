@@ -8,6 +8,7 @@ use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use chrono::{Local, Timelike};
 use crate::config::Config;
+use log::debug;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -37,6 +38,12 @@ async fn get_available_calendars() -> Result<Vec<String>> {
 }
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
+    // Check for event search related phrases
+    if contains_event_search_intent(input) {
+        debug!("Detected event search intent: {}", input);
+        return handle_event_search_intent(input);
+    }
+
     let api_key = env::var("XAI_API_KEY")
         .map_err(|_| anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"))?;
 
@@ -148,6 +155,84 @@ Rules:
         .put(input.to_string(), commands.clone());
 
     Ok(commands)
+}
+
+/// Check if the input is about searching for events
+fn contains_event_search_intent(input: &str) -> bool {
+    let input_lower = input.to_lowercase();
+    
+    // Check for common event search patterns
+    let search_terms = ["when", "find", "search for", "lookup", "look up", "show me"];
+    let event_terms = ["game", "match", "play", "event", "concert", "show", "performance"];
+    
+    let has_search_term = search_terms.iter().any(|&term| input_lower.contains(term));
+    let has_event_term = event_terms.iter().any(|&term| input_lower.contains(term));
+    
+    has_search_term && has_event_term
+}
+
+/// Handle event search intents directly
+fn handle_event_search_intent(input: &str) -> Result<String> {
+    let input_lower = input.to_lowercase();
+    
+    // Extract the query by removing common phrases
+    let mut query = input_lower
+        .replace("when", "")
+        .replace("is", "")
+        .replace("are", "")
+        .replace("the", "")
+        .replace("next", "")
+        .replace("upcoming", "")
+        .replace("search for", "")
+        .replace("search", "")
+        .replace("find", "")
+        .replace("lookup", "")
+        .replace("look up", "")
+        .replace("show me", "");
+        
+    // Remove event-related terms that shouldn't be part of the search query
+    query = query
+        .replace("game", "")
+        .replace("match", "")
+        .replace("event", "")
+        .replace("play", "")
+        .replace("playing", "")
+        .trim()
+        .to_string();
+        
+    // Determine appropriate calendar based on the content
+    let calendar = if input_lower.contains("rugby") || 
+                      input_lower.contains("springbok") || 
+                      input_lower.contains("all black") {
+        " --calendar \"Rugby\""
+    } else if input_lower.contains("football") || 
+              input_lower.contains("soccer") {
+        " --calendar \"Football\""
+    } else if input_lower.contains("basketball") || 
+              input_lower.contains("nba") || 
+              input_lower.contains("lakers") ||
+              input_lower.contains("warriors") ||
+              input_lower.contains("celtics") {
+        " --calendar \"Basketball\""
+    } else if input_lower.contains("baseball") || 
+              input_lower.contains("mlb") {
+        " --calendar \"Baseball\""
+    } else if input_lower.contains("concert") || 
+              input_lower.contains("show") || 
+              input_lower.contains("music") || 
+              input_lower.contains("festival") {
+        " --calendar \"Entertainment\""
+    } else {
+        ""
+    };
+    
+    Ok(format!("ducktape search-events \"{}\"{}",  
+              query.trim(), 
+              calendar))
+}
+
+pub async fn parse_with_history(_history: &[&str], input: &str) -> Result<String> {
+    parse_natural_language(input).await
 }
 
 #[cfg(test)]

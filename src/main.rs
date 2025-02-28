@@ -7,6 +7,7 @@ mod notes;
 mod openai_parser;
 mod state;
 mod todo;
+mod event_search; // Import the event_search module
 
 use anyhow::Result;
 use config::{Config, LLMProvider};
@@ -405,6 +406,23 @@ fn process_command(command: &str) -> Pin<Box<dyn Future<Output = Result<()>> + '
                     println!("Cleanup complete!");
                     Ok(())
                 }
+                "search-events" | "event-search" => {
+                    if args.args.is_empty() {
+                        println!("Usage: ducktape search-events <query> [--calendar <calendar>]");
+                        println!("Example: ducktape search-events \"Springboks rugby\"");
+                        return Ok(());
+                    }
+                    
+                    let query = args.args.join(" ");
+                    let calendar = args
+                        .flags
+                        .get("--calendar")
+                        .and_then(|c| c.as_ref())
+                        .map(|s| s.as_str());
+                    
+                    println!("Searching for events: {}", query);
+                    return event_search::search_events(&query, calendar).await;
+                },
                 "help" => print_help(),
                 "exit" => {
                     std::process::exit(0);
@@ -583,6 +601,11 @@ fn print_help() -> Result<()> {
     println!("  ducktape cleanup                Remove old items and compact storage");
     println!("  ducktape config show            Display current configuration");
     println!("  ducktape help                   Show this help message");
+    
+    println!("
+Event Search:");
+    println!("  ducktape search-events \"<query>\" [--calendar \"<calendar>\"]");
+    println!("  Example: ducktape search-events \"Lakers basketball\" --calendar \"Sports\"");
     
     println!("\nTips:");
     println!("  - Dates can be in YYYY-MM-DD format");

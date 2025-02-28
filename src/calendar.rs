@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;  // Add timezone support
 use log::{debug, error, info}; // Import the info macro
 use std::process::Command;
