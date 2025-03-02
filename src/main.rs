@@ -482,7 +482,6 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                 println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
                 return Ok(());
             }
-
             let title = args.args[1].trim_matches('"').to_string();
             let date = args.args[2].trim().to_string();
             let start_time = args.args[3].trim().to_string();
@@ -509,23 +508,6 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                         .collect();
                     debug!("Parsed email addresses: {:?}", emails);
                     config.emails = emails;
-                }
-            }
-
-            // Handle contact names if provided
-            if let Some(contacts) = args.flags.get("--contacts") {
-                if let Some(contact_str) = contacts {
-                    let contact_names: Vec<&str> = contact_str
-                        .trim_matches('"')
-                        .split(',')
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    
-                    if !contact_names.is_empty() {
-                        debug!("Looking up contacts: {:?}", contact_names);
-                        return calendar::create_event_with_contacts(config, &contact_names);
-                    }
                 }
             }
             
@@ -564,7 +546,7 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                 config.all_day = true;
             }
             
-            // Handle recurrence flags
+            // Handle recurrence flags - MOVED UP before contacts processing
             if let Some(repeat) = args.flags.get("--repeat") {
                 if let Some(frequency_str) = repeat {
                     match calendar::RecurrenceFrequency::from_str(frequency_str) {
@@ -618,6 +600,23 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                             println!("Invalid recurrence frequency: {}", e);
                             return Err(e);
                         }
+                    }
+                }
+            }
+
+            // Handle contact names if provided - MOVED DOWN after recurrence processing
+            if let Some(contacts) = args.flags.get("--contacts") {
+                if let Some(contact_str) = contacts {
+                    let contact_names: Vec<&str> = contact_str
+                        .trim_matches('"')
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    
+                    if !contact_names.is_empty() {
+                        debug!("Looking up contacts: {:?}", contact_names);
+                        return calendar::create_event_with_contacts(config, &contact_names);
                     }
                 }
             }
