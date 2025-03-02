@@ -8,6 +8,7 @@ use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use chrono::{Local, Timelike};
 use crate::config::Config;
+use log::debug;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -65,8 +66,17 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 Current time is: {current_time}
 Available calendars: {calendars}
 Default calendar: {default_cal}
+
 For calendar events, use the format:
 ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"] [--contacts "<name1>,<name2>"]
+
+For recurring events, add any of these options:
+--repeat <daily|weekly|monthly|yearly>   Set recurrence frequency
+--interval <number>                      Set interval (e.g., every 2 weeks)
+--until <YYYY-MM-DD>                     Set end date for recurrence
+--count <number>                         Set number of occurrences
+--days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)
+
 Rules:
 1. If no date is specified, use today's date ({today}).
 2. If no time is specified, use the next available hour ({next_hour}:00) for start time and add 1 hour for end time.
@@ -78,7 +88,15 @@ Rules:
 8. If input mentions "work", use the "Work" calendar.
 9. If no calendar is specified, use the default calendar.
 10. Available calendars are: {calendars}.
-11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names."#,
+11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names.
+12. If the input mentions recurring events or repetition:
+    - For "daily" recurrence: use --repeat daily
+    - For "weekly" recurrence: use --repeat weekly
+    - For "monthly" recurrence: use --repeat monthly
+    - For "yearly" or "annual" recurrence: use --repeat yearly
+    - If specific interval is mentioned (e.g., "every 2 weeks"), add --interval 2
+    - If specific end date is mentioned (e.g., "until March 15"), add --until YYYY-MM-DD
+    - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10"#,
         current_time = current_date.format("%Y-%m-%d %H:%M"),
         calendars = available_calendars.join(", "),
         default_cal = default_calendar,
@@ -91,6 +109,8 @@ Rules:
         Local::now().format("%Y-%m-%d %H:%M")
     );
     let prompt = format!("{}\n\n{}", context, input);
+
+    debug!("Sending prompt to Grok API: {}", prompt);
 
     let client = Client::new();
     let response = client
@@ -139,13 +159,66 @@ Rules:
         return Err(anyhow!("Unexpected response format: {}", response_text));
     };
 
+    // Clean up and enhance the response
+    let enhanced_command = enhance_recurrence_command(&commands);
+    debug!("Enhanced Grok command: {}", enhanced_command);
+
     // Cache the response before returning
     RESPONSE_CACHE
         .lock()
         .unwrap()
-        .put(input.to_string(), commands.clone());
+        .put(input.to_string(), enhanced_command.clone());
 
-    Ok(commands)
+    Ok(enhanced_command)
+}
+
+// Helper function to enhance recurrence commands
+fn enhance_recurrence_command(command: &str) -> String {
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+
+    let mut enhanced = command.to_string();
+    
+    // Check for recurring event keywords in the input but missing flags
+    let has_recurring_keyword = 
+        command.to_lowercase().contains("every day") ||
+        command.to_lowercase().contains("every week") ||
+        command.to_lowercase().contains("every month") ||
+        command.to_lowercase().contains("every year") ||
+        command.to_lowercase().contains("daily") ||
+        command.to_lowercase().contains("weekly") ||
+        command.to_lowercase().contains("monthly") ||
+        command.to_lowercase().contains("yearly") ||
+        command.to_lowercase().contains("annually");
+
+    // If recurring keywords found but no --repeat flag, add it
+    if has_recurring_keyword && !command.contains("--repeat") && !command.contains("--recurring") {
+        if command.contains("every day") || command.contains("daily") {
+            enhanced = format!("{} --repeat daily", enhanced);
+        } else if command.contains("every week") || command.contains("weekly") {
+            enhanced = format!("{} --repeat weekly", enhanced);
+        } else if command.contains("every month") || command.contains("monthly") {
+            enhanced = format!("{} --repeat monthly", enhanced);
+        } else if command.contains("every year") || command.contains("yearly") || command.contains("annually") {
+            enhanced = format!("{} --repeat yearly", enhanced);
+        }
+    }
+
+    // Add interval if appropriate keywords exist
+    if !command.contains("--interval") {
+        if command.contains("every 2 day") || command.contains("every other day") {
+            enhanced = format!("{} --interval 2", enhanced);
+        } else if command.contains("every 2 week") || command.contains("every other week") {
+            enhanced = format!("{} --interval 2", enhanced);
+        } else if command.contains("every 2 month") || command.contains("every other month") {
+            enhanced = format!("{} --interval 2", enhanced);
+        } else if command.contains("every 3 ") {
+            enhanced = format!("{} --interval 3", enhanced);
+        }
+    }
+
+    enhanced
 }
 
 #[cfg(test)]
@@ -183,5 +256,23 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_enhance_recurrence_command() {
+        // Test adding recurrence
+        let input = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" every week";
+        let enhanced = enhance_recurrence_command(input);
+        assert!(enhanced.contains("--repeat weekly"));
+        
+        // Test adding interval
+        let input = "ducktape calendar create \"Bi-weekly Meeting\" 2024-03-15 10:00 11:00 \"Work\" every 2 weeks";
+        let enhanced = enhance_recurrence_command(input);
+        assert!(enhanced.contains("--interval 2"));
+        
+        // Test non-calendar command (should remain unchanged)
+        let input = "ducktape todo \"Buy groceries\"";
+        let enhanced = enhance_recurrence_command(input);
+        assert_eq!(input, enhanced);
     }
 }
