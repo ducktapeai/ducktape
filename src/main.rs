@@ -474,9 +474,14 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
             if args.args.len() < 5 {
                 println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
                 println!("Example: ducktape calendar create \"Meeting\" 2024-02-07 09:00 10:00 \"Work\"");
+                println!("\nRecurrence options:");
+                println!("  --repeat <daily|weekly|monthly|yearly>   Set recurrence frequency");
+                println!("  --interval <number>                      Set interval (e.g., every 2 weeks)");
+                println!("  --until <YYYY-MM-DD>                     Set end date for recurrence");
+                println!("  --count <number>                         Set number of occurrences");
+                println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
                 return Ok(());
             }
-
             let title = args.args[1].trim_matches('"').to_string();
             let date = args.args[2].trim().to_string();
             let start_time = args.args[3].trim().to_string();
@@ -505,8 +510,101 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
                     config.emails = emails;
                 }
             }
+            
+            // Handle location flag
+            if let Some(location) = args.flags.get("--location") {
+                if let Some(loc) = location {
+                    config.location = Some(loc.trim_matches('"').to_string());
+                }
+            }
+            
+            // Handle description/notes flag
+            if let Some(description) = args.flags.get("--notes") {
+                if let Some(desc) = description {
+                    config.description = Some(desc.trim_matches('"').to_string());
+                }
+            }
+            
+            // Handle reminder flag
+            if let Some(reminder) = args.flags.get("--reminder") {
+                if let Some(mins) = reminder {
+                    if let Ok(minutes) = mins.parse::<i32>() {
+                        config.reminder = Some(minutes);
+                    }
+                }
+            }
+            
+            // Handle timezone flag
+            if let Some(timezone) = args.flags.get("--timezone") {
+                if let Some(tz) = timezone {
+                    config.timezone = Some(tz.trim_matches('"').to_string());
+                }
+            }
+            
+            // Handle all-day flag
+            if args.flags.contains_key("--all-day") {
+                config.all_day = true;
+            }
+            
+            // Handle recurrence flags - MOVED UP before contacts processing
+            if let Some(repeat) = args.flags.get("--repeat") {
+                if let Some(frequency_str) = repeat {
+                    match calendar::RecurrenceFrequency::from_str(frequency_str) {
+                        Ok(frequency) => {
+                            // Create recurrence pattern
+                            let mut recurrence = calendar::RecurrencePattern::new(frequency);
+                            
+                            // Handle interval
+                            if let Some(interval) = args.flags.get("--interval") {
+                                if let Some(interval_str) = interval {
+                                    if let Ok(interval_val) = interval_str.parse::<u32>() {
+                                        recurrence = recurrence.with_interval(interval_val);
+                                    }
+                                }
+                            }
+                            
+                            // Handle until date
+                            if let Some(until) = args.flags.get("--until") {
+                                if let Some(until_str) = until {
+                                    recurrence = recurrence.with_end_date(until_str);
+                                }
+                            }
+                            
+                            // Handle count
+                            if let Some(count) = args.flags.get("--count") {
+                                if let Some(count_str) = count {
+                                    if let Ok(count_val) = count_str.parse::<u32>() {
+                                        recurrence = recurrence.with_count(count_val);
+                                    }
+                                }
+                            }
+                            
+                            // Handle days (for weekly recurrence)
+                            if let Some(days) = args.flags.get("--days") {
+                                if let Some(days_str) = days {
+                                    let days: Vec<u8> = days_str
+                                        .split(',')
+                                        .filter_map(|d| d.trim().parse::<u8>().ok())
+                                        .collect();
+                                    
+                                    if !days.is_empty() {
+                                        recurrence = recurrence.with_days_of_week(&days);
+                                    }
+                                }
+                            }
+                            
+                            // Set recurrence pattern in config
+                            config.recurrence = Some(recurrence);
+                        }
+                        Err(e) => {
+                            println!("Invalid recurrence frequency: {}", e);
+                            return Err(e);
+                        }
+                    }
+                }
+            }
 
-            // Handle contact names if provided
+            // Handle contact names if provided - MOVED DOWN after recurrence processing
             if let Some(contacts) = args.flags.get("--contacts") {
                 if let Some(contact_str) = contacts {
                     let contact_names: Vec<&str> = contact_str
@@ -558,20 +656,18 @@ fn handle_calendar_command(args: CommandArgs) -> Result<()> {
 
 fn print_help() -> Result<()> {
     println!("DuckTape - Your AI-Powered Command Line Productivity Duck 🦆");
-    println!("
-Usage:");
+    println!("\nUsage:");
     println!("  1. Natural Language: Just type what you want to do");
     println!("  2. Command Mode: ducktape <command> [options]");
     
-    println!("
-Natural Language Examples:");
+    println!("\nNatural Language Examples:");
     println!("  \"create a meeting with John tomorrow at 2pm\"");
     println!("  \"add a todo to buy groceries next Monday\"");
     println!("  \"make a note about the project requirements\"");
     println!("  \"schedule kids dentist appointment on March 15th at 10am\"");
+    println!("  \"create weekly team meeting every Tuesday at 10am\"");
     
-    println!("
-Configuration:");
+    println!("\nConfiguration:");
     println!("  ducktape config llm <provider>   Switch language model provider");
     println!("  ducktape config show             Show current settings");
     println!("Available Providers:");
@@ -579,37 +675,43 @@ Configuration:");
     println!("  - grok      (requires XAI_API_KEY)");
     println!("  - deepseek  (requires DEEPSEEK_API_KEY)");
     
-    println!("
-Calendar Commands:");
+    println!("\nCalendar Commands:");
     println!("  ducktape calendar create \"<title>\" <date> <start> <end> [calendar]");
     println!("  ducktape calendar delete \"<title>\"");
-    println!("  ducktape calendar set-default \"<name>\"   Set the default calendar");
     println!("  ducktape calendars               List available calendars");
     println!("  ducktape calendar-props          Show calendar properties");
+    println!("\nRecurrence Options:");
+    println!("  --repeat <daily|weekly|monthly|yearly>   Set recurrence frequency");
+    println!("  --interval <number>                      Set interval (e.g., every 2 weeks)");
+    println!("  --until <YYYY-MM-DD>                     Set end date for recurrence");
+    println!("  --count <number>                         Set number of occurrences");
+    println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
     
-    println!("
-Todo Commands:");
+    println!("\nTodo Commands:");
     println!("  ducktape todo \"<title>\" [--notes \"<notes>\"] [--lists \"list1,list2\"]");
     println!("  ducktape list-todos              Show all todos");
     
-    println!("
-Notes Commands:");
+    println!("\nNotes Commands:");
     println!("  ducktape note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
     println!("  ducktape notes                   List all notes");
     
-    println!("
-Utility Commands:");
+    println!("\nUtility Commands:");
     println!("  ducktape list-events            Show all calendar events");
     println!("  ducktape cleanup                Remove old items and compact storage");
     println!("  ducktape config show            Display current configuration");
     println!("  ducktape help                   Show this help message");
     
     println!("
-Tips:");
+Event Search:");
+    println!("  ducktape search-events \"<query>\" [--calendar \"<calendar>\"]");
+    println!("  Example: ducktape search-events \"Lakers basketball\" --calendar \"Sports\"");
+    
+    println!("\nTips:");
     println!("  - Dates can be in YYYY-MM-DD format");
     println!("  - Times should be in 24-hour format (HH:MM)");
     println!("  - Use quotes around titles and text with spaces");
-    println!("  - Set your preferred calendar with: ducktape calendar set-default \"<name>\"");
+    println!("  - Recurring events: ducktape calendar create \"Weekly Meeting\" 2024-05-01 10:00 11:00 --repeat weekly");
+
     Ok(())
 }
 
