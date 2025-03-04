@@ -3,7 +3,7 @@
 Time possible the most important commodity. At DuckTape we recognise that.
 So we figured why dont we combine how we interact with time and mix it with a touch of AI.
 Effectively you "TimeAI"
-Our goal is ambitious, to interact naturally (-clicking in Calendars) and get to a place where suggestions happen.
+Our goal is ambitious, to interact naturally (lets remove the clicking in Calendars) and get to a place where suggestions happen.
 Your time, your way, with what AI thinks can help your day run smoothly. Work towards a common goal you might have.
 
 We have started this journey off as unified CLI (soon to be App) for Apple Calendar, Reminders, and Notes with natural language support.
