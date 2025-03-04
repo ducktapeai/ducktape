@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use log::{info, debug, error};
+use log::{info, debug};
 use chrono::{Datelike, Local};
 
 #[derive(Debug, Serialize, Deserialize)]
