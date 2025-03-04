@@ -1,5 +1,5 @@
 # Ignore the ducktape.code-workspace file
-ducktape.code-workspace
+*.code-workspace
 
 # Other files and directories to ignore
 target/
