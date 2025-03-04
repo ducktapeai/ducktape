@@ -58,6 +58,7 @@ Just type what you want to do:
 # Switch language model provider (OpenAI, Grok, or DeepSeek)
 ducktape config llm openai
 ducktape config llm grok
+Note - deepseek still under development
 ducktape config llm deepseek
 
 # Show current configuration settings
