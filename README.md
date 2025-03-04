@@ -21,6 +21,11 @@ For Grok (XAI), export your XAI API key:
 export XAI_API_KEY='your-xai-api-key-here'
 ```
 
+For DeepSeek, export your DeepSeek API key:
+```bash
+export DEEPSEEK_API_KEY='your-deepseek-api-key-here'
+```
+
 3. Build and run:
 ```bash
 cargo build
@@ -40,6 +45,17 @@ Just type what you want to do:
 
 ## Command Reference
 
+### Configuration Commands
+```bash
+# Switch language model provider (OpenAI, Grok, or DeepSeek)
+ducktape config llm openai
+ducktape config llm grok
+ducktape config llm deepseek
+
+# Show current configuration settings
+ducktape config show
+```
+
 ### Calendar Commands
 ```bash
 # Create a calendar event
@@ -58,13 +74,16 @@ ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --r
 ducktape calendar delete "<title>"
 
 # Set the default calendar (if no calendar is specified in event creation, this calendar will be used)
-ducktape calendar set-default "<name>"
+ducktape calendar set-default "<calendar_name>"
 
 # List available calendars
 ducktape calendars
 
 # List calendar properties
 ducktape calendar-props
+
+# List all events
+ducktape list-events
 ```
 
 ### Calendar Options
@@ -111,14 +130,11 @@ ducktape notes
 # Search for files
 ducktape search <path> <pattern>
 
-# List calendar properties
-ducktape calendar-props
-
 # Clean up old events and compact storage
 ducktape cleanup
 
 # Show help
-ducktape --help
+ducktape help
 
 # Exit application
 ducktape exit
@@ -126,7 +142,10 @@ ducktape exit
 
 ## Features
 
-- Natural language command processing
+- Natural language command processing with multiple AI model support:
+  - OpenAI
+  - Grok (X.AI)
+  - DeepSeek
 - Smart date/time understanding ("tomorrow", "next Monday")
 - Context-aware calendar selection
 - Automatic email attendee addition
@@ -134,15 +153,24 @@ ducktape exit
 - Contact lookup for event attendees
 - State persistence
 - Calendar integration with Apple Calendar.app
+- Modular, well-organized code architecture
+
+## Architecture
+
+DuckTape follows a modular architecture pattern:
+- Command pattern for processing different command types
+- Natural language processing adapters for different LLM providers
+- Clear separation of concerns between UI, business logic, and state management
 
 ## State Files
 
 DuckTape maintains state in the following files:
 - `~/.ducktape/todos.json` - Todo items
 - `~/.ducktape/events.json` - Calendar events
+- `~/.ducktape/config.json` - Application configuration
 
 ## Requirements
 
 - macOS with Calendar.app configured
 - Rust toolchain
-- OpenAI API key for natural language processing
+- API key for at least one supported language model provider (OpenAI, Grok, or DeepSeek)
