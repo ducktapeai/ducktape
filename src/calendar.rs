@@ -616,7 +616,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         end tell"#,
         calendar_name = config.calendars[0],
         title = config.title,
-        description = config.description.as_deref().unwrap_or("Created by Ducktape"),
+        description = config.description.as_deref().unwrap_or("Created by Ducktape🦆"),
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
