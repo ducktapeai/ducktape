@@ -23,12 +23,23 @@ impl<'a> NoteConfig<'a> {
     }
 }
 
+// Helper function to escape strings for AppleScript to prevent command injection
+fn escape_applescript_string(input: &str) -> String {
+    // Replace each quote with a pair of quotes (AppleScript string escaping)
+    input.replace("\"", "\"\"")
+}
+
 pub fn create_note(config: NoteConfig) -> Result<()> {
     let folder_script = if let Some(folder) = config.folder {
-        format!("tell folder \"{}\" of default account", folder)
+        let escaped_folder = escape_applescript_string(folder);
+        format!("tell folder \"{}\" of default account", escaped_folder)
     } else {
         "tell default account".to_string()
     };
+
+    // Escape title and content to prevent command injection
+    let escaped_title = escape_applescript_string(config.title);
+    let escaped_content = escape_applescript_string(config.content);
 
     let script = format!(
         r#"tell application "Notes"
@@ -41,12 +52,12 @@ pub fn create_note(config: NoteConfig) -> Result<()> {
                 return "Error: " & errMsg
             end try
         end tell"#,
-        folder_script, config.title, config.content
+        folder_script, escaped_title, escaped_content
     );
 
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-
     let result = String::from_utf8_lossy(&output.stdout);
+
     if result.contains("Success") {
         println!("Note created: {}", config.title);
         Ok(())
@@ -136,6 +147,7 @@ pub fn create_note_local(title: &str, content: &str, tags: &[String]) -> Result<
 #[allow(dead_code)]
 pub fn create_note_apple(config: NoteConfig) -> Result<()> {
     let folder_code = if let Some(folder) = config.folder {
+        let escaped_folder = escape_applescript_string(folder);
         format!(
             r#"
             set targetFolder to missing value
@@ -149,11 +161,15 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
                 set targetFolder to make new folder with properties {{name:"{}"}}
             end if
             tell targetFolder"#,
-            folder, folder
+            escaped_folder, escaped_folder
         )
     } else {
         "tell default account".to_string()
     };
+
+    // Escape title and content to prevent command injection
+    let escaped_title = escape_applescript_string(config.title);
+    let escaped_content = escape_applescript_string(config.content);
 
     let script = format!(
         r#"tell application "Notes"
@@ -166,12 +182,12 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
                 return "Error: " & errMsg
             end try
         end tell"#,
-        folder_code, config.title, config.content
+        folder_code, escaped_title, escaped_content
     );
 
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-
     let result = String::from_utf8_lossy(&output.stdout);
+
     if result.contains("Success") {
         println!("Note created: {}", config.title);
         Ok(())
