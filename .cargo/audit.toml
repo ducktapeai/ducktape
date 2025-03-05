@@ -1,0 +1,7 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2025-0001", # gix-worktree-state vulnerability (only in dev dependencies)
+    "RUSTSEC-2022-0092", # rmp-serde unsound warning (only in dev dependencies)
+]
+
+# The vulnerabilities are in dev-dependencies only, not in runtime dependencies
