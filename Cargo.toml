@@ -32,5 +32,5 @@ test-case = "3.1"
 tempfile = "3.8"
 # Security-related dev dependencies
 cargo-audit = "0.21.2"      # Dependency vulnerability scanning
-cargo-deny = "0.14.3"       # Helps enforce license and dependency policies
+cargo-deny = "0.15.0"       # Helps enforce license and dependency policies
 cargo-udeps = "0.1.40"      # Find unused dependencies

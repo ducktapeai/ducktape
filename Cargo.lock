@@ -441,7 +441,7 @@ dependencies = [
  "cargo-credential-libsecret",
  "cargo-credential-macos-keychain",
  "cargo-credential-wincred",
- "cargo-platform 0.2.0",
+ "cargo-platform",
  "cargo-util",
  "cargo-util-schemas",
  "clap",
@@ -571,25 +571,27 @@ dependencies = [
 
 [[package]]
 name = "cargo-deny"
-version = "0.14.24"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58cf1dea76d8e8bb8a86c10ed24bf595cb81962cfaf24985cf393b34cef87be5"
+checksum = "5a29e3cd3b3424e2ea811054acb0ede275fa36e825eb8343f872b1cb6b0a32eb"
 dependencies = [
  "anyhow",
  "askalono",
  "bitvec",
  "camino",
+ "cfg-expr 0.15.8",
  "clap",
  "codespan",
  "codespan-reporting",
  "crossbeam",
  "fern",
- "gix 0.63.0",
+ "gix 0.64.0",
  "globset",
  "goblin",
  "home",
  "krates",
  "log",
+ "memchr",
  "nu-ansi-term 0.50.1",
  "parking_lot",
  "rayon",
@@ -602,9 +604,9 @@ dependencies = [
  "smallvec",
  "spdx",
  "strum",
- "tame-index 0.12.2",
+ "tame-index 0.13.2",
  "time",
- "toml-span 0.2.1",
+ "toml-span 0.3.0",
  "twox-hash 1.6.3",
  "url",
  "walkdir",
@@ -633,15 +635,6 @@ dependencies = [
  "serde",
  "toml 0.8.20",
  "url",
-]
-
-[[package]]
-name = "cargo-platform"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -708,20 +701,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cargo_metadata"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d886547e41f740c616ae73108f6eb70afe6d940c7bc697cb30f13daec073037"
-dependencies = [
- "camino",
- "cargo-platform 0.1.9",
- "semver",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "cc"
 version = "1.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -737,6 +716,15 @@ name = "cfg-expr"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d067ad48b8650848b989a59a86c6c36a995d02d2bf778d45c3c5d57bc2718f02"
+dependencies = [
+ "smallvec",
+]
+
+[[package]]
+name = "cfg-expr"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d4ba6e40bd1184518716a6e1a781bf9160e286d219ccdb8ab2612e74cfe4789"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -1655,19 +1643,19 @@ dependencies = [
 
 [[package]]
 name = "gix"
-version = "0.63.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "984c5018adfa7a4536ade67990b3ebc6e11ab57b3d6cd9968de0947ca99b4b06"
+checksum = "d78414d29fcc82329080166077e0f7689f4016551fdb334d787c3d040fe2634f"
 dependencies = [
  "gix-actor 0.31.5",
  "gix-attributes 0.22.5",
  "gix-command 0.3.11",
  "gix-commitgraph 0.24.3",
- "gix-config 0.37.0",
+ "gix-config 0.38.0",
  "gix-credentials 0.24.5",
  "gix-date 0.8.7",
  "gix-diff 0.44.1",
- "gix-discover 0.32.0",
+ "gix-discover 0.33.0",
  "gix-features 0.38.2",
  "gix-filter 0.11.3",
  "gix-fs 0.11.3",
@@ -1686,12 +1674,12 @@ dependencies = [
  "gix-pathspec 0.7.7",
  "gix-prompt 0.8.9",
  "gix-protocol 0.45.3",
- "gix-ref 0.44.1",
+ "gix-ref 0.45.0",
  "gix-refspec 0.23.1",
  "gix-revision 0.27.2",
  "gix-revwalk 0.13.2",
  "gix-sec",
- "gix-submodule 0.11.0",
+ "gix-submodule 0.12.0",
  "gix-tempfile 14.0.2",
  "gix-trace",
  "gix-transport 0.42.3",
@@ -1980,16 +1968,16 @@ dependencies = [
 
 [[package]]
 name = "gix-config"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53fafe42957e11d98e354a66b6bd70aeea00faf2f62dd11164188224a507c840"
+checksum = "28f53fd03d1bf09ebcc2c8654f08969439c4556e644ca925f27cf033bc43e658"
 dependencies = [
  "bstr",
  "gix-config-value",
  "gix-features 0.38.2",
  "gix-glob 0.16.5",
  "gix-path",
- "gix-ref 0.44.1",
+ "gix-ref 0.45.0",
  "gix-sec",
  "memchr",
  "once_cell",
@@ -2187,16 +2175,16 @@ dependencies = [
 
 [[package]]
 name = "gix-discover"
-version = "0.32.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc27c699b63da66b50d50c00668bc0b7e90c3a382ef302865e891559935f3dbf"
+checksum = "67662731cec3cb31ba3ed2463809493f76d8e5d6c6d245de8b0560438c13450e"
 dependencies = [
  "bstr",
  "dunce",
  "gix-fs 0.11.3",
  "gix-hash 0.14.2",
  "gix-path",
- "gix-ref 0.44.1",
+ "gix-ref 0.45.0",
  "gix-sec",
  "thiserror 1.0.69",
 ]
@@ -3106,12 +3094,11 @@ dependencies = [
 
 [[package]]
 name = "gix-ref"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3394a2997e5bc6b22ebc1e1a87b41eeefbcfcff3dbfa7c4bd73cb0ac8f1f3e2e"
+checksum = "636e96a0a5562715153fee098c217110c33a6f8218f08f4687ff99afde159bb5"
 dependencies = [
  "gix-actor 0.31.5",
- "gix-date 0.8.7",
  "gix-features 0.38.2",
  "gix-fs 0.11.3",
  "gix-hash 0.14.2",
@@ -3340,12 +3327,12 @@ dependencies = [
 
 [[package]]
 name = "gix-submodule"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921cd49924ac14b6611b22e5fb7bbba74d8780dc7ad26153304b64d1272460ac"
+checksum = "0f2e0f69aa00805e39d39ec80472a7e9da20ed5d73318b27925a2cc198e854fd"
 dependencies = [
  "bstr",
- "gix-config 0.37.0",
+ "gix-config 0.38.0",
  "gix-path",
  "gix-pathspec 0.7.7",
  "gix-refspec 0.23.1",
@@ -4374,15 +4361,16 @@ dependencies = [
 
 [[package]]
 name = "krates"
-version = "0.16.10"
+version = "0.17.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcb3baf2360eb25ad31f0ada3add63927ada6db457791979b82ac199f835cb9"
+checksum = "cd5bdd9794c39f6eb77da784fdcd065cc730a95fd0ca7d88ec945ed26c3c5109"
 dependencies = [
- "cargo-platform 0.1.9",
- "cargo_metadata",
- "cfg-expr",
+ "camino",
+ "cfg-expr 0.17.2",
  "petgraph",
  "semver",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -6183,13 +6171,14 @@ dependencies = [
 
 [[package]]
 name = "tame-index"
-version = "0.12.2"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbf60b994ded7946fbf1c3eea9aff178da624dfb101b14c7341db018ddaf483e"
+checksum = "d22e7b1003e6348cceb96e70f68523e22d2a298869ebe6d778a2207e45dc2f97"
 dependencies = [
+ "bytes",
  "camino",
  "crossbeam-channel",
- "gix 0.63.0",
+ "gix 0.64.0",
  "home",
  "http 1.2.0",
  "libc",
@@ -6199,6 +6188,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sha2",
  "smol_str 0.2.2",
  "thiserror 1.0.69",
  "tokio",
@@ -6516,20 +6506,11 @@ dependencies = [
 
 [[package]]
 name = "toml-span"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6e089b1253c3fbee40bd2091535cb5e0f0b85f85a50024c3e7785f227449738"
-dependencies = [
- "codespan-reporting",
- "smallvec",
-]
-
-[[package]]
-name = "toml-span"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce0e1be49e3b9bf33d1a8077c081a3b7afcfc94e4bc1002c80376784381bc106"
 dependencies = [
+ "codespan-reporting",
  "smallvec",
 ]
 
