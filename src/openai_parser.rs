@@ -262,9 +262,10 @@ Rules:
     Ok(results.join("\n"))
 }
 
-// Enhanced email extraction
+// Enhanced email extraction with improved validation
 fn extract_emails(input: &str) -> Result<Vec<String>> {
-    let re = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+    // Use a more strict email regex pattern
+    let re = Regex::new(r"\b[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.){1,125}[A-Za-z]{2,63}\b")
         .map_err(|e| anyhow!("Failed to create regex: {}", e))?;
     
     let mut emails = Vec::new();
@@ -272,8 +273,18 @@ fn extract_emails(input: &str) -> Result<Vec<String>> {
     // Split by common separators
     for part in input.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
         let part = part.trim();
+        if part.len() > 320 { // Max allowed email length according to standards
+            debug!("Skipping potential email due to excessive length: {}", part);
+            continue;
+        }
+        
         if re.is_match(part) {
-            emails.push(part.to_string());
+            // Additional validation to prevent injection
+            if !part.contains('\'') && !part.contains('\"') && !part.contains('`') {
+                emails.push(part.to_string());
+            } else {
+                debug!("Skipping email with potentially dangerous characters: {}", part);
+            }
         }
     }
     

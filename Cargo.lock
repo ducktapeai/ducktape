@@ -1243,6 +1243,7 @@ dependencies = [
  "regex",
  "reqwest 0.11.27",
  "rustyline",
+ "scopeguard",
  "serde",
  "serde_json",
  "tempfile",

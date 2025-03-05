@@ -25,6 +25,7 @@ regex = "1.10.2"
 directories = "5.0"
 toml = "0.8"
 chrono-tz = "0.8.6"  # Add timezone database support
+scopeguard = "1.2.0"  # For safely cleaning up resources
 
 [dev-dependencies]
 pretty_assertions = "1.3"

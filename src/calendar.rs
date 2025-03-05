@@ -6,6 +6,7 @@ use chrono_tz::Tz;  // Add timezone support
 use log::{debug, error, info}; // Import the info macro
 use std::process::Command;
 use std::str::FromStr;
+use regex::Regex;
 
 // Remove unused constants
 // const ALL_DAY_DURATION: i64 = 86400;
@@ -130,7 +131,7 @@ pub struct EventConfig<'a> {
     pub start_time: &'a str,
     pub end_date: Option<&'a str>, // New field
     pub end_time: Option<&'a str>, // New field
-    pub calendars: Vec<&'a str>,   // Changed from Option<&'a str> to Vec<&'a str>
+    pub calendars: Vec<String>,   // Changed from Vec<&'a str> to Vec<String>
     pub all_day: bool,
     pub location: Option<String>,
     pub description: Option<String>,
@@ -171,6 +172,141 @@ impl<'a> EventConfig<'a> {
         self.recurrence = Some(recurrence);
         self
     }
+    
+    /// Validates the EventConfig for security and correctness
+    pub fn validate(&self) -> Result<()> {
+        // Validate date format (YYYY-MM-DD)
+        if !validate_date_format(self.start_date) {
+            return Err(CalendarError::InvalidDateTime(format!("Invalid date format: {}", self.start_date)).into());
+        }
+        
+        // Validate time format (HH:MM)
+        if !validate_time_format(self.start_time) {
+            return Err(CalendarError::InvalidDateTime(format!("Invalid time format: {}", self.start_time)).into());
+        }
+        
+        // Validate end time if specified
+        if let Some(end_time) = self.end_time {
+            if !validate_time_format(end_time) {
+                return Err(CalendarError::InvalidDateTime(format!("Invalid end time format: {}", end_time)).into());
+            }
+        }
+        
+        // Validate end date if specified
+        if let Some(end_date) = self.end_date {
+            if !validate_date_format(end_date) {
+                return Err(CalendarError::InvalidDateTime(format!("Invalid end date format: {}", end_date)).into());
+            }
+        }
+        
+        // Validate title doesn't contain dangerous characters
+        if contains_dangerous_characters(self.title) {
+            return Err(anyhow!("Title contains potentially dangerous characters"));
+        }
+        
+        // Validate location if specified
+        if let Some(location) = &self.location {
+            if contains_dangerous_characters(location) {
+                return Err(anyhow!("Location contains potentially dangerous characters"));
+            }
+        }
+        
+        // Validate description if specified
+        if let Some(description) = &self.description {
+            if contains_dangerous_chars_for_script(description) {
+                return Err(anyhow!("Description contains potentially dangerous characters"));
+            }
+        }
+        
+        // Validate emails
+        for email in &self.emails {
+            if !validate_email(email) {
+                return Err(anyhow!("Invalid email format: {}", email));
+            }
+        }
+        
+        // Validate timezone if specified
+        if let Some(timezone) = &self.timezone {
+            // Basic validation - more comprehensive would check against a list of valid timezones
+            if timezone.len() > 50 || contains_dangerous_chars_for_script(timezone) {
+                return Err(anyhow!("Invalid timezone format"));
+            }
+        }
+        
+        // Validate recurrence if specified
+        if let Some(recurrence) = &self.recurrence {
+            if let Some(end_date) = &recurrence.end_date {
+                if !validate_date_format(end_date) {
+                    return Err(anyhow!("Invalid recurrence end date format: {}", end_date));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+/// Validate date string has format YYYY-MM-DD
+pub fn validate_date_format(date: &str) -> bool {
+    let re = Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
+    
+    if !re.is_match(date) {
+        return false;
+    }
+    
+    // Further validate the date is reasonable
+    if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        // Check date is within reasonable range
+        let year = naive_date.year();
+        return year >= 2000 && year <= 2100;
+    }
+    
+    false
+}
+
+/// Validate time string has format HH:MM
+pub fn validate_time_format(time: &str) -> bool {
+    let re = Regex::new(r"^\d{1,2}:\d{2}$").unwrap();
+    
+    if !re.is_match(time) {
+        return false;
+    }
+    
+    // Further validate the time values
+    let parts: Vec<&str> = time.split(':').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    
+    if let (Ok(hours), Ok(minutes)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+        return hours < 24 && minutes < 60;
+    }
+    
+    false
+}
+
+/// Validate email format
+pub fn validate_email(email: &str) -> bool {
+    let re = Regex::new(r"^[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.){1,125}[A-Za-z]{2,63}$").unwrap();
+    
+    if !re.is_match(email) {
+        return false;
+    }
+    
+    // Check for dangerous characters that could cause script injection
+    !contains_dangerous_characters(email)
+}
+
+/// Check for potentially dangerous characters that could cause AppleScript injection
+fn contains_dangerous_characters(input: &str) -> bool {
+    input.contains('\'') || input.contains('\"') || input.contains('`') || 
+    input.contains(';') || input.contains('&') || input.contains('|') ||
+    input.contains('<') || input.contains('>') || input.contains('$')
+}
+
+/// Check for characters that could break AppleScript specifically
+fn contains_dangerous_chars_for_script(input: &str) -> bool {
+    input.contains('\"') || input.contains('\\') || input.contains('¬')
 }
 
 pub fn list_calendars() -> Result<()> {
@@ -225,6 +361,9 @@ pub fn list_calendars() -> Result<()> {
 pub fn create_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
     
+    // Validate the event configuration first
+    config.validate()?;
+    
     // First verify Calendar.app is running and get available calendars
     ensure_calendar_running()?;
     
@@ -241,7 +380,7 @@ pub fn create_event(config: EventConfig) -> Result<()> {
             .unwrap_or_else(|| "Calendar".to_string())]
     } else {
         // Validate that specified calendars exist
-        let requested: Vec<String> = config.calendars.iter().map(|&s| s.to_string()).collect();
+        let requested: Vec<String> = config.calendars.iter().map(|s| s.to_string()).collect();
         let valid_calendars: Vec<String> = requested
             .into_iter()
             .filter(|cal| {
@@ -269,13 +408,15 @@ pub fn create_event(config: EventConfig) -> Result<()> {
 
     for calendar in requested_calendars {
         info!("Attempting to create event in calendar: {}", calendar);
+        // Clone the calendar string so we can use it later
+        let calendar_name = calendar.clone();
         let this_config = EventConfig {
             title: config.title,
             start_date: config.start_date,
             start_time: config.start_time,
             end_date: config.end_date,
             end_time: config.end_time,
-            calendars: vec![&calendar],
+            calendars: vec![calendar],  // This consumes the calendar string
             all_day: config.all_day,
             location: config.location.clone(),
             description: config.description.clone(),
@@ -288,10 +429,10 @@ pub fn create_event(config: EventConfig) -> Result<()> {
         match create_single_event(this_config) {
             Ok(_) => {
                 success_count += 1;
-                info!("Successfully created event in calendar '{}'", calendar);
+                info!("Successfully created event in calendar '{}'", calendar_name);  // Use the cloned name
             }
             Err(e) => {
-                error!("Failed to create event in calendar '{}': {}", calendar, e);
+                error!("Failed to create event in calendar '{}': {}", calendar_name, e);  // Use the cloned name
                 last_error = Some(e);
             }
         }

@@ -5,6 +5,7 @@ use std::pin::Pin;
 use crate::calendar;
 use crate::state;
 use log::debug;
+use std::str::FromStr;  // Add FromStr import for Tz::from_str
 
 pub struct CalendarCommand;
 
@@ -110,54 +111,84 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
         return Ok(());
     }
     
-    let title = args.args[1].trim_matches('"').to_string();
-    let date = args.args[2].trim().to_string();
-    let start_time = args.args[3].trim().to_string();
-    let end_time = args.args[4].trim().to_string();
+    // Safely sanitize title input
+    let title = sanitize_input(&args.args[1], false);
     
-    let mut config = calendar::EventConfig::new(&title, &date, &start_time);
-    config.end_time = Some(&end_time);
-    
-    // Set calendar if provided, trimming any quotes
-    if let Some(calendar) = args.args.get(5) {
-        let calendar = calendar.trim_matches('"');
-        debug!("Using calendar: {}", calendar);
-        config.calendars = vec![calendar];
+    // Validate date format
+    let date = args.args[2].trim();
+    if !calendar::validate_date_format(date) {
+        println!("Invalid date format. Please use YYYY-MM-DD format.");
+        return Ok(());
     }
     
-    // Handle email addresses - split on commas and trim whitespace and quotes
+    // Validate time format
+    let start_time = args.args[3].trim();
+    if !calendar::validate_time_format(start_time) {
+        println!("Invalid start time format. Please use HH:MM format (24-hour).");
+        return Ok(());
+    }
+    
+    let end_time = args.args[4].trim();
+    if !calendar::validate_time_format(end_time) {
+        println!("Invalid end time format. Please use HH:MM format (24-hour).");
+        return Ok(());
+    }
+    
+    let mut config = calendar::EventConfig::new(&title, date, start_time);
+    config.end_time = Some(end_time);
+    
+    // Set calendar if provided, trimming any quotes and sanitizing
+    if let Some(calendar_name) = args.args.get(5) {
+        let sanitized_calendar = sanitize_input(calendar_name, true);
+        debug!("Using calendar: {}", sanitized_calendar);
+        // Store the calendar name as an owned String
+        config.calendars = vec![sanitized_calendar];
+    }
+    
+    // Handle email addresses - split on commas, trim whitespace and quotes, validate format
     if let Some(emails) = args.flags.get("--email") {
         if let Some(email_str) = emails {
+            let email_str = sanitize_input(email_str, false);
             let emails: Vec<String> = email_str
-                .trim_matches('"')
                 .split(',')
                 .map(|e| e.trim().to_string())
-                .filter(|e| !e.is_empty())
+                .filter(|e| !e.is_empty() && validate_email_format(e))
                 .collect();
-            debug!("Parsed email addresses: {:?}", emails);
-            config.emails = emails;
+                
+            if emails.len() > 0 {
+                debug!("Parsed valid email addresses: {:?}", emails);
+                config.emails = emails;
+            } else {
+                debug!("No valid email addresses found in input");
+            }
         }
     }
     
     // Handle location flag
     if let Some(location) = args.flags.get("--location") {
         if let Some(loc) = location {
-            config.location = Some(loc.trim_matches('"').to_string());
+            let location = sanitize_input(loc, false);
+            config.location = Some(location);
         }
     }
     
     // Handle description/notes flag
     if let Some(description) = args.flags.get("--notes") {
         if let Some(desc) = description {
-            config.description = Some(desc.trim_matches('"').to_string());
+            config.description = Some(sanitize_input(desc, true));
         }
     }
     
     // Handle reminder flag
     if let Some(reminder) = args.flags.get("--reminder") {
         if let Some(mins) = reminder {
-            if let Ok(minutes) = mins.parse::<i32>() {
-                config.reminder = Some(minutes);
+            if let Ok(minutes) = mins.trim().parse::<i32>() {
+                // Cap reminder minutes to reasonable values
+                if minutes > 0 && minutes < 10080 { // Max 1 week in minutes
+                    config.reminder = Some(minutes);
+                } else {
+                    println!("Warning: Reminder minutes should be between 1 and 10080 (1 week). Using default.");
+                }
             }
         }
     }
@@ -165,7 +196,14 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
     // Handle timezone flag
     if let Some(timezone) = args.flags.get("--timezone") {
         if let Some(tz) = timezone {
-            config.timezone = Some(tz.trim_matches('"').to_string());
+            let sanitized_tz = sanitize_input(tz, true);
+            // Validate timezone
+            match chrono_tz::Tz::from_str(&sanitized_tz) {
+                Ok(_) => config.timezone = Some(sanitized_tz),
+                Err(_) => {
+                    println!("Warning: Invalid timezone '{}'. Using system default.", sanitized_tz);
+                }
+            }
         }
     }
     
@@ -189,7 +227,12 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
                     if let Some(interval) = args.flags.get("--interval") {
                         if let Some(interval_str) = interval {
                             if let Ok(interval_val) = interval_str.parse::<u32>() {
-                                recurrence = recurrence.with_interval(interval_val);
+                                // Validate interval is reasonable
+                                if interval_val > 0 && interval_val <= 365 {
+                                    recurrence = recurrence.with_interval(interval_val);
+                                } else {
+                                    println!("Warning: Interval should be between 1 and 365. Using default of 1.");
+                                }
                             }
                         }
                     }
@@ -197,7 +240,12 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
                     // Handle until date
                     if let Some(until) = args.flags.get("--until") {
                         if let Some(until_str) = until {
-                            recurrence = recurrence.with_end_date(until_str);
+                            // Validate date format
+                            if calendar::validate_date_format(until_str) {
+                                recurrence = recurrence.with_end_date(until_str);
+                            } else {
+                                println!("Warning: Invalid end date format. Please use YYYY-MM-DD format.");
+                            }
                         }
                     }
                     
@@ -205,7 +253,12 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
                     if let Some(count) = args.flags.get("--count") {
                         if let Some(count_str) = count {
                             if let Ok(count_val) = count_str.parse::<u32>() {
-                                recurrence = recurrence.with_count(count_val);
+                                // Validate count is reasonable
+                                if count_val > 0 && count_val <= 500 {
+                                    recurrence = recurrence.with_count(count_val);
+                                } else {
+                                    println!("Warning: Count should be between 1 and 500. Using default of no limit.");
+                                }
                             }
                         }
                     }
@@ -215,7 +268,16 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
                         if let Some(days_str) = days {
                             let days: Vec<u8> = days_str
                                 .split(',')
-                                .filter_map(|d| d.trim().parse::<u8>().ok())
+                                .filter_map(|d| {
+                                    let result = d.trim().parse::<u8>();
+                                    match result {
+                                        Ok(val) if val <= 6 => Some(val), // 0-6 are valid day values
+                                        _ => {
+                                            println!("Warning: Invalid day value: {}. Days should be 0-6.", d.trim());
+                                            None
+                                        }
+                                    }
+                                })
                                 .collect();
                             
                             if !days.is_empty() {
@@ -241,8 +303,8 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
     // Handle contact names if provided
     if let Some(contacts) = args.flags.get("--contacts") {
         if let Some(contact_str) = contacts {
+            let contact_str = sanitize_input(contact_str, true);
             let contact_names: Vec<&str> = contact_str
-                .trim_matches('"')
                 .split(',')
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
@@ -256,6 +318,52 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
     }
     
     calendar::create_event(config)
+}
+
+/// Safely sanitize user input to prevent injection attacks
+fn sanitize_input(input: &str, allow_quotes: bool) -> String {
+    // Trim quotes first if they're at the start/end of the input
+    let trimmed = input.trim_matches('"').trim_matches('\'');
+    
+    // Escape special characters
+    let mut result = String::new();
+    
+    for c in trimmed.chars() {
+        match c {
+            // If allow_quotes is true, we preserve quote characters for some fields
+            '"' if allow_quotes => result.push('"'),
+            '"' => result.push('\''), // Replace double quotes with single quotes if not allowed
+            '\'' if allow_quotes => result.push('\''),
+            '\'' => result.push('`'), // Replace single quotes if not allowed
+            '\\' => result.push_str("\\\\"), // Escape backslashes
+            ';' => result.push(','), // Replace semicolons with commas
+            '&' => result.push_str("and"), // Replace & with "and"
+            '|' => result.push('/'), // Replace pipes with slashes
+            '<' => result.push('('), // Replace angle brackets with parentheses
+            '>' => result.push(')'),
+            '$' => result.push('$'), // Drop dollar signs which could be used for variable references
+            '`' => result.push('\''), // Replace backticks
+            '\n' => result.push(' '), // Replace newlines with spaces
+            '\r' => result.push(' '), // Replace carriage returns with spaces
+            _ if c.is_control() => {}, // Remove control characters
+            _ => result.push(c),
+        }
+    }
+    
+    result
+}
+
+/// Validate email format with simple regex check
+fn validate_email_format(email: &str) -> bool {
+    let re = regex::Regex::new(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,63}$").unwrap();
+    re.is_match(email) && !contains_dangerous_chars(email)
+}
+
+/// Check for potentially dangerous characters in string
+fn contains_dangerous_chars(input: &str) -> bool {
+    input.contains('\'') || input.contains('\"') || input.contains('`') || 
+    input.contains(';') || input.contains('&') || input.contains('|') ||
+    input.contains('<') || input.contains('>')
 }
 
 fn delete_calendar_event(args: CommandArgs) -> Result<()> {

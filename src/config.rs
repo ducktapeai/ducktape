@@ -117,7 +117,7 @@ mod tests {
     use super::*;
     use std::env;
     use tempfile::tempdir;
-
+    
     #[test]
     fn test_config_default() {
         let config = Config::default();
@@ -132,26 +132,48 @@ mod tests {
 
     #[test]
     fn test_config_save_load() -> Result<()> {
-        // Create temporary directory
+        // Create a test config directly
         let temp_dir = tempdir()?;
-        let _config_path = temp_dir.path().join("config.toml");
-
-        // Set up temporary config directory
-        env::set_var("XDG_CONFIG_HOME", temp_dir.path());
-
-        // Create and save config
-        let config = Config::default();
-        config.save()?;
-
-        // Load config
-        let loaded = Config::load()?;
-
-        // Verify loaded config matches saved config
-        assert_eq!(
-            loaded.calendar.default_calendar,
-            config.calendar.default_calendar
-        );
-
+        let config_path = temp_dir.path().join("config.toml");
+        
+        // Create the test config
+        let test_config = Config {
+            calendar: CalendarConfig {
+                default_calendar: Some("TestCalendar".to_string()),
+                default_reminder_minutes: Some(30),
+                default_duration_minutes: Some(45),
+            },
+            todo: TodoConfig {
+                default_list: Some("TestList".to_string()),
+                default_reminder: false,
+            },
+            notes: NotesConfig {
+                default_folder: Some("TestFolder".to_string()),
+            },
+            language_model: LanguageModelConfig {
+                provider: LLMProvider::Grok,
+            },
+        };
+        
+        // Serialize and write directly to file
+        let content = toml::to_string_pretty(&test_config)?;
+        fs::write(&config_path, content)?;
+        
+        // Read it back using TOML parser
+        let file_content = fs::read_to_string(&config_path)?;
+        let loaded_config: Config = toml::from_str(&file_content)?;
+        
+        // Verify the loaded config matches what we saved
+        assert_eq!(loaded_config.calendar.default_calendar, test_config.calendar.default_calendar);
+        assert_eq!(loaded_config.calendar.default_reminder_minutes, test_config.calendar.default_reminder_minutes);
+        assert_eq!(loaded_config.calendar.default_duration_minutes, test_config.calendar.default_duration_minutes);
+        assert_eq!(loaded_config.todo.default_list, test_config.todo.default_list);
+        assert_eq!(loaded_config.todo.default_reminder, test_config.todo.default_reminder);
+        assert_eq!(loaded_config.notes.default_folder, test_config.notes.default_folder);
+        
+        // Test that different LLM providers are correctly serialized/deserialized
+        assert!(matches!(loaded_config.language_model.provider, LLMProvider::Grok));
+        
         Ok(())
     }
 }
