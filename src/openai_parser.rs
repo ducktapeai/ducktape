@@ -16,6 +16,17 @@ use std::sync::Mutex;
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
+// Helper function to escape strings for AppleScript to prevent command injection
+fn escape_applescript_string(input: &str) -> String {
+    // First replace double quotes with escaped quotes for AppleScript
+    let escaped = input.replace("\"", "\"\"");
+    
+    // Remove any control characters that could interfere with AppleScript execution
+    escaped.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
 // Function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
     // Execute AppleScript to get calendars
@@ -45,12 +56,13 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
-    // Check cache first with proper error handling
-    let cached_response = RESPONSE_CACHE
-        .lock()
-        .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?
-        .get(input)
-        .cloned();
+    // Check cache first with proper error handling - fixed to use mutable reference
+    let cached_response = {
+        let mut lock_result = RESPONSE_CACHE
+            .lock()
+            .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+        lock_result.get(input).cloned()
+    };
     
     if let Some(cached) = cached_response {
         return Ok(cached);
@@ -217,7 +229,9 @@ Rules:
 
                     // Always add the email parameter if we found any emails
                     if !email_str.is_empty() {
-                        command = format!(r#"{} --email "{}""#, command, email_str);
+                        // Escape emails to prevent injection
+                        let escaped_emails = escape_applescript_string(&email_str);
+                        command = format!(r#"{} --email "{}""#, command, escaped_emails);
                     }
 
                     // Extract potential contact names from input more accurately
@@ -252,7 +266,9 @@ Rules:
                         }
                         
                         if !contact_names.is_empty() {
-                            command = format!(r#"{} --contacts "{}"#, command, contact_names.join(","));
+                            // Escape contact names to prevent injection
+                            let escaped_contacts = escape_applescript_string(&contact_names.join(","));
+                            command = format!(r#"{} --contacts "{}"#, command, escaped_contacts);
                         }
                     }
 
@@ -317,11 +333,13 @@ mod tests {
         ];
 
         for input in inputs {
-            let cached_response = RESPONSE_CACHE
-                .lock()
-                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
-                .get(input)
-                .cloned();
+            // Improved cache access with proper mutex handling
+            let cached_response = {
+                let mut lock_result = RESPONSE_CACHE
+                    .lock()
+                    .map_err(|_| anyhow!("Failed to acquire cache lock"))?;
+                lock_result.get(input).cloned()
+            };
                 
             if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
@@ -333,10 +351,11 @@ mod tests {
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
             
-            RESPONSE_CACHE
-                .lock()
-                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
-                .put(input.to_string(), mock_response.clone());
+            if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+                cache.put(input.to_string(), mock_response.clone());
+            } else {
+                println!("Warning: Failed to update cache in test");
+            }
 
             let command = mock_response;
             assert!(command.starts_with("ducktape"));

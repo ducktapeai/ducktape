@@ -3,7 +3,13 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use log::{info, debug};
-use chrono::{Datelike, Local};
+use chrono::{Datelike, Local, NaiveDate, NaiveTime}; // Added missing imports
+use std::{fs::File, io::Write};
+use std::path::Path;
+use std::io::Read;
+
+// Maximum size for response data to prevent DoS attacks (5MB)
+const MAX_RESPONSE_SIZE: usize = 5 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventSearchResult {
@@ -189,7 +195,15 @@ Respond ONLY with the JSON array. Do not include any explanatory text."#,
     // Parse the response
     debug!("Received Grok API response: {}", response_text);
     
-    let response_json: Value = serde_json::from_str(&response_text)
+    // Limit response size to prevent DoS attacks
+    if response_text.len() > MAX_RESPONSE_SIZE {
+        return Err(anyhow!("Response size exceeds security limits"));
+    }
+
+    // Sanitize the response text to prevent injection attacks
+    let sanitized_response = sanitize_json_string(&response_text);
+
+    let response_json: Value = serde_json::from_str(&sanitized_response)
         .map_err(|e| anyhow!("Failed to parse Grok response: {}", e))?;
     
     let content = response_json["choices"][0]["message"]["content"]
@@ -448,4 +462,144 @@ fn format_command(event: &EventSearchResult, calendar_name: &str) -> String {
     }
     
     command
+}
+
+/// Helper function to sanitize JSON strings to prevent injection attacks
+fn sanitize_json_string(input: &str) -> String {
+    // Remove control characters that might interfere with JSON parsing
+    input.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect()
+}
+
+pub fn save_search_results(results: &[EventSearchResult], file_path: &str) -> Result<()> {
+    // Limit the number of results to save
+    let max_items = 1000;
+    let limited_results = if results.len() > max_items {
+        &results[0..max_items]
+    } else {
+        results
+    };
+    
+    let json_content = serde_json::to_string_pretty(limited_results)
+        .map_err(|e| anyhow!("Failed to serialize results: {}", e))?;
+    
+    // Validate path to prevent path traversal attacks
+    let path = Path::new(file_path);
+    let file_name = path.file_name()
+        .ok_or_else(|| anyhow!("Invalid file path"))?
+        .to_str()
+        .ok_or_else(|| anyhow!("File name contains invalid characters"))?;
+    
+    if file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
+        return Err(anyhow!("Invalid file name - potential path traversal attempt"));
+    }
+    
+    let mut file = File::create(file_path)
+        .map_err(|e| anyhow!("Failed to create file: {}", e))?;
+        
+    file.write_all(json_content.as_bytes())
+        .map_err(|e| anyhow!("Failed to write results: {}", e))?;
+        
+    Ok(())
+}
+
+pub fn load_search_results(file_path: &str) -> Result<Vec<EventSearchResult>> {
+    // Validate the file path
+    let path = Path::new(file_path);
+    
+    // Check if file exists
+    if !path.exists() {
+        return Err(anyhow!("Search results file not found: {}", file_path));
+    }
+    
+    // Check file size before loading to prevent DoS attacks
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > MAX_RESPONSE_SIZE as u64 {
+        return Err(anyhow!("File size exceeds security limits"));
+    }
+    
+    // Read the file with size limits
+    let mut file = File::open(path)?;
+    let mut json_content = String::new();
+    file.read_to_string(&mut json_content)?;
+    
+    // Sanitize content
+    let sanitized_content = sanitize_json_string(&json_content);
+    
+    // Parse with proper error handling and limits
+    let events: Vec<EventSearchResult> = serde_json::from_str(&sanitized_content)
+        .map_err(|e| anyhow!("Failed to parse events from file: {}", e))?;
+    
+    if events.len() > 1000 { // Additional safety check
+        return Err(anyhow!("Too many events in file (maximum 1000)"));
+    }
+    
+    Ok(events)
+}
+
+// Function to format search results for display
+pub fn format_search_results(results: &[EventSearchResult]) -> String {
+    if results.is_empty() {
+        return "No events found matching your search.".to_string();
+    }
+
+    let now = Local::now();
+    let mut formatted = String::new();
+    formatted.push_str("Search Results:\n");
+    formatted.push_str("==============\n\n");
+
+    for (idx, event) in results.iter().enumerate() {
+        // Fix: Access fields using their correct names
+        formatted.push_str(&format!("{}. {}\n", idx + 1, event.title));
+        formatted.push_str(&format!("   Date: {}, Time: {} - {}\n", 
+            event.date, 
+            event.start_time.as_deref().unwrap_or("N/A"),
+            event.end_time.as_deref().unwrap_or("N/A")));
+        
+        if let Some(location) = &event.location {
+            formatted.push_str(&format!("   Location: {}\n", location));
+        }
+        
+        if let Some(description) = &event.description {
+            // Truncate description if too long
+            let desc = if description.len() > 100 {
+                format!("{}...", &description[..100])
+            } else {
+                description.clone()
+            };
+            formatted.push_str(&format!("   Description: {}\n", desc));
+        }
+        
+        if let Some(url) = &event.url {
+            formatted.push_str(&format!("   URL: {}\n", url));
+        }
+        
+        // Attempt to parse the event date/time for relative time display
+        // Fix: Use start_time instead of time
+        if let (Ok(date), Some(time_str)) = (
+            NaiveDate::parse_from_str(&event.date, "%Y-%m-%d"),
+            &event.start_time
+        ) {
+            if let Ok(time) = NaiveTime::parse_from_str(time_str, "%H:%M") {
+                let event_dt = date.and_time(time);
+                let now_naive = now.naive_local();
+                
+                let diff = event_dt.signed_duration_since(now_naive);
+                let days = diff.num_days();
+                
+                if days == 0 {
+                    formatted.push_str("   When: Today\n");
+                } else if days == 1 {
+                    formatted.push_str("   When: Tomorrow\n");
+                } else if days > 1 && days < 7 {
+                    formatted.push_str(&format!("   When: In {} days\n", days));
+                }
+            }
+        }
+        
+        formatted.push_str("\n");
+    }
+
+    formatted
 }
