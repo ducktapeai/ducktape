@@ -550,7 +550,7 @@ pub fn format_search_results(results: &[EventSearchResult]) -> String {
     formatted.push_str("==============\n\n");
 
     for (idx, event) in results.iter().enumerate() {
-        // Fix: Access fields using their correct names
+        // Fixed field access
         formatted.push_str(&format!("{}. {}\n", idx + 1, event.title));
         formatted.push_str(&format!("   Date: {}, Time: {} - {}\n", 
             event.date, 
@@ -576,7 +576,7 @@ pub fn format_search_results(results: &[EventSearchResult]) -> String {
         }
         
         // Attempt to parse the event date/time for relative time display
-        // Fix: Use start_time instead of time
+        // Fixed to use start_time instead of time
         if let (Ok(date), Some(time_str)) = (
             NaiveDate::parse_from_str(&event.date, "%Y-%m-%d"),
             &event.start_time
