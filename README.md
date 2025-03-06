@@ -164,6 +164,33 @@ ducktape exit
 - Calendar integration with Apple Calendar.app
 - Modular, well-organized code architecture
 
+## Security Features
+- Command injection prevention through proper input sanitization and escaping
+- Secure API key handling via environment variables rather than hardcoded values
+- Validation of all user inputs before processing
+- Size and data limits on JSON parsing to prevent DoS attacks
+- Proper error handling to prevent information leakage
+- Memory-safe mutex handling for concurrent operations
+- Path traversal prevention in file operations
+- Automatic security checks with `security-check.sh` script
+
+## Running Security Checks
+DuckTape includes a comprehensive security check script:
+
+```bash
+# Run the security checks
+chmod +x security-check.sh
+./security-check.sh
+```
+
+The script checks for:
+- Dependency vulnerabilities using cargo-audit
+- License compliance and additional dependency checks with cargo-deny
+- Code quality issues with Clippy security lints
+- Common vulnerable patterns like unwrap(), expect(), and unsafe blocks
+- Potential command injection vulnerabilities
+- Secure handling of sensitive data
+
 ## Architecture
 
 DuckTape follows a modular architecture pattern:
@@ -183,3 +210,9 @@ DuckTape maintains state in the following files:
 - macOS with Calendar.app configured
 - Rust toolchain
 - API key for at least one supported language model provider (OpenAI, Grok, or DeepSeek)
+
+## Security Best Practices
+- Always keep your API keys confidential and use environment variables
+- Regularly run `cargo update` and `cargo audit` to keep dependencies up to date and secure
+- Never edit the generated JSON state files manually
+- Consider using application-specific passwords for calendar access if using iCloud
