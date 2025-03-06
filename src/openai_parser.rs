@@ -16,6 +16,17 @@ use std::sync::Mutex;
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
+// Helper function to escape strings for AppleScript to prevent command injection
+fn escape_applescript_string(input: &str) -> String {
+    // First replace double quotes with escaped quotes for AppleScript
+    let escaped = input.replace("\"", "\"\"");
+    
+    // Remove any control characters that could interfere with AppleScript execution
+    escaped.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
 // Function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
     // Execute AppleScript to get calendars
@@ -45,9 +56,16 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
-    // Check cache first
-    if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
-        return Ok(cached_response.clone());
+    // Check cache first with proper error handling - fixed to use mutable reference
+    let cached_response = {
+        let mut lock_result = RESPONSE_CACHE
+            .lock()
+            .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+        lock_result.get(input).cloned()
+    };
+    
+    if let Some(cached) = cached_response {
+        return Ok(cached);
     }
 
     // Get available calendars and configuration early
@@ -141,10 +159,9 @@ Rules:
         .to_string();
 
     // Cache the response before returning
-    RESPONSE_CACHE
-        .lock()
-        .unwrap()
-        .put(input.to_string(), commands.clone());
+    if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+        cache.put(input.to_string(), commands.clone());
+    }
 
     // Process each command separately
     let mut results = Vec::new();
@@ -212,7 +229,9 @@ Rules:
 
                     // Always add the email parameter if we found any emails
                     if !email_str.is_empty() {
-                        command = format!(r#"{} --email "{}""#, command, email_str);
+                        // Escape emails to prevent injection
+                        let escaped_emails = escape_applescript_string(&email_str);
+                        command = format!(r#"{} --email "{}""#, command, escaped_emails);
                     }
 
                     // Extract potential contact names from input more accurately
@@ -247,7 +266,9 @@ Rules:
                         }
                         
                         if !contact_names.is_empty() {
-                            command = format!(r#"{} --contacts "{}"#, command, contact_names.join(","));
+                            // Escape contact names to prevent injection
+                            let escaped_contacts = escape_applescript_string(&contact_names.join(","));
+                            command = format!(r#"{} --contacts "{}"#, command, escaped_contacts);
                         }
                     }
 
@@ -262,9 +283,10 @@ Rules:
     Ok(results.join("\n"))
 }
 
-// Enhanced email extraction
+// Enhanced email extraction with improved validation
 fn extract_emails(input: &str) -> Result<Vec<String>> {
-    let re = Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
+    // Use a more strict email regex pattern
+    let re = Regex::new(r"\b[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.){1,125}[A-Za-z]{2,63}\b")
         .map_err(|e| anyhow!("Failed to create regex: {}", e))?;
     
     let mut emails = Vec::new();
@@ -272,8 +294,18 @@ fn extract_emails(input: &str) -> Result<Vec<String>> {
     // Split by common separators
     for part in input.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
         let part = part.trim();
+        if part.len() > 320 { // Max allowed email length according to standards
+            debug!("Skipping potential email due to excessive length: {}", part);
+            continue;
+        }
+        
         if re.is_match(part) {
-            emails.push(part.to_string());
+            // Additional validation to prevent injection
+            if !part.contains('\'') && !part.contains('\"') && !part.contains('`') {
+                emails.push(part.to_string());
+            } else {
+                debug!("Skipping email with potentially dangerous characters: {}", part);
+            }
         }
     }
     
@@ -301,7 +333,15 @@ mod tests {
         ];
 
         for input in inputs {
-            if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
+            // Improved cache access with proper mutex handling
+            let cached_response = {
+                let mut lock_result = RESPONSE_CACHE
+                    .lock()
+                    .map_err(|_| anyhow!("Failed to acquire cache lock"))?;
+                lock_result.get(input).cloned()
+            };
+                
+            if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
                 continue;
             }
@@ -310,10 +350,12 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
-            RESPONSE_CACHE
-                .lock()
-                .unwrap()
-                .put(input.to_string(), mock_response.clone());
+            
+            if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+                cache.put(input.to_string(), mock_response.clone());
+            } else {
+                println!("Warning: Failed to update cache in test");
+            }
 
             let command = mock_response;
             assert!(command.starts_with("ducktape"));

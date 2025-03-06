@@ -8,7 +8,6 @@ use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use chrono::{Local, Timelike};
 use crate::config::Config;
-use log::debug;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -38,15 +37,34 @@ async fn get_available_calendars() -> Result<Vec<String>> {
 }
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
+    // Input validation
+    if input.is_empty() {
+        return Err(anyhow!("Empty input provided"));
+    }
+    
+    if input.len() > 1000 {
+        return Err(anyhow!("Input too long (max 1000 characters)"));
+    }
+    
+    // Sanitize input by removing any potentially harmful characters
+    let sanitized_input = sanitize_user_input(input);
+    
+    // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")
         .map_err(|_| anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"))?;
 
     let api_base = env::var("XAI_API_BASE")
         .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
 
-    // Check cache first
-    if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
-        return Ok(cached_response.clone());
+    // Check cache first using a properly declared mutable lock
+    let cached = {
+        let mut lock_result = RESPONSE_CACHE.lock()
+            .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+        lock_result.get(&sanitized_input).cloned()
+    };
+    
+    if let Some(cached_response) = cached {
+        return Ok(cached_response);
     }
 
     // Get available calendars and configuration
@@ -108,16 +126,20 @@ Rules:
         "Current date and time: {}",
         Local::now().format("%Y-%m-%d %H:%M")
     );
-    let prompt = format!("{}\n\n{}", context, input);
+    let prompt = format!("{}\n\n{}", context, sanitized_input);
 
-    debug!("Sending prompt to Grok API: {}", prompt);
+    // API request with proper error handling and timeouts
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
-    let client = Client::new();
     let response = client
         .post(format!("{}/chat/completions", api_base))
         .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
         .json(&json!({
-            "model": "grok-2-latest",
+            "model": "grok-1",
             "messages": [
                 {
                     "role": "system",
@@ -132,43 +154,38 @@ Rules:
             "max_tokens": 150
         }))
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow!("API request failed: {}", e))?;
 
-    let status = response.status();
-    let response_text = response.text().await?;
-
-    if !status.is_success() {
-        return Err(anyhow!(
-            "Grok API error: Status {}, Response: {}",
-            status,
-            response_text
-        ));
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await
+            .unwrap_or_else(|_| "Unable to read error response".to_string());
+        
+        return Err(anyhow!("X.AI API error ({}): {}", status, error_text));
     }
 
-    // Parse the response, handle both streaming and non-streaming formats
-    let response_json: Value = serde_json::from_str(&response_text)
-        .map_err(|e| anyhow!("Failed to parse Grok response: {}. Response text: {}", e, response_text))?;
+    let response_json: Value = response.json().await
+        .map_err(|e| anyhow!("Failed to parse API response: {}", e))?;
+        
+    // Safely extract the response content
+    let commands = response_json["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Invalid or missing response content"))?
+        .trim()
+        .to_string();
 
-    let commands = if let Some(choices) = response_json.get("choices") {
-        choices[0]["message"]["content"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Invalid response format: {}", response_text))?
-            .trim()
-            .to_string()
-    } else {
-        return Err(anyhow!("Unexpected response format: {}", response_text));
-    };
+    // Cache the response - use a safe mutex pattern
+    if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+        cache.put(sanitized_input.to_string(), commands.clone());
+    }
 
-    // Clean up and enhance the response
+    // Enhanced command processing
     let enhanced_command = enhance_recurrence_command(&commands);
-    debug!("Enhanced Grok command: {}", enhanced_command);
-
-    // Cache the response before returning
-    RESPONSE_CACHE
-        .lock()
-        .unwrap()
-        .put(input.to_string(), enhanced_command.clone());
-
+    
+    // Final validation of the returned commands
+    validate_calendar_command(&enhanced_command)?;
+    
     Ok(enhanced_command)
 }
 
@@ -204,21 +221,76 @@ fn enhance_recurrence_command(command: &str) -> String {
             enhanced = format!("{} --repeat yearly", enhanced);
         }
     }
-
-    // Add interval if appropriate keywords exist
-    if !command.contains("--interval") {
-        if command.contains("every 2 day") || command.contains("every other day") {
-            enhanced = format!("{} --interval 2", enhanced);
-        } else if command.contains("every 2 week") || command.contains("every other week") {
-            enhanced = format!("{} --interval 2", enhanced);
-        } else if command.contains("every 2 month") || command.contains("every other month") {
-            enhanced = format!("{} --interval 2", enhanced);
-        } else if command.contains("every 3 ") {
-            enhanced = format!("{} --interval 3", enhanced);
+    
+    // Look for interval patterns like "every 2 weeks" and add --interval
+    let re_interval = regex::Regex::new(r"every (\d+) (day|days|week|weeks|month|months|year|years)").unwrap();
+    if let Some(caps) = re_interval.captures(&command.to_lowercase()) {
+        if let Some(interval_str) = caps.get(1) {
+            if let Ok(interval) = interval_str.as_str().parse::<u32>() {
+                if interval > 0 && interval < 100 && // Reasonable limit
+                   !command.contains("--interval") {
+                    enhanced = format!("{} --interval {}", enhanced, interval);
+                }
+            }
         }
     }
-
+    
     enhanced
+}
+
+/// Sanitize user input to prevent injection or other security issues
+fn sanitize_user_input(input: &str) -> String {
+    // Remove any control characters
+    input.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
+/// Validate returned calendar command for security
+fn validate_calendar_command(command: &str) -> Result<()> {
+    // Check for suspicious patterns
+    if command.contains("&&") || command.contains("|") || 
+       command.contains(";") || command.contains("`") {
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
+    }
+    
+    // Validate interval values are reasonable if present
+    if let Some(interval_idx) = command.find("--interval") {
+        let interval_part = &command[interval_idx + 10..]; // Skip past "--interval "
+        
+        // Extract the interval value - look for the first number after "--interval "
+        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
+        if let Some(caps) = re.captures(interval_part) {
+            if let Some(interval_match) = caps.get(1) {
+                let interval_str = interval_match.as_str();
+                if let Ok(interval) = interval_str.parse::<u32>() {
+                    if interval > 100 {
+                        return Err(anyhow!("Unreasonably large interval value: {}", interval));
+                    }
+                }
+            }
+        }
+    }
+    
+    // Validate count values are reasonable if present
+    if let Some(count_idx) = command.find("--count") {
+        let count_part = &command[count_idx + 7..]; // Skip past "--count "
+        
+        // Extract the count value using regex for more reliable parsing
+        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
+        if let Some(caps) = re.captures(count_part) {
+            if let Some(count_match) = caps.get(1) {
+                let count_str = count_match.as_str();
+                if let Ok(count) = count_str.parse::<u32>() {
+                    if count > 500 {
+                        return Err(anyhow!("Unreasonably large count value: {}", count));
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
 }
 
 #[cfg(test)]
@@ -236,7 +308,14 @@ mod tests {
         ];
 
         for input in inputs {
-            if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
+            // Use a properly declared mutable lock for checking the cache
+            let cached_response = {
+                let mut lock_result = RESPONSE_CACHE.lock()
+                    .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+                lock_result.get(input).cloned()
+            };
+                
+            if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
                 continue;
             }
@@ -245,10 +324,12 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
-            RESPONSE_CACHE
-                .lock()
-                .unwrap()
-                .put(input.to_string(), mock_response.clone());
+            
+            if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+                cache.put(input.to_string(), mock_response.clone());
+            } else {
+                println!("Warning: Failed to update cache in test");
+            }
 
             let command = mock_response;
             assert!(command.starts_with("ducktape"));
@@ -274,5 +355,31 @@ mod tests {
         let input = "ducktape todo \"Buy groceries\"";
         let enhanced = enhance_recurrence_command(input);
         assert_eq!(input, enhanced);
+    }
+    
+    #[test]
+    fn test_sanitize_user_input() {
+        let input = "Meeting with John\u{0000} tomorrow";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Meeting with John tomorrow");
+        
+        let input = "Lunch\nmeeting";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Lunch\nmeeting"); // Preserves newlines
+    }
+    
+    #[test]
+    fn test_validate_calendar_command() {
+        // Test valid command
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --repeat weekly --interval 2";
+        assert!(validate_calendar_command(cmd).is_ok());
+        
+        // Test invalid command with shell injection attempt
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00; rm -rf /";
+        assert!(validate_calendar_command(cmd).is_err());
+        
+        // Test unreasonable interval
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --interval 500";
+        assert!(validate_calendar_command(cmd).is_err());
     }
 }

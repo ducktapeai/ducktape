@@ -7,7 +7,7 @@ async fn integration_test_create_event_with_invite() -> Result<()> {
     let mut config = EventConfig::new("Integration Invite Test", "2024-02-21", "14:30");
     config.end_time = Some("15:30");
     // Use a calendar name that is unlikely to exist in the test environment.
-    config.calendars = vec!["NonexistentCalendar"];
+    config.calendars = vec!["NonexistentCalendar".to_string()];
     config.location = Some("Integration Room".to_string());
     config.description = Some("Integration Test Event".to_string());
     config.emails = vec!["integration@test.com".to_string()];

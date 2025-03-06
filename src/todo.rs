@@ -17,12 +17,24 @@ impl<'a> TodoConfig<'a> {
     }
 }
 
+// Helper function to escape strings for AppleScript to prevent command injection
+fn escape_applescript_string(input: &str) -> String {
+    // First replace double quotes with escaped quotes for AppleScript
+    let escaped = input.replace("\"", "\"\"");
+    
+    // Remove any control characters that could interfere with AppleScript execution
+    escaped.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
 pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
     let target_lists = if config.lists.is_empty() {
         vec!["Reminders"]
     } else {
         config.lists
     };
+
     // Format reminder time to AppleScript-friendly string if provided
     let reminder_prop = if let Some(time_str) = config.reminder_time {
         // Parse input in format "YYYY-MM-DD HH:MM"
@@ -40,9 +52,15 @@ pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
     } else {
         String::new()
     };
+
     let mut success_count = 0;
     for list in target_lists {
-        // Updated AppleScript to locate or create the target list
+        // Escape all inputs to prevent command injection
+        let escaped_list = escape_applescript_string(list);
+        let escaped_title = escape_applescript_string(config.title);
+        let escaped_notes = escape_applescript_string(config.notes.as_deref().unwrap_or(""));
+        
+        // Updated AppleScript with escaped inputs
         let script = format!(
 r#"tell application "Reminders"
     try
@@ -58,17 +76,19 @@ r#"tell application "Reminders"
         return "Error: " & errMsg
     end try
 end tell"#,
-            list, // search for list
-            list, // create list if not found
-            config.title,
-            config.notes.as_deref().unwrap_or(""),
+            escaped_list, // search for list
+            escaped_list, // create list if not found
+            escaped_title,
+            escaped_notes,
             reminder_prop
         );
+
         let output = Command::new("osascript")
             .arg("-e")
             .arg(&script)
             .output()?;
         let result = String::from_utf8_lossy(&output.stdout);
+
         if result.contains("Success") {
             println!("Todo created in list {}: {}", list, config.title);
             success_count += 1;
@@ -76,6 +96,7 @@ end tell"#,
             println!("Failed to create todo in list {}: {}", list, config.title);
         }
     }
+
     if success_count > 0 {
         Ok(())
     } else {

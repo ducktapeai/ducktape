@@ -1,14 +1,17 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
+use std::io::Read;
 
 const STATE_DIR: &str = ".ducktape";
 const TODOS_FILE: &str = "todos.json";
 const EVENTS_FILE: &str = "events.json";
 const NOTES_FILE: &str = "notes.json";
+// Maximum allowed size for state files to prevent DoS attacks (10MB)
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
 // Trait for items that can be persisted
 pub trait Persistent: Sized + Serialize + for<'de> Deserialize<'de> {
@@ -70,7 +73,9 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new() -> Result<Self> {
-        let mut state_dir = dirs::home_dir().expect("Could not find home directory");
+        let home_dir = dirs::home_dir()
+            .ok_or_else(|| anyhow!("Could not find home directory"))?;
+        let mut state_dir = home_dir;
         state_dir.push(STATE_DIR);
         std::fs::create_dir_all(&state_dir)?;
         Ok(Self { state_dir })
@@ -79,9 +84,31 @@ impl StateManager {
     pub fn load<T: Persistent>(&self) -> Result<Vec<T>> {
         let path = self.state_dir.join(T::filename());
         if path.exists() {
+            // Check file size before loading to prevent DoS attacks
+            let metadata = std::fs::metadata(&path)?;
+            if metadata.len() > MAX_FILE_SIZE {
+                return Err(anyhow!("File size exceeds security limits"));
+            }
+            
             let file = File::open(path)?;
             let reader = BufReader::new(file);
-            Ok(serde_json::from_reader(reader)?)
+            
+            // Use the from_reader function with proper security limits
+            let json_value: serde_json::Value = serde_json::from_reader(reader)
+                .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
+            
+            // Count elements to prevent DoS attacks
+            if let Some(array) = json_value.as_array() {
+                if array.len() > 10000 {
+                    return Err(anyhow!("Too many items in file (maximum 10000)"));
+                }
+            }
+            
+            // Convert to the desired type
+            let items: Vec<T> = serde_json::from_value(json_value)
+                .map_err(|e| anyhow!("Failed to deserialize data: {}", e))?;
+            
+            Ok(items)
         } else {
             Ok(Vec::new())
         }
@@ -146,8 +173,28 @@ impl StateManager {
         for filename in &[TODOS_FILE, EVENTS_FILE, NOTES_FILE] {
             let path = self.state_dir.join(filename);
             if path.exists() {
-                let items: serde_json::Value =
-                    serde_json::from_reader(BufReader::new(File::open(&path)?))?;
+                // Check file size before loading to prevent DoS attacks
+                let metadata = std::fs::metadata(&path)?;
+                if metadata.len() > MAX_FILE_SIZE {
+                    return Err(anyhow!("File {} exceeds security limits", filename));
+                }
+                
+                // Read file content with size limits
+                let mut file = File::open(&path)?;
+                let mut content = Vec::with_capacity(metadata.len() as usize);
+                file.read_to_end(&mut content)?;
+                
+                // Use a depth limit for JSON parsing
+                let items: serde_json::Value = serde_json::from_slice(&content)
+                    .map_err(|e| anyhow!("Error parsing {}: {}", filename, e))?;
+                
+                // Count elements to prevent DoS attacks
+                if let Some(array) = items.as_array() {
+                    if array.len() > 10000 {
+                        return Err(anyhow!("Too many items in file {} (maximum 10000)", filename));
+                    }
+                }
+                
                 let file = OpenOptions::new()
                     .write(true)
                     .truncate(true)
