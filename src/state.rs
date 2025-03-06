@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
@@ -70,7 +70,9 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new() -> Result<Self> {
-        let mut state_dir = dirs::home_dir().expect("Could not find home directory");
+        let home_dir = dirs::home_dir()
+            .ok_or_else(|| anyhow!("Could not find home directory"))?;
+        let mut state_dir = home_dir;
         state_dir.push(STATE_DIR);
         std::fs::create_dir_all(&state_dir)?;
         Ok(Self { state_dir })

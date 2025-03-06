@@ -45,9 +45,15 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
-    // Check cache first
-    if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
-        return Ok(cached_response.clone());
+    // Check cache first with proper error handling
+    let cached_response = RESPONSE_CACHE
+        .lock()
+        .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?
+        .get(input)
+        .cloned();
+    
+    if let Some(cached) = cached_response {
+        return Ok(cached);
     }
 
     // Get available calendars and configuration early
@@ -141,10 +147,9 @@ Rules:
         .to_string();
 
     // Cache the response before returning
-    RESPONSE_CACHE
-        .lock()
-        .unwrap()
-        .put(input.to_string(), commands.clone());
+    if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+        cache.put(input.to_string(), commands.clone());
+    }
 
     // Process each command separately
     let mut results = Vec::new();
@@ -312,7 +317,13 @@ mod tests {
         ];
 
         for input in inputs {
-            if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
+            let cached_response = RESPONSE_CACHE
+                .lock()
+                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
+                .get(input)
+                .cloned();
+                
+            if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
                 continue;
             }
@@ -321,9 +332,10 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
+            
             RESPONSE_CACHE
                 .lock()
-                .unwrap()
+                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
                 .put(input.to_string(), mock_response.clone());
 
             let command = mock_response;

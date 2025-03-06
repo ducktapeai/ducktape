@@ -8,7 +8,6 @@ use std::num::NonZeroUsize;
 use std::sync::Mutex;
 use chrono::{Local, Timelike};
 use crate::config::Config;
-use log::debug;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -50,6 +49,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
     
+    // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")
         .map_err(|_| anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"))?;
 
@@ -57,16 +57,14 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
 
     // Check cache first - use a safe mutex pattern
-    let cache_result = match RESPONSE_CACHE.lock() {
-        Ok(mut cache) => cache.get(&sanitized_input).cloned(),
-        Err(err) => {
-            debug!("Cache mutex poisoned: {}", err);
-            None
-        }
-    };
+    let cached_response = RESPONSE_CACHE
+        .lock()
+        .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?
+        .get(&sanitized_input)
+        .cloned();
     
-    if let Some(cached_response) = cache_result {
-        return Ok(cached_response);
+    if let Some(cached) = cached_response {
+        return Ok(cached);
     }
 
     // Get available calendars and configuration
@@ -310,7 +308,13 @@ mod tests {
         ];
 
         for input in inputs {
-            if let Some(cached_response) = RESPONSE_CACHE.lock().unwrap().get(input) {
+            let cached_response = RESPONSE_CACHE
+                .lock()
+                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
+                .get(input)
+                .cloned();
+                
+            if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
                 continue;
             }
@@ -319,9 +323,10 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
+            
             RESPONSE_CACHE
                 .lock()
-                .unwrap()
+                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
                 .put(input.to_string(), mock_response.clone());
 
             let command = mock_response;
