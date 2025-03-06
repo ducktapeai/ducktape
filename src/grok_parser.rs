@@ -56,15 +56,15 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let api_base = env::var("XAI_API_BASE")
         .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
 
-    // Check cache first - use a safe mutex pattern
-    let cached_response = RESPONSE_CACHE
-        .lock()
-        .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?
-        .get(&sanitized_input)
-        .cloned();
+    // Check cache first using a properly declared mutable lock
+    let cached = {
+        let mut lock_result = RESPONSE_CACHE.lock()
+            .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+        lock_result.get(&sanitized_input).cloned()
+    };
     
-    if let Some(cached) = cached_response {
-        return Ok(cached);
+    if let Some(cached_response) = cached {
+        return Ok(cached_response);
     }
 
     // Get available calendars and configuration
@@ -308,11 +308,12 @@ mod tests {
         ];
 
         for input in inputs {
-            let cached_response = RESPONSE_CACHE
-                .lock()
-                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
-                .get(input)
-                .cloned();
+            // Use a properly declared mutable lock for checking the cache
+            let cached_response = {
+                let mut lock_result = RESPONSE_CACHE.lock()
+                    .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
+                lock_result.get(input).cloned()
+            };
                 
             if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
@@ -324,10 +325,11 @@ mod tests {
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
             
-            RESPONSE_CACHE
-                .lock()
-                .map_err(|_| anyhow!("Failed to acquire cache lock"))?
-                .put(input.to_string(), mock_response.clone());
+            if let Ok(mut cache) = RESPONSE_CACHE.lock() {
+                cache.put(input.to_string(), mock_response.clone());
+            } else {
+                println!("Warning: Failed to update cache in test");
+            }
 
             let command = mock_response;
             assert!(command.starts_with("ducktape"));
