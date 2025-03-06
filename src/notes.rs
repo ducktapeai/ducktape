@@ -23,12 +23,28 @@ impl<'a> NoteConfig<'a> {
     }
 }
 
+// Helper function to escape strings for AppleScript to prevent command injection
+fn escape_applescript_string(input: &str) -> String {
+    // First replace double quotes with escaped quotes for AppleScript
+    let escaped = input.replace("\"", "\"\"");
+    
+    // Remove any control characters that could interfere with AppleScript execution
+    escaped.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
 pub fn create_note(config: NoteConfig) -> Result<()> {
     let folder_script = if let Some(folder) = config.folder {
-        format!("tell folder \"{}\" of default account", folder)
+        let escaped_folder = escape_applescript_string(folder);
+        format!("tell folder \"{}\" of default account", escaped_folder)
     } else {
         "tell default account".to_string()
     };
+
+    // Escape title and content to prevent command injection
+    let escaped_title = escape_applescript_string(config.title);
+    let escaped_content = escape_applescript_string(config.content);
 
     let script = format!(
         r#"tell application "Notes"
@@ -41,12 +57,12 @@ pub fn create_note(config: NoteConfig) -> Result<()> {
                 return "Error: " & errMsg
             end try
         end tell"#,
-        folder_script, config.title, config.content
+        folder_script, escaped_title, escaped_content
     );
 
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-
     let result = String::from_utf8_lossy(&output.stdout);
+
     if result.contains("Success") {
         println!("Note created: {}", config.title);
         Ok(())
@@ -101,7 +117,9 @@ struct Note {
 // Rest of unused functions can be removed if not needed for future development
 #[allow(dead_code)]
 pub fn create_note_local(title: &str, content: &str, tags: &[String]) -> Result<()> {
-    let mut notes_dir = dirs::home_dir().expect("Could not find home directory");
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);
     create_dir_all(&notes_dir)?;
@@ -136,6 +154,7 @@ pub fn create_note_local(title: &str, content: &str, tags: &[String]) -> Result<
 #[allow(dead_code)]
 pub fn create_note_apple(config: NoteConfig) -> Result<()> {
     let folder_code = if let Some(folder) = config.folder {
+        let escaped_folder = escape_applescript_string(folder);
         format!(
             r#"
             set targetFolder to missing value
@@ -149,11 +168,15 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
                 set targetFolder to make new folder with properties {{name:"{}"}}
             end if
             tell targetFolder"#,
-            folder, folder
+            escaped_folder, escaped_folder
         )
     } else {
         "tell default account".to_string()
     };
+
+    // Escape title and content to prevent command injection
+    let escaped_title = escape_applescript_string(config.title);
+    let escaped_content = escape_applescript_string(config.content);
 
     let script = format!(
         r#"tell application "Notes"
@@ -166,12 +189,12 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
                 return "Error: " & errMsg
             end try
         end tell"#,
-        folder_code, config.title, config.content
+        folder_code, escaped_title, escaped_content
     );
 
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-
     let result = String::from_utf8_lossy(&output.stdout);
+
     if result.contains("Success") {
         println!("Note created: {}", config.title);
         Ok(())
@@ -182,7 +205,9 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn list_notes_local() -> Result<()> {
-    let mut notes_dir = dirs::home_dir().expect("Could not find home directory");
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);
 
@@ -236,7 +261,7 @@ pub fn list_notes_apple() -> Result<()> {
 
 #[allow(dead_code)]
 pub fn read_note_local(title: &str) -> Result<()> {
-    let mut file_path = get_notes_dir();
+    let mut file_path = get_notes_dir()?;
     file_path.push(format!("{}.md", sanitize_filename(title)));
 
     if !file_path.exists() {
@@ -249,11 +274,13 @@ pub fn read_note_local(title: &str) -> Result<()> {
 }
 
 #[allow(dead_code)]
-fn get_notes_dir() -> PathBuf {
-    let mut notes_dir = dirs::home_dir().expect("Could not find home directory");
+fn get_notes_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);
-    notes_dir
+    Ok(notes_dir)
 }
 
 #[allow(dead_code)]
