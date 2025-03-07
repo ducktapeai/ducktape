@@ -212,7 +212,7 @@ DuckTape maintains state in the following files:
 - API key for at least one supported language model provider (OpenAI, Grok, or DeepSeek)
 
 ## Security Best Practices
-- Always keep your API keys confidential and use environment variables
+- Make sure you always keep your API keys confidential and use environment variables
 - Regularly run `cargo update` and `cargo audit` to keep dependencies up to date and secure
 - Never edit the generated JSON state files manually
 - Consider using application-specific passwords for calendar access if using iCloud
