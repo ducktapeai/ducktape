@@ -50,6 +50,7 @@ Just type what you want to do:
 - "create an event for 7pm tonight to my KIDS calendar inviting joe.blogs@gmail.com"
 - "schedule a weekly team meeting every Tuesday at 10am with Jane and Bob"
 - "create a monthly book club meeting on the first Friday until December"
+- "schedule a zoom meeting with the team tomorrow at 3pm for one hour"
 
 ## Command Reference
 
@@ -79,6 +80,9 @@ ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --r
 # Create recurring event with contacts
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat weekly --contacts "Jane Doe"
 
+# Create event with Zoom meeting
+ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --zoom
+
 # Delete events
 ducktape calendar delete "<title>"
 
@@ -102,6 +106,7 @@ ducktape list-events
 - `--email "<email>"` - Add attendee
 - `--reminder <minutes>` - Set reminder (minutes before event)
 - `--contacts "<name1,name2>"` - Add contacts by name (automatically looks up email addresses)
+- `--zoom` - Create a Zoom meeting for the event (requires Zoom API credentials)
 
 ### Recurring Event Options
 - `--repeat <daily|weekly|monthly|yearly>` - Set recurrence frequency
@@ -149,6 +154,25 @@ ducktape help
 ducktape exit
 ```
 
+### Zoom Integration Setup
+```bash
+# Configure Zoom API credentials
+ducktape zoom-setup
+```
+You'll need:
+1. Create a Server-to-Server OAuth app in the [Zoom App Marketplace](https://marketplace.zoom.us/)
+2. Get these credentials from your app:
+   - Account ID
+   - Client ID
+   - Client Secret
+
+Alternatively, you can set these environment variables:
+```bash
+export ZOOM_ACCOUNT_ID='your-zoom-account-id'
+export ZOOM_CLIENT_ID='your-zoom-client-id'
+export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
+```
+
 ## Features
 
 - Natural language command processing with multiple AI model support:
@@ -160,6 +184,7 @@ ducktape exit
 - Automatic email attendee addition
 - Recurring events support (daily, weekly, monthly, yearly)
 - Contact lookup for event attendees
+- Zoom meeting integration with automatic meeting creation
 - State persistence
 - Calendar integration with Apple Calendar.app
 - Modular, well-organized code architecture
@@ -210,9 +235,11 @@ DuckTape maintains state in the following files:
 - macOS with Calendar.app configured
 - Rust toolchain
 - API key for at least one supported language model provider (OpenAI, Grok, or DeepSeek)
+- (Optional) Zoom API credentials for meeting integration
 
 ## Security Best Practices
 - Always keep your API keys confidential and use environment variables
 - Regularly run `cargo update` and `cargo audit` to keep dependencies up to date and secure
 - Never edit the generated JSON state files manually
 - Consider using application-specific passwords for calendar access if using iCloud
+- Store Zoom API credentials securely in your system keychain

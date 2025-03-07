@@ -66,10 +66,14 @@ pub fn print_help() -> Result<()> {
     println!("  ducktape config show            Display current configuration");
     println!("  ducktape help                   Show this help message");
     
-    println!("
-Event Search:");
+    println!("\nEvent Search:");
     println!("  ducktape search-events \"<query>\" [--calendar \"<calendar>\"]");
     println!("  Example: ducktape search-events \"Lakers basketball\" --calendar \"Sports\"");
+    
+    println!("\nApplication Control:");
+    println!("  exit, quit                      Exit the application");
+    println!("  Ctrl+C                          Interrupt current operation");
+    println!("  Ctrl+D                          Exit the application");
     
     println!("\nTips:");
     println!("  - Dates can be in YYYY-MM-DD format");

@@ -13,6 +13,7 @@ mod openai_parser;
 mod reminders;
 mod state;
 mod todo;
+mod zoom;
 
 use anyhow::Result;
 use app::Application;
