@@ -37,7 +37,7 @@ async fn get_available_calendars() -> Result<Vec<String>> {
 }
 
 pub async fn parse_natural_language(input: &str) -> Result<String> {
-    // Input validation and sanitization
+    // Input validation
     if input.is_empty() {
         return Err(anyhow!("Empty input provided"));
     }
@@ -46,10 +46,17 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         return Err(anyhow!("Input too long (max 1000 characters)"));
     }
     
-    // Sanitize input
+    // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
     
-    // Check cache first
+    // Load API key without showing it in error messages
+    let api_key = env::var("XAI_API_KEY")
+        .map_err(|_| anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"))?;
+
+    let api_base = env::var("XAI_API_BASE")
+        .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
+
+    // Check cache first using a properly declared mutable lock
     let cached = {
         let mut lock_result = RESPONSE_CACHE.lock()
             .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
@@ -71,7 +78,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let current_date = Local::now();
     let current_hour = current_date.hour();
 
-    // Enhanced system prompt for natural language understanding
+    // Build system prompt similar to OpenAI but adapted for Grok
     let system_prompt = format!(
         r#"You are a command line interface parser that converts natural language into ducktape commands.
 Current time is: {current_time}
@@ -79,21 +86,14 @@ Available calendars: {calendars}
 Default calendar: {default_cal}
 
 For calendar events, use the format:
-ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [options]
+ducktape calendar create "<title>" <date> <start_time> <end_time> "<calendar>" [--email "<email1>,<email2>"] [--contacts "<name1>,<name2>"]
 
-Available options:
---zoom                                   Create a Zoom meeting for this event
---email "<email1>,<email2>"             Add attendees by email
---contacts "<name1>,<name2>"            Add attendees by contact name
---location "<location>"                 Set event location
---notes "<description>"                 Add event description
-
-For recurring events:
+For recurring events, add any of these options:
 --repeat <daily|weekly|monthly|yearly>   Set recurrence frequency
 --interval <number>                      Set interval (e.g., every 2 weeks)
 --until <YYYY-MM-DD>                     Set end date for recurrence
 --count <number>                         Set number of occurrences
---days <0,1,2...>                       Set days of week (0=Sun, 1=Mon, etc.)
+--days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)
 
 Rules:
 1. If no date is specified, use today's date ({today}).
@@ -106,18 +106,15 @@ Rules:
 8. If input mentions "work", use the "Work" calendar.
 9. If no calendar is specified, use the default calendar.
 10. Available calendars are: {calendars}.
-11. If input mentions meeting/scheduling with someone's name, add their name to --contacts
-12. If input mentions Zoom, video call, or virtual meeting, add --zoom flag
-13. Handle natural language time expressions:
-    - "tomorrow at 10am" -> next day at 10:00
-    - "next week Tuesday at 2pm" -> next Tuesday at 14:00
-    - "in 2 hours" -> current time + 2 hours
-14. For recurring events, detect patterns like:
-    - "every day/daily" -> --repeat daily
-    - "every week/weekly" -> --repeat weekly
-    - "every 2 weeks" -> --repeat weekly --interval 2
-    - "monthly" -> --repeat monthly
-    - "yearly/annually" -> --repeat yearly"#,
+11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names.
+12. If the input mentions recurring events or repetition:
+    - For "daily" recurrence: use --repeat daily
+    - For "weekly" recurrence: use --repeat weekly
+    - For "monthly" recurrence: use --repeat monthly
+    - For "yearly" or "annual" recurrence: use --repeat yearly
+    - If specific interval is mentioned (e.g., "every 2 weeks"), add --interval 2
+    - If specific end date is mentioned (e.g., "until March 15"), add --until YYYY-MM-DD
+    - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10"#,
         current_time = current_date.format("%Y-%m-%d %H:%M"),
         calendars = available_calendars.join(", "),
         default_cal = default_calendar,
@@ -137,18 +134,12 @@ Rules:
         .build()
         .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
-    let api_key = env::var("XAI_API_KEY")
-        .map_err(|_| anyhow!("XAI_API_KEY environment variable not set"))?;
-
-    let api_base = env::var("XAI_API_BASE")
-        .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
-
     let response = client
         .post(format!("{}/chat/completions", api_base))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&json!({
-            "model": "grok-2-latest",
+            "model": "grok-1",
             "messages": [
                 {
                     "role": "system",
@@ -160,10 +151,11 @@ Rules:
                 }
             ],
             "temperature": 0.3,
-            "max_tokens": 500
+            "max_tokens": 150
         }))
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow!("API request failed: {}", e))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -176,20 +168,22 @@ Rules:
     let response_json: Value = response.json().await
         .map_err(|e| anyhow!("Failed to parse API response: {}", e))?;
         
-    // Extract the response content
-    let command = response_json["choices"][0]["message"]["content"]
+    // Safely extract the response content
+    let commands = response_json["choices"][0]["message"]["content"]
         .as_str()
         .ok_or_else(|| anyhow!("Invalid or missing response content"))?
         .trim()
         .to_string();
 
-    // Cache the response
+    // Cache the response - use a safe mutex pattern
     if let Ok(mut cache) = RESPONSE_CACHE.lock() {
-        cache.put(sanitized_input.to_string(), command.clone());
+        cache.put(sanitized_input.to_string(), commands.clone());
     }
 
-    // Enhance and validate the command
-    let enhanced_command = enhance_recurrence_command(&command);
+    // Enhanced command processing
+    let enhanced_command = enhance_recurrence_command(&commands);
+    
+    // Final validation of the returned commands
     validate_calendar_command(&enhanced_command)?;
     
     Ok(enhanced_command)
