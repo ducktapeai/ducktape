@@ -74,12 +74,16 @@ impl Application {
     }
 
     async fn process_input(&self, input: &str) -> Result<()> {
-        let args = CommandArgs::parse(input)?;
-
-        if args.command == "exit" || args.command == "quit" {
-            std::process::exit(0);
+        // First try natural language processing if input doesn't start with "ducktape"
+        if !input.trim().to_lowercase().starts_with("ducktape") {
+            match self.process_natural_language(input).await {
+                Ok(_) => return Ok(()),
+                Err(e) => log::debug!("Natural language processing failed: {}", e),
+            }
         }
 
+        // Fall back to command parsing if natural language fails or input starts with "ducktape"
+        let args = CommandArgs::parse(input)?;
         self.execute_command(args).await
     }
 
@@ -91,11 +95,17 @@ impl Application {
         }
         
         // If no executor found, try natural language processing
-        self.process_natural_language(&args.command).await
+        Box::pin(self.process_natural_language(&args.command)).await
     }
 
-    async fn process_natural_language(&self, _input: &str) -> Result<()> {
-        println!("Unrecognized command. Type 'help' for a list of available commands.");
-        Ok(())
+    async fn process_natural_language(&self, input: &str) -> Result<()> {
+        use crate::grok_parser;
+        
+        // Convert natural language to ducktape command
+        let command = grok_parser::parse_natural_language(input).await?;
+        
+        // Parse and execute the translated command
+        let args = CommandArgs::parse(&command)?;
+        Box::pin(self.execute_command(args)).await
     }
 }
