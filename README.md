@@ -45,7 +45,6 @@ cargo run
 Just type what you want to do:
 - "schedule a meeting with John tomorrow at 2pm"
 - "remind me to buy groceries next Monday morning"
-- "take notes about the project meeting"
 - "add a todo about calling the bank"
 - "create an event for 7pm tonight to my KIDS calendar inviting joe.blogs@gmail.com"
 - "schedule a weekly team meeting every Tuesday at 10am with Jane and Bob"
