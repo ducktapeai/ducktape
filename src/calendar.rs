@@ -2,11 +2,12 @@ use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Datelike, Local, NaiveDateTime, TimeZone};
-use chrono_tz::Tz;  // Add timezone support
-use log::{debug, error, info}; // Import the info macro
+use chrono_tz::Tz;
+use log::{debug, error, info};
 use std::process::Command;
 use std::str::FromStr;
 use regex::Regex;
+use crate::zoom::{ZoomClient, ZoomMeetingOptions, format_zoom_time, calculate_meeting_duration};
 
 // Remove unused constants
 // const ALL_DAY_DURATION: i64 = 86400;
@@ -35,7 +36,7 @@ pub enum RecurrenceFrequency {
 }
 
 impl RecurrenceFrequency {
-    /// Convert the recurrence frequency to AppleScript string
+    #[allow(dead_code)]
     pub fn to_applescript(&self) -> &'static str {
         match self {
             RecurrenceFrequency::Daily => "daily",
@@ -124,83 +125,86 @@ impl RecurrencePattern {
 }
 
 /// Configuration for a calendar event
-#[derive(Debug)]
-pub struct EventConfig<'a> {
-    pub title: &'a str,
-    pub start_date: &'a str,
-    pub start_time: &'a str,
-    pub end_date: Option<&'a str>, // New field
-    pub end_time: Option<&'a str>, // New field
-    pub calendars: Vec<String>,   // Changed from Vec<&'a str> to Vec<String>
+#[derive(Debug, Clone)]
+pub struct EventConfig {
+    pub title: String,
+    pub start_date: String,
+    pub start_time: String,
+    pub end_date: Option<String>,
+    pub end_time: Option<String>,
+    pub calendars: Vec<String>,
     pub all_day: bool,
     pub location: Option<String>,
     pub description: Option<String>,
-    pub emails: Vec<String>,  // Changed from Option<String> to Vec<String>
-    pub reminder: Option<i32>, // Minutes before event to show reminder
-    pub timezone: Option<String>,  // Add timezone field
-    pub recurrence: Option<RecurrencePattern>, // Add recurrence pattern
+    pub emails: Vec<String>,
+    pub reminder: Option<i32>,
+    pub timezone: Option<String>,
+    pub recurrence: Option<RecurrencePattern>,
+    // Enhanced Zoom integration fields
+    pub create_zoom_meeting: bool,
+    pub zoom_meeting_id: Option<u64>,
+    pub zoom_join_url: Option<String>,
+    pub zoom_password: Option<String>,
 }
 
-impl<'a> EventConfig<'a> {
-    /// Creates a new EventConfig with required fields
-    pub fn new(title: &'a str, start_date: &'a str, start_time: &'a str) -> Self {
+impl EventConfig {
+    pub fn new(title: &str, date: &str, time: &str) -> Self {
         Self {
-            title,
-            start_date,
-            start_time,
+            title: title.to_string(),
+            start_date: date.to_string(),
+            start_time: time.to_string(),
             end_date: None,
             end_time: None,
             calendars: Vec::new(),
             all_day: false,
             location: None,
             description: None,
-            emails: Vec::new(),  // Initialize empty vector
+            emails: Vec::new(),
             reminder: None,
-            timezone: None,  // Initialize timezone as None
+            timezone: None,
             recurrence: None,
+            // Initialize Zoom fields
+            create_zoom_meeting: false,
+            zoom_meeting_id: None,
+            zoom_join_url: None,
+            zoom_password: None,
         }
     }
 
-    /// Set the timezone for the event
-    pub fn with_timezone(mut self, timezone: &str) -> Self {
-        self.timezone = Some(timezone.to_string());
-        self
-    }
-    
-    /// Set the recurrence pattern for the event
+    // Method to easily set recurrence pattern
+    #[allow(dead_code)]
     pub fn with_recurrence(mut self, recurrence: RecurrencePattern) -> Self {
         self.recurrence = Some(recurrence);
         self
     }
-    
-    /// Validates the EventConfig for security and correctness
+
+    // Method to enable Zoom meeting
+    #[allow(dead_code)]
+    pub fn with_zoom_meeting(mut self, enable: bool) -> Self {
+        self.create_zoom_meeting = enable;
+        self
+    }
+
     pub fn validate(&self) -> Result<()> {
         // Validate date format (YYYY-MM-DD)
-        if !validate_date_format(self.start_date) {
+        if !validate_date_format(&self.start_date) {
             return Err(CalendarError::InvalidDateTime(format!("Invalid date format: {}", self.start_date)).into());
         }
         
         // Validate time format (HH:MM)
-        if !validate_time_format(self.start_time) {
+        if !validate_time_format(&self.start_time) {
             return Err(CalendarError::InvalidDateTime(format!("Invalid time format: {}", self.start_time)).into());
         }
         
         // Validate end time if specified
-        if let Some(end_time) = self.end_time {
+        if let Some(end_time) = &self.end_time {
             if !validate_time_format(end_time) {
                 return Err(CalendarError::InvalidDateTime(format!("Invalid end time format: {}", end_time)).into());
             }
         }
         
-        // Validate end date if specified
-        if let Some(end_date) = self.end_date {
-            if !validate_date_format(end_date) {
-                return Err(CalendarError::InvalidDateTime(format!("Invalid end date format: {}", end_date)).into());
-            }
-        }
-        
         // Validate title doesn't contain dangerous characters
-        if contains_dangerous_characters(self.title) {
+        if contains_dangerous_characters(&self.title) {
             return Err(anyhow!("Title contains potentially dangerous characters"));
         }
         
@@ -242,6 +246,14 @@ impl<'a> EventConfig<'a> {
             }
         }
         
+        // If creating a Zoom meeting, validate needed fields
+        if self.create_zoom_meeting {
+            // Zoom requires an end time for calculating meeting duration
+            if self.end_time.is_none() {
+                return Err(anyhow!("End time is required for Zoom meetings"));
+            }
+        }
+
         Ok(())
     }
 }
@@ -358,7 +370,7 @@ pub fn list_calendars() -> Result<()> {
     }
 }
 
-pub fn create_event(config: EventConfig) -> Result<()> {
+pub async fn create_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
     
     // Validate the event configuration first
@@ -406,33 +418,54 @@ pub fn create_event(config: EventConfig) -> Result<()> {
     // Clone the calendars Vec before the loop
     let calendars_for_state = requested_calendars.clone();
 
-    for calendar in requested_calendars {
+    // Clone the config values before the loop
+    let title = config.title.clone();
+    let start_date = config.start_date.clone();
+    let start_time = config.start_time.clone();
+    let end_date = config.end_date.clone();
+    let end_time = config.end_time.clone();
+    let all_day = config.all_day;
+    let location = config.location.clone();
+    let description = config.description.clone();
+    let emails = config.emails.clone();
+    let reminder = config.reminder;
+    let timezone = config.timezone.clone();
+    let recurrence = config.recurrence.clone();
+    let create_zoom_meeting = config.create_zoom_meeting;
+    let zoom_meeting_id = config.zoom_meeting_id;
+    let zoom_join_url = config.zoom_join_url.clone();
+    let zoom_password = config.zoom_password.clone();
+
+    for calendar in requested_calendars.clone() {
         info!("Attempting to create event in calendar: {}", calendar);
-        // Clone the calendar string so we can use it later
-        let calendar_name = calendar.clone();
+        // Create a new config object with cloned values for each calendar
         let this_config = EventConfig {
-            title: config.title,
-            start_date: config.start_date,
-            start_time: config.start_time,
-            end_date: config.end_date,
-            end_time: config.end_time,
-            calendars: vec![calendar],  // This consumes the calendar string
-            all_day: config.all_day,
-            location: config.location.clone(),
-            description: config.description.clone(),
-            emails: config.emails.clone(),
-            reminder: config.reminder,
-            timezone: config.timezone.clone(),
-            recurrence: config.recurrence.clone(),
+            title: title.clone(),
+            start_date: start_date.clone(),
+            start_time: start_time.clone(),
+            end_date: end_date.clone(),
+            end_time: end_time.clone(),
+            calendars: vec![calendar.clone()],  // Clone before moving
+            all_day,
+            location: location.clone(),
+            description: description.clone(),
+            emails: emails.clone(),
+            reminder,
+            timezone: timezone.clone(),
+            recurrence: recurrence.clone(),
+            create_zoom_meeting,
+            zoom_meeting_id,
+            zoom_join_url: zoom_join_url.clone(),
+            zoom_password: zoom_password.clone(),
         };
         
-        match create_single_event(this_config) {
+        match create_single_event(this_config).await {
             Ok(_) => {
                 success_count += 1;
-                info!("Successfully created event in calendar '{}'", calendar_name);  // Use the cloned name
+                info!("Successfully created event in calendar '{}'", calendar);  // Use the cloned name
             }
             Err(e) => {
-                error!("Failed to create event in calendar '{}': {}", calendar_name, e);  // Use the cloned name
+                error!("Failed to create event in calendar '{}': {}", calendar, e);  // Use the cloned name
                 last_error = Some(e);
             }
         }
@@ -497,7 +530,7 @@ fn get_available_calendars() -> Result<Vec<String>> {
     }
 }
 
-fn create_single_event(config: EventConfig) -> Result<()> {
+async fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
     // Parse start datetime with timezone handling
     let start_datetime = format!(
@@ -506,7 +539,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         if config.all_day {
             "00:00"
         } else {
-            config.start_time
+            &config.start_time
         }
     );
     
@@ -539,7 +572,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
     // Parse end datetime with similar timezone handling
-    let end_dt = if let Some(end_time) = config.end_time {
+    let end_dt = if let Some(ref end_time) = config.end_time {
         let end_datetime = format!("{} {}", config.start_date, end_time);
         let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
             .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
@@ -574,8 +607,86 @@ fn create_single_event(config: EventConfig) -> Result<()> {
     if end_dt <= local_start {
         return Err(anyhow!("End time must be after start time"));
     }
+    
     // First verify Calendar.app is running
     ensure_calendar_running()?;
+    
+    // Create Zoom meeting if requested
+    let mut zoom_meeting_info = String::new();
+    if config.create_zoom_meeting {
+        info!("Creating Zoom meeting for event: {}", config.title);
+        
+        // Create Zoom client
+        let mut client = ZoomClient::new()?;
+        
+        // Format start time in Zoom format
+        let zoom_start_time = format_zoom_time(&config.start_date, &config.start_time)?;
+        
+        // Calculate duration
+        let duration = if let Some(end_time) = &config.end_time {
+            calculate_meeting_duration(&config.start_time, end_time)?
+        } else {
+            60 // Default 1 hour
+        };
+        
+        // Create meeting options
+        let meeting_options = ZoomMeetingOptions {
+            topic: config.title.to_string(),
+            start_time: zoom_start_time,
+            duration,
+            password: None, // Auto-generate password
+            agenda: config.description.clone(),
+        };
+        
+        // Create the meeting - note this will use the existing runtime
+        match client.create_meeting(meeting_options).await {
+            Ok(meeting) => {
+                info!("Created Zoom meeting: ID={}, URL={}", meeting.id, meeting.join_url);
+                
+                // Format Zoom information for calendar description
+                let password_info = if let Some(password) = meeting.password {
+                    format!("\nPassword: {}", password)
+                } else {
+                    String::new()
+                };
+                
+                zoom_meeting_info = format!(
+                    "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}", 
+                    meeting.join_url,
+                    password_info
+                );
+            },
+            Err(e) => {
+                error!("Failed to create Zoom meeting: {}", e);
+                zoom_meeting_info = "\n\nNote: Zoom meeting creation failed. Please create a meeting manually.".to_string();
+            }
+        }
+    } else if let Some(url) = &config.zoom_join_url {
+        // Use existing Zoom meeting URL
+        let password_info = if let Some(password) = &config.zoom_password {
+            format!("\nPassword: {}", password)
+        } else {
+            String::new()
+        };
+        
+        zoom_meeting_info = format!(
+            "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}", 
+            url,
+            password_info
+        );
+    }
+    
+    // Build the description with Zoom info if available
+    let full_description = if !zoom_meeting_info.is_empty() {
+        // Combine the original description with Zoom info
+        match &config.description {
+            Some(desc) if !desc.is_empty() => format!("{}{}", desc, zoom_meeting_info),
+            _ => format!("Created by Ducktape 🦆{}", zoom_meeting_info)
+        }
+    } else {
+        config.description.as_deref().unwrap_or("Created by Ducktape 🦆").to_string()
+    };
+    
     // Build extras for properties: include location if non-empty.
     let mut extra = String::new();
     if let Some(loc) = &config.location {
@@ -757,7 +868,7 @@ fn create_single_event(config: EventConfig) -> Result<()> {
         end tell"#,
         calendar_name = config.calendars[0],
         title = config.title,
-        description = config.description.as_deref().unwrap_or("Created by Ducktape 🦆"),
+        description = full_description,  // Use the description with Zoom info
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
@@ -869,6 +980,12 @@ fn create_single_event(config: EventConfig) -> Result<()> {
             println!("1. Double-click on the event to open its details");
             println!("2. You'll see the recurrence pattern displayed");
             println!("3. Scroll forward in your calendar to see future instances");
+        }
+        
+        // Add information about Zoom meeting if created
+        if config.create_zoom_meeting && !zoom_meeting_info.is_empty() {
+            println!("\n✅ Zoom meeting linked to calendar event");
+            println!("Check the event description for meeting details");
         }
         
         Ok(())
@@ -1050,7 +1167,7 @@ pub fn lookup_contact(name: &str) -> Result<Vec<String>> {
 }
 
 /// Enhanced event creation with contact lookup
-pub fn create_event_with_contacts(mut config: EventConfig, contact_names: &[&str]) -> Result<()> {
+pub async fn create_event_with_contacts(mut config: EventConfig, contact_names: &[&str]) -> Result<()> {
     // Look up emails for each contact name
     let mut found_emails = Vec::new();
     for name in contact_names {
@@ -1083,7 +1200,7 @@ pub fn create_event_with_contacts(mut config: EventConfig, contact_names: &[&str
     }
     
     // Create the event with the updated config
-    create_event(config)
+    create_event(config).await
 }
 
 #[cfg(test)]

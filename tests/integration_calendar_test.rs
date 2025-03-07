@@ -5,14 +5,14 @@ use ducktape::calendar::{self, CalendarError, EventConfig, RecurrenceFrequency, 
 async fn integration_test_create_event_with_invite() -> Result<()> {
     // Setup an EventConfig with valid times and an email invite.
     let mut config = EventConfig::new("Integration Invite Test", "2024-02-21", "14:30");
-    config.end_time = Some("15:30");
+    config.end_time = Some("15:30".to_string());
     // Use a calendar name that is unlikely to exist in the test environment.
     config.calendars = vec!["NonexistentCalendar".to_string()];
     config.location = Some("Integration Room".to_string());
     config.description = Some("Integration Test Event".to_string());
     config.emails = vec!["integration@test.com".to_string()];
 
-    let result = calendar::create_event(config);
+    let result = calendar::create_event(config).await;
 
     // Expect failure since the calendar does not exist.
     match result {
@@ -90,7 +90,7 @@ fn test_event_config_with_recurrence() -> Result<()> {
     let weekly_recurrence = RecurrencePattern::new(RecurrenceFrequency::Weekly)
         .with_days_of_week(&[1, 4]);  // Monday and Thursday
     let mut config = EventConfig::new("Team Sync", "2024-05-06", "14:00");
-    config.end_time = Some("15:00");
+    config.end_time = Some("15:00".to_string());
     config = config.with_recurrence(weekly_recurrence);
     
     assert!(config.recurrence.is_some());
@@ -102,7 +102,7 @@ fn test_event_config_with_recurrence() -> Result<()> {
     let monthly_recurrence = RecurrencePattern::new(RecurrenceFrequency::Monthly)
         .with_count(6);
     let mut config = EventConfig::new("Monthly Review", "2024-05-15", "09:00");
-    config.end_time = Some("10:30");
+    config.end_time = Some("10:30".to_string());
     config = config.with_recurrence(monthly_recurrence);
     
     assert!(config.recurrence.is_some());
@@ -163,5 +163,43 @@ fn test_recurrence_rule_generation() -> Result<()> {
     let rule = parts.join(";");
     assert_eq!(rule, "FREQ=MONTHLY;INTERVAL=1;UNTIL=20251231T235900Z");
     
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_calendar_event() -> Result<()> {
+    use ducktape::calendar::{EventConfig, create_event};
+    
+    let mut config = EventConfig::new("Test Event", "2024-02-01", "14:30");
+    config.end_time = Some("15:30".to_string());
+    
+    let result = create_event(config).await;
+    assert!(result.is_ok(), "Failed to create calendar event: {:?}", result);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_event_with_contacts() -> Result<()> {
+    use ducktape::calendar::{EventConfig, create_event};
+    
+    let mut config = EventConfig::new("Meeting with Team", "2024-02-01", "14:00");
+    config.end_time = Some("15:00".to_string());
+    config.calendars = vec!["Work".to_string()];
+    config.emails = vec!["john.doe@example.com".to_string()];
+    
+    let result = create_event(config).await;
+    assert!(result.is_ok(), "Failed to create calendar event with contacts: {:?}", result);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_create_short_event() -> Result<()> {
+    use ducktape::calendar::{EventConfig, create_event};
+    
+    let mut config = EventConfig::new("Quick Sync", "2024-02-01", "10:00");
+    config.end_time = Some("10:30".to_string());
+    
+    let result = create_event(config).await;
+    assert!(result.is_ok(), "Failed to create short calendar event: {:?}", result);
     Ok(())
 }
