@@ -74,13 +74,16 @@ impl Application {
     }
 
     async fn process_input(&self, input: &str) -> Result<()> {
-        let args = CommandArgs::parse(input)?;
-
-        if args.command == "exit" || args.command == "quit" {
-            std::process::exit(0);
+        if input.starts_with("ducktape") {
+            let args = CommandArgs::parse(input)?;
+            if args.command == "exit" || args.command == "quit" {
+                std::process::exit(0);
+            }
+            self.execute_command(args).await
+        } else {
+            // If input doesn't start with "ducktape", treat as natural language
+            self.process_natural_language(input).await
         }
-
-        self.execute_command(args).await
     }
 
     async fn execute_command(&self, args: CommandArgs) -> Result<()> {
@@ -90,12 +93,33 @@ impl Application {
             }
         }
         
-        // If no executor found, try natural language processing
-        self.process_natural_language(&args.command).await
-    }
-
-    async fn process_natural_language(&self, _input: &str) -> Result<()> {
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
+    }
+
+    async fn process_natural_language(&self, input: &str) -> Result<()> {
+        use crate::grok_parser;
+        
+        println!("Processing natural language: '{}'", input);
+        
+        match grok_parser::parse_natural_language(input).await {
+            Ok(command) => {
+                println!("Translated to command: {}", command);
+                
+                // Check if the generated command starts with ducktape
+                if command.starts_with("ducktape") {
+                    let args = CommandArgs::parse(&command)?;
+                    self.execute_command(args).await
+                } else {
+                    println!("Generated command doesn't start with 'ducktape': {}", command);
+                    Ok(())
+                }
+            }
+            Err(e) => {
+                println!("Error processing natural language: {}", e);
+                println!("Type 'help' for a list of available commands or try rephrasing.");
+                Ok(())
+            }
+        }
     }
 }
