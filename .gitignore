@@ -4,4 +4,4 @@
 # Other files and directories to ignore
 target/
 *.rs.bk
-*.log
+*.logtarget/
