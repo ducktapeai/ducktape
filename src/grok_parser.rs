@@ -139,7 +139,7 @@ Rules:
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&json!({
-            "model": "grok-1",
+            "model": "grok-2-latest",
             "messages": [
                 {
                     "role": "system",
