@@ -22,6 +22,18 @@ impl CommandArgs {
 
         log::debug!("Normalized input: {}", normalized_input);
 
+        // Handle exit commands
+        if normalized_input.eq_ignore_ascii_case("exit") || 
+           normalized_input.eq_ignore_ascii_case("quit") || 
+           normalized_input.eq_ignore_ascii_case("ducktape exit") ||
+           normalized_input.eq_ignore_ascii_case("ducktape quit") {
+            return Ok(CommandArgs {
+                command: "exit".to_string(),
+                args: vec![],
+                flags: HashMap::new(),
+            });
+        }
+
         // Special case for help commands
         if normalized_input.eq_ignore_ascii_case("help") || 
            normalized_input.eq_ignore_ascii_case("ducktape help") ||

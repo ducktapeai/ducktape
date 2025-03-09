@@ -5,43 +5,39 @@ use std::pin::Pin;
 use crate::calendar;
 use crate::state;
 use log::debug;
-use std::str::FromStr;  // Add FromStr import for Tz::from_str
+use std::str::FromStr;
 
 pub struct CalendarCommand;
 
 impl CommandExecutor for CalendarCommand {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            handle_calendar_command(args)
+            match args.command.as_str() {
+                "calendars" => calendar::list_calendars(),
+                "calendar-props" => calendar::list_event_properties(),
+                "list-events" => list_events(),
+                "delete-event" => delete_event(args),
+                "calendar" => {
+                    match args.args.get(0).map(|s| s.to_lowercase()).as_deref() {
+                        Some("create") => create_calendar_event(args).await,
+                        Some("delete") => delete_calendar_event(args),
+                        Some("set-default") => set_default_calendar(args),
+                        _ => {
+                            println!("Unknown calendar command. Use 'calendar create', 'calendar delete', or 'calendar set-default'.");
+                            Ok(())
+                        }
+                    }
+                },
+                _ => {
+                    println!("Unknown calendar command");
+                    Ok(())
+                }
+            }
         })
     }
 
     fn can_handle(&self, command: &str) -> bool {
         matches!(command, "calendar" | "calendars" | "calendar-props" | "delete-event" | "list-events")
-    }
-}
-
-fn handle_calendar_command(args: CommandArgs) -> Result<()> {
-    match args.command.as_str() {
-        "calendars" => calendar::list_calendars(),
-        "calendar-props" => calendar::list_event_properties(),
-        "list-events" => list_events(),
-        "delete-event" => delete_event(args),
-        "calendar" => {
-            match args.args.get(0).map(|s| s.to_lowercase()).as_deref() {
-                Some("create") => create_calendar_event(args),
-                Some("delete") => delete_calendar_event(args),
-                Some("set-default") => set_default_calendar(args),
-                _ => {
-                    println!("Unknown calendar command. Use 'calendar create', 'calendar delete', or 'calendar set-default'.");
-                    Ok(())
-                }
-            }
-        },
-        _ => {
-            println!("Unknown calendar command");
-            Ok(())
-        }
     }
 }
 
@@ -85,10 +81,13 @@ fn delete_event(args: CommandArgs) -> Result<()> {
         println!("Usage: delete-event \"<title>\"");
         return Ok(());
     }
+    
+    // Fix the argument order to match calendar::delete_event's parameter order
     calendar::delete_event(
         &args.args[0],
         args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
     )?;
+    
     // Also remove from state
     let mut events = state::load_events()?;
     events.retain(|e| e.title != args.args[0]);
@@ -96,7 +95,7 @@ fn delete_event(args: CommandArgs) -> Result<()> {
     Ok(())
 }
 
-fn create_calendar_event(args: CommandArgs) -> Result<()> {
+async fn create_calendar_event(args: CommandArgs) -> Result<()> {
     // Require at least: "create" + title + date + start_time + end_time = 5 args
     if args.args.len() < 5 {
         println!("Usage: ducktape calendar create \"<title>\" <date> <start_time> <end_time> [calendar]");
@@ -108,6 +107,8 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
         println!("  --until <YYYY-MM-DD>                     Set end date for recurrence");
         println!("  --count <number>                         Set number of occurrences");
         println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
+        println!("\nZoom options:");
+        println!("  --zoom                                   Create a Zoom meeting for this event");
         return Ok(());
     }
     
@@ -128,6 +129,7 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
         return Ok(());
     }
     
+    // Fix the compile error with if let Some(end)
     let end_time = args.args[4].trim();
     if !calendar::validate_time_format(end_time) {
         println!("Invalid end time format. Please use HH:MM format (24-hour).");
@@ -135,7 +137,7 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
     }
     
     let mut config = calendar::EventConfig::new(&title, date, start_time);
-    config.end_time = Some(end_time);
+    config.end_time = Some(end_time.to_string());
     
     // Set calendar if provided, trimming any quotes and sanitizing
     if let Some(calendar_name) = args.args.get(5) {
@@ -210,6 +212,12 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
     // Handle all-day flag
     if args.flags.contains_key("--all-day") {
         config.all_day = true;
+    }
+    
+    // Handle Zoom meeting flag
+    if args.flags.contains_key("--zoom") {
+        config.create_zoom_meeting = true;
+        debug!("Zoom meeting will be created for this event");
     }
     
     // Handle recurrence flags - support both --repeat and --recurring
@@ -312,12 +320,13 @@ fn create_calendar_event(args: CommandArgs) -> Result<()> {
             
             if !contact_names.is_empty() {
                 debug!("Looking up contacts: {:?}", contact_names);
-                return calendar::create_event_with_contacts(config, &contact_names);
+                return calendar::create_event_with_contacts(config, &contact_names).await;
             }
         }
     }
     
-    calendar::create_event(config)
+    // Create the event with async/await
+    calendar::create_event(config).await
 }
 
 /// Safely sanitize user input to prevent injection attacks
@@ -396,3 +405,5 @@ fn set_default_calendar(args: CommandArgs) -> Result<()> {
     
     Ok(())
 }
+
+// Removed unused parse_calendar_command function
