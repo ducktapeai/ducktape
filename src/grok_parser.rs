@@ -114,7 +114,8 @@ Rules:
     - For "yearly" or "annual" recurrence: use --repeat yearly
     - If specific interval is mentioned (e.g., "every 2 weeks"), add --interval 2
     - If specific end date is mentioned (e.g., "until March 15"), add --until YYYY-MM-DD
-    - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10"#,
+    - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10
+13. If the input mentions "zoom", "video call", "video meeting", or "virtual meeting", add the --zoom flag to create a Zoom meeting automatically."#,
         current_time = current_date.format("%Y-%m-%d %H:%M"),
         calendars = available_calendars.join(", "),
         default_cal = default_calendar,
@@ -139,7 +140,7 @@ Rules:
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&json!({
-            "model": "grok-1",
+            "model": "grok-2-latest",
             "messages": [
                 {
                     "role": "system",
@@ -182,11 +183,30 @@ Rules:
 
     // Enhanced command processing
     let enhanced_command = enhance_recurrence_command(&commands);
+    let enhanced_command = enhance_command_with_zoom(&enhanced_command, &sanitized_input);
     
     // Final validation of the returned commands
     validate_calendar_command(&enhanced_command)?;
     
     Ok(enhanced_command)
+}
+
+// Add a helper function to enhance Zoom recognition
+fn enhance_command_with_zoom(command: &str, input: &str) -> String {
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+    
+    let input_lower = input.to_lowercase();
+    let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
+    
+    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
+    
+    if has_zoom_keyword && !command.contains("--zoom") {
+        return format!("{} --zoom", command);
+    }
+    
+    command.to_string()
 }
 
 // Helper function to enhance recurrence commands
@@ -355,6 +375,33 @@ mod tests {
         let input = "ducktape todo \"Buy groceries\"";
         let enhanced = enhance_recurrence_command(input);
         assert_eq!(input, enhanced);
+    }
+    
+    #[test]
+    fn test_enhance_command_with_zoom() {
+        // Test adding zoom flag for zoom keyword
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a zoom meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(enhanced.contains("--zoom"));
+        
+        // Test adding zoom flag for video call keyword
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a video call with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(enhanced.contains("--zoom"));
+        
+        // Test not adding zoom flag for non-zoom input
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a regular meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(!enhanced.contains("--zoom"));
+        
+        // Test not duplicating zoom flag
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" --zoom";
+        let input = "Schedule a zoom meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert_eq!(enhanced.matches("--zoom").count(), 1);
     }
     
     #[test]
