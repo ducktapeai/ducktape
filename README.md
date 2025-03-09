@@ -18,27 +18,39 @@ DuckTape is an AI-powered command-line interface that makes it easy to manage yo
 
 1. Ensure you have Rust installed
 2. Clone this repository
-
-For OpenAI, export your API key:
-```bash
-export OPENAI_API_KEY='your-openai-api-key-here'
-```
-
-For Grok (XAI), export your XAI API key:
-```bash
-export XAI_API_KEY='your-xai-api-key-here'
-```
-
-For DeepSeek, export your DeepSeek API key:
-```bash
-export DEEPSEEK_API_KEY='your-deepseek-api-key-here'
-```
-
-3. Build and run:
+3. Set up required API keys (see [Environment Variables](#environment-variables) section below)
+4. Build and run:
 ```bash
 cargo build
 cargo run
 ```
+
+## Environment Variables
+DuckTape uses several environment variables to store sensitive configuration information:
+
+### Required for AI Language Models:
+Choose at least one of the following AI providers:
+
+```bash
+# For OpenAI
+export OPENAI_API_KEY='your-openai-api-key-here'
+
+# For Grok (XAI)
+export XAI_API_KEY='your-xai-api-key-here'
+
+# For DeepSeek
+export DEEPSEEK_API_KEY='your-deepseek-api-key-here'
+```
+
+### Required for Zoom Integration:
+```bash
+# Zoom credentials
+export ZOOM_ACCOUNT_ID='your-zoom-account-id'
+export ZOOM_CLIENT_ID='your-zoom-client-id'
+export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
+```
+
+You can add these to your shell profile file (e.g., `.zshrc`, `.bashrc`, or `.bash_profile`) for persistence across terminal sessions.
 
 ## Natural Language Examples
 
@@ -154,23 +166,48 @@ ducktape help
 ducktape exit
 ```
 
-### Zoom Integration Setup
+## Zoom Integration
+DuckTape provides seamless integration with Zoom for creating meeting links directly in your calendar events. There are two ways to set up Zoom integration:
+
+### Option 1: Using the Interactive Setup
 ```bash
-# Configure Zoom API credentials
+# Run the interactive setup
 ducktape zoom-setup
 ```
-You'll need:
-1. Create a Server-to-Server OAuth app in the [Zoom App Marketplace](https://marketplace.zoom.us/)
-2. Get these credentials from your app:
-   - Account ID
-   - Client ID
-   - Client Secret
 
-Alternatively, you can set these environment variables:
+This command will guide you through the process of entering your Zoom credentials and save them securely.
+
+### Option 2: Using Environment Variables
+Set the following environment variables before running DuckTape:
 ```bash
 export ZOOM_ACCOUNT_ID='your-zoom-account-id'
 export ZOOM_CLIENT_ID='your-zoom-client-id'
 export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
+```
+
+### Creating a Server-to-Server OAuth App in Zoom
+To get the required credentials:
+
+1. Sign in to the [Zoom App Marketplace](https://marketplace.zoom.us/)
+2. Click "Develop" in the top-right corner
+3. Select "Build App"
+4. Choose "Server-to-Server OAuth" app type
+5. Enter app name and other required information
+6. Under "Scopes", add the following permissions:
+   - `meeting:write:admin` or `meeting:write`
+   - `user:read:admin` or `user:read`
+7. Create the app and collect the Account ID, Client ID, and Client Secret
+8. Your app might need to be activated or submitted for approval depending on your Zoom account type
+
+### Using Zoom in Calendar Events
+Once configured, you can add Zoom meetings to calendar events using:
+
+```bash
+# Command-line approach
+ducktape calendar create "Meeting Title" 2023-06-15 14:00 15:00 --zoom
+
+# Or using natural language
+"schedule a zoom meeting with the team tomorrow at 3pm for one hour"
 ```
 
 ## Features
