@@ -1,12 +1,18 @@
-use crate::config::Config;
-use crate::state::{CalendarItem, StateManager};
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Datelike, Local, NaiveDateTime, TimeZone};
+use chrono::{Datelike, Local, NaiveDateTime, TimeZone, DateTime};
 use chrono_tz::Tz;
 use log::{debug, error, info};
+use regex::Regex;
+use std::path::Path;
+use std::fs::File;
+use std::io::BufReader;
 use std::process::Command;
 use std::str::FromStr;
-use regex::Regex;
+use ical::parser::ical::IcalParser;
+use ical::parser::ical::component::IcalEvent;
+use csv::ReaderBuilder;
+use crate::config::Config;
+use crate::state::{CalendarItem, StateManager};
 use crate::zoom::{ZoomClient, ZoomMeetingOptions, format_zoom_time, calculate_meeting_duration};
 
 // Remove unused constants
@@ -130,6 +136,7 @@ pub struct EventConfig {
     pub title: String,
     pub start_date: String,
     pub start_time: String,
+    #[allow(dead_code)]
     pub end_date: Option<String>,
     pub end_time: Option<String>,
     pub calendars: Vec<String>,
@@ -142,8 +149,11 @@ pub struct EventConfig {
     pub recurrence: Option<RecurrencePattern>,
     // Enhanced Zoom integration fields
     pub create_zoom_meeting: bool,
+    #[allow(dead_code)]
     pub zoom_meeting_id: Option<u64>,
+    #[allow(dead_code)]
     pub zoom_join_url: Option<String>,
+    #[allow(dead_code)]
     pub zoom_password: Option<String>,
 }
 
@@ -321,26 +331,15 @@ fn contains_dangerous_chars_for_script(input: &str) -> bool {
     input.contains('\"') || input.contains('\\') || input.contains('¬')
 }
 
-pub fn list_calendars() -> Result<()> {
+pub async fn list_calendars() -> Result<()> {
     // First ensure Calendar.app is running
-    let launch_script = r#"
-        tell application "Calendar"
-            launch
-            delay 1
-        end tell
-    "#;
-
-    Command::new("osascript")
-        .arg("-e")
-        .arg(launch_script)
-        .output()?;
+    ensure_calendar_running().await?;
 
     let script = r#"tell application "Calendar"
         try
             set output to {}
             repeat with aCal in calendars
                 set calInfo to name of aCal
-                -- Removed block referencing 'account'
                 copy calInfo to end of output
             end repeat
             return output
@@ -349,7 +348,11 @@ pub fn list_calendars() -> Result<()> {
         end try
     end tell"#;
 
-    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .await?;
 
     if output.status.success() {
         println!("Available calendars:");
@@ -377,13 +380,13 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
     config.validate()?;
     
     // First verify Calendar.app is running and get available calendars
-    ensure_calendar_running()?;
+    ensure_calendar_running().await?;
     
     // Get list of available calendars first
-    let available_calendars = get_available_calendars()?;
+    let available_calendars = get_available_calendars().await?;
     debug!("Available calendars: {:?}", available_calendars);
 
-    // Load configuration and get default calendar if none specified
+    // Load configuration and get default calendar if none specified 
     let app_config = Config::load()?;
     let requested_calendars = if config.calendars.is_empty() {
         vec![app_config
@@ -415,69 +418,35 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
     let mut success_count = 0;
     let total_calendars = requested_calendars.len();
 
-    // Clone the calendars Vec before the loop
+    // Clone the calendars Vec for state management
     let calendars_for_state = requested_calendars.clone();
 
-    // Clone the config values before the loop
-    let title = config.title.clone();
-    let start_date = config.start_date.clone();
-    let start_time = config.start_time.clone();
-    let end_date = config.end_date.clone();
-    let end_time = config.end_time.clone();
-    let all_day = config.all_day;
-    let location = config.location.clone();
-    let description = config.description.clone();
-    let emails = config.emails.clone();
-    let reminder = config.reminder;
-    let timezone = config.timezone.clone();
-    let recurrence = config.recurrence.clone();
-    let create_zoom_meeting = config.create_zoom_meeting;
-    let zoom_meeting_id = config.zoom_meeting_id;
-    let zoom_join_url = config.zoom_join_url.clone();
-    let zoom_password = config.zoom_password.clone();
-
-    for calendar in requested_calendars.clone() {
+    for calendar in requested_calendars {
         info!("Attempting to create event in calendar: {}", calendar);
-        // Create a new config object with cloned values for each calendar
         let this_config = EventConfig {
-            title: title.clone(),
-            start_date: start_date.clone(),
-            start_time: start_time.clone(),
-            end_date: end_date.clone(),
-            end_time: end_time.clone(),
-            calendars: vec![calendar.clone()],  // Clone before moving
-            all_day,
-            location: location.clone(),
-            description: description.clone(),
-            emails: emails.clone(),
-            reminder,
-            timezone: timezone.clone(),
-            recurrence: recurrence.clone(),
-            create_zoom_meeting,
-            zoom_meeting_id,
-            zoom_join_url: zoom_join_url.clone(),
-            zoom_password: zoom_password.clone(),
+            calendars: vec![calendar.clone()],
+            ..config.clone()
         };
         
         match create_single_event(this_config).await {
             Ok(_) => {
                 success_count += 1;
-                info!("Successfully created event in calendar '{}'", calendar);  // Use the cloned name
+                info!("Successfully created event in calendar '{}'", calendar);
             }
             Err(e) => {
-                error!("Failed to create event in calendar '{}': {}", calendar, e);  // Use the cloned name
+                error!("Failed to create event in calendar '{}': {}", calendar, e);
                 last_error = Some(e);
             }
         }
     }
 
     if success_count > 0 {
-        // Save the event to state using the cloned calendars
+        // Save the event to state
         let calendar_item = CalendarItem {
-            title: config.title.to_string(),
-            date: config.start_date.to_string(),
-            time: config.start_time.to_string(),
-            calendars: calendars_for_state,  // Use the cloned Vec here
+            title: config.title.clone(),
+            date: config.start_date.clone(),
+            time: config.start_time.clone(),
+            calendars: calendars_for_state,
             all_day: config.all_day,
             location: config.location,
             description: config.description,
@@ -499,7 +468,7 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
     }
 }
 
-fn get_available_calendars() -> Result<Vec<String>> {
+pub async fn get_available_calendars() -> Result<Vec<String>> {
     let script = r#"tell application "Calendar"
         try
             set output to {}
@@ -513,7 +482,12 @@ fn get_available_calendars() -> Result<Vec<String>> {
         end try
     end tell"#;
 
-    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .await?;
+
     if output.status.success() {
         let calendars = String::from_utf8_lossy(&output.stdout);
         Ok(calendars
@@ -532,29 +506,26 @@ fn get_available_calendars() -> Result<Vec<String>> {
 
 async fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
+
     // Parse start datetime with timezone handling
     let start_datetime = format!(
         "{} {}",
         config.start_date,
-        if config.all_day {
-            "00:00"
-        } else {
-            &config.start_time
-        }
+        if config.all_day { "00:00" } else { &config.start_time }
     );
     
-    // Parse the base datetime
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
-        .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
-    // Handle timezone conversion if specified
-    let local_start: DateTime<Local> = if let Some(tz_str) = config.timezone.as_deref() {
+        .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
+    
+    // Convert to local timezone with consistent type
+    let local_start = if let Some(tz_str) = config.timezone.as_deref() {
         match Tz::from_str(tz_str) {
             Ok(tz) => {
                 let tz_dt = tz.from_local_datetime(&start_dt)
                     .single()
                     .ok_or_else(|| anyhow!("Invalid or ambiguous start time in timezone {}", tz_str))?;
                 tz_dt.with_timezone(&Local)
-            }
+            },
             Err(_) => {
                 error!("Invalid timezone specified: {}. Using local timezone.", tz_str);
                 Local::now()
@@ -571,11 +542,12 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             .single()
             .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
+
     // Parse end datetime with similar timezone handling
     let end_dt = if let Some(ref end_time) = config.end_time {
         let end_datetime = format!("{} {}", config.start_date, end_time);
         let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
-            .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
+            .map_err(|e| anyhow!("Invalid end datetime: {}", e))?;
         
         if let Some(tz_str) = config.timezone.as_deref() {
             match Tz::from_str(tz_str) {
@@ -584,7 +556,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                         .single()
                         .ok_or_else(|| anyhow!("Invalid or ambiguous end time in timezone {}", tz_str))?;
                     tz_dt.with_timezone(&Local)
-                }
+                },
                 Err(_) => {
                     Local::now()
                         .timezone()
@@ -603,225 +575,136 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     } else {
         local_start + chrono::Duration::hours(1)
     };
-    // Validate that end time is after start time
+
     if end_dt <= local_start {
         return Err(anyhow!("End time must be after start time"));
     }
-    
-    // First verify Calendar.app is running
-    ensure_calendar_running()?;
-    
+
     // Create Zoom meeting if requested
     let mut zoom_meeting_info = String::new();
     if config.create_zoom_meeting {
         info!("Creating Zoom meeting for event: {}", config.title);
-        
-        // Create Zoom client
         let mut client = ZoomClient::new()?;
-        
-        // Format start time in Zoom format
         let zoom_start_time = format_zoom_time(&config.start_date, &config.start_time)?;
-        
-        // Calculate duration
         let duration = if let Some(end_time) = &config.end_time {
             calculate_meeting_duration(&config.start_time, end_time)?
         } else {
             60 // Default 1 hour
         };
         
-        // Create meeting options
         let meeting_options = ZoomMeetingOptions {
             topic: config.title.to_string(),
             start_time: zoom_start_time,
             duration,
-            password: None, // Auto-generate password
+            password: None,
             agenda: config.description.clone(),
         };
         
-        // Create the meeting - note this will use the existing runtime
         match client.create_meeting(meeting_options).await {
             Ok(meeting) => {
                 info!("Created Zoom meeting: ID={}, URL={}", meeting.id, meeting.join_url);
-                
-                // Format Zoom information for calendar description
-                let password_info = if let Some(password) = meeting.password {
-                    format!("\nPassword: {}", password)
-                } else {
-                    String::new()
-                };
-                
+                let password_info = meeting.password.map_or(String::new(), |p| format!("\nPassword: {}", p));
                 zoom_meeting_info = format!(
-                    "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}", 
-                    meeting.join_url,
-                    password_info
+                    "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}",
+                    meeting.join_url, password_info
                 );
             },
             Err(e) => {
                 error!("Failed to create Zoom meeting: {}", e);
-                zoom_meeting_info = "\n\nNote: Zoom meeting creation failed. Please create a meeting manually.".to_string();
+                zoom_meeting_info = "\n\nNote: Zoom meeting creation failed.".to_string();
             }
         }
     } else if let Some(url) = &config.zoom_join_url {
-        // Use existing Zoom meeting URL
-        let password_info = if let Some(password) = &config.zoom_password {
-            format!("\nPassword: {}", password)
-        } else {
-            String::new()
-        };
-        
+        let password_info = config.zoom_password.as_ref().map_or(String::new(), |p| format!("\nPassword: {}", p));
         zoom_meeting_info = format!(
-            "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}", 
-            url,
-            password_info
+            "\n\n--------------------\nZoom Meeting\n--------------------\nJoin URL: {}{}",
+            url, password_info
         );
     }
-    
-    // Build the description with Zoom info if available
+
+    // Build description with Zoom info
     let full_description = if !zoom_meeting_info.is_empty() {
-        // Combine the original description with Zoom info
         match &config.description {
             Some(desc) if !desc.is_empty() => format!("{}{}", desc, zoom_meeting_info),
-            _ => format!("Created by Ducktape 🦆{}", zoom_meeting_info)
+            _ => format!("Created by Ducktape 🦆{}", zoom_meeting_info),
         }
     } else {
         config.description.as_deref().unwrap_or("Created by Ducktape 🦆").to_string()
     };
-    
-    // Build extras for properties: include location if non-empty.
+
+    // Build extra properties (location)
     let mut extra = String::new();
     if let Some(loc) = &config.location {
         if !loc.is_empty() {
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }
-    
-    // Build attendees code block with proper error handling
+
+    // Build attendees block
     let mut attendees_block = String::new();
     if !config.emails.is_empty() {
         info!("Adding {} attendee(s): {}", config.emails.len(), config.emails.join(", "));
         for email in &config.emails {
-            attendees_block.push_str(&format!(r#"
+            attendees_block.push_str(&format!(
+                r#"
                     try
                         tell newEvent
                             make new attendee with properties {{email:"{}"}}
                         end tell
-                        log "Successfully added attendee: {}"
                     on error errMsg
                         log "Failed to add attendee {}: " & errMsg
                     end try"#,
-                email, email, email
+                email, email
             ));
         }
     }
-    
-    // Build the recurrence string in RFC 5545 format
+
+    // Build recurrence rule (RFC 5545 format)
     let mut recurrence_rule = String::new();
-    // Build the recurrence parameters separately - don't include directly in event properties
-    let mut has_recurrence = false;
-    if let Some(recurrence) = &config.recurrence {
-        has_recurrence = true;
-        info!("Building recurrence rule with frequency: {:?}, interval: {}", recurrence.frequency, recurrence.interval);
-        
-        // Convert day numbers to BYDAY format if needed
-        let byday_str = if recurrence.frequency == RecurrenceFrequency::Weekly && !recurrence.days_of_week.is_empty() {
-            // If days aren't specified for weekly recurrence, use the day of the start date
-            let day_abbrs: Vec<String> = if recurrence.days_of_week.is_empty() {
-                // Get day of week from start date (0=Sunday, 1=Monday, etc.)
-                let day_of_week = local_start.weekday().num_days_from_sunday() as u8;
-                info!("No days specified for weekly recurrence. Using day of start date: {}", day_of_week);
-                vec![match day_of_week {
-                    0 => "SU",
-                    1 => "MO",
-                    2 => "TU",
-                    3 => "WE",
-                    4 => "TH",
-                    5 => "FR",
-                    6 => "SA",
-                    _ => "SU" // Default
-                }.to_string()]
-            } else {
-                info!("Using specified days for weekly recurrence: {:?}", recurrence.days_of_week);
-                recurrence.days_of_week.iter()
-                    .map(|&d| match d {
-                        0 => "SU",
-                        1 => "MO",
-                        2 => "TU",
-                        3 => "WE",
-                        4 => "TH",
-                        5 => "FR",
-                        6 => "SA",
-                        _ => "MO" // Default
-                    })
-                    .map(|s| s.to_string())
-                    .collect()
-            };
-            
-            let byday = format!("BYDAY={}", day_abbrs.join(","));
-            info!("Generated BYDAY parameter: {}", byday);
-            byday
-        } else {
-            String::new()
-        };
-        
-        // Build the complete recurrence rule
+    let recurrence_code = if let Some(recurrence) = &config.recurrence {
         let mut parts = vec![
             format!("FREQ={}", recurrence.frequency.to_rfc5545()),
             format!("INTERVAL={}", recurrence.interval),
         ];
         
-        // Add count if specified
         if let Some(count) = recurrence.count {
-            info!("Adding COUNT={} to recurrence rule", count);
             parts.push(format!("COUNT={}", count));
         }
         
-        // Add end date if specified
         if let Some(end_date) = &recurrence.end_date {
             let end_naive = NaiveDateTime::parse_from_str(&format!("{} 23:59", end_date), "%Y-%m-%d %H:%M")
-                .map_err(|e| CalendarError::InvalidDateTime(e.to_string()))?;
-            
-            let end_str = end_naive.format("%Y%m%dT%H%M%SZ").to_string();
-            info!("Adding UNTIL={} to recurrence rule", end_str);
-            parts.push(format!("UNTIL={}", end_str));
+                .map_err(|e| anyhow!("Invalid recurrence end date: {}", e))?;
+            parts.push(format!("UNTIL={}", end_naive.format("%Y%m%dT%H%M%SZ")));
         }
         
-        // Add BYDAY if needed
-        if !byday_str.is_empty() {
-            parts.push(byday_str);
+        if recurrence.frequency == RecurrenceFrequency::Weekly && !recurrence.days_of_week.is_empty() {
+            let days: Vec<&str> = recurrence.days_of_week.iter().map(|&d| match d {
+                0 => "SU", 1 => "MO", 2 => "TU", 3 => "WE", 4 => "TH", 5 => "FR", 6 => "SA",
+                _ => "MO",
+            }).collect();
+            parts.push(format!("BYDAY={}", days.join(",")));
         }
         
-        // Join all parts
         recurrence_rule = parts.join(";");
-        info!("Generated complete recurrence rule: {}", recurrence_rule);
-    } else {
-        info!("No recurrence specified for event");
-    }
-    
-    // Format the recurrence script block properly with explicit quoting
-    // This is a critical fix for the AppleScript syntax error
-    let recurrence_code = if has_recurrence {
-        format!(r#"
-                    -- Set recurrence rule separately after creating the event
+        format!(
+            r#"
                     tell newEvent
                         set its recurrence to "{}"
-                        log "Recurrence rule set to: " & (its recurrence as string)
-                    end tell"#, 
-                recurrence_rule)
-    } else { 
-        String::new() 
+                    end tell"#,
+            recurrence_rule
+        )
+    } else {
+        String::new()
     };
-    
-    // Build the complete AppleScript with fixed ordering of operations
-    // Ensure all code blocks are properly separated and contained in the right tell blocks
+
+    // Generate AppleScript
     let script = format!(
         r#"tell application "Calendar"
             try
-                -- Find calendar and ensure it exists
                 if not (exists calendar "{calendar_name}") then
                     error "Calendar '{calendar_name}' not found"
                 end if
                 tell calendar "{calendar_name}"
-                    -- Create event dates
                     set startDate to current date
                     set year of startDate to {start_year}
                     set month of startDate to {start_month}
@@ -836,30 +719,14 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                     set hours of endDate to {end_hours}
                     set minutes of endDate to {end_minutes}
                     set seconds of endDate to 0
-                    -- Create new event with logging
-                    log "Creating event: {title}"
-                    log "Creating event with recurrence: {recurrence_logging}"
                     set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
-                    log "Event created successfully"
-                    
-                    -- Set all-day flag if needed
                     {all_day_code}
-                    
-                    -- Add reminder if specified
                     {reminder_code}
-                    
                     {recurrence_code}
-                    
-                    -- Add attendees with error handling after setting recurrence
                     {attendees_block}
-                    
-                    -- Save changes
                     save
-                    log "Event saved"
                 end tell
-                -- Force calendar refresh
                 reload calendars
-                
                 return "Success: Event created"
             on error errMsg
                 log errMsg
@@ -868,7 +735,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         end tell"#,
         calendar_name = config.calendars[0],
         title = config.title,
-        description = full_description,  // Use the description with Zoom info
+        description = full_description,
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
@@ -880,149 +747,61 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         end_hours = end_dt.format("%-H"),
         end_minutes = end_dt.format("%-M"),
         extra = extra,
-        recurrence_logging = if recurrence_rule.is_empty() { "none" } else { &recurrence_rule },
-        recurrence_code = recurrence_code,
-        all_day_code = if config.all_day { 
-            "\n                    set allday event of newEvent to true" 
-        } else { 
-            "" 
-        },
+        all_day_code = if config.all_day { "set allday event of newEvent to true" } else { "" },
         reminder_code = if let Some(minutes) = config.reminder {
             format!(
-                r#"
-                    -- Add reminder alarm
-                    set theAlarm to make new display alarm at end of newEvent
+                r#"set theAlarm to make new display alarm at end of newEvent
                     set trigger interval of theAlarm to -{}"#,
                 minutes * 60
             )
-        } else { 
-            String::new() 
+        } else {
+            String::new()
         },
+        recurrence_code = recurrence_code,
         attendees_block = attendees_block,
     );
-    
+
     debug!("Generated AppleScript:\n{}", script);
-    
+
+    // Execute AppleScript
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     let error_output = String::from_utf8_lossy(&output.stderr);
-    
-    // Log AppleScript output for debugging
-    if !output.stderr.is_empty() {
-        info!("AppleScript log output: {}", error_output);
-    }
-    
+
     if result.contains("Success") {
-        info!(
-            "Calendar event created: {} at {} ({} timezone)",
-            config.title,
-            format!("{} {}", config.start_date, config.start_time),
-            local_start.offset()
-        );
-        if !config.emails.is_empty() {
-            info!("Added {} attendees: {}", config.emails.len(), config.emails.join(", "));
-        }
-        
-        // Log recurrence info if applicable with improved feedback
-        if let Some(recurrence) = &config.recurrence {
-            let frequency_str = match recurrence.frequency {
-                RecurrenceFrequency::Daily => "day",
-                RecurrenceFrequency::Weekly => "week",
-                RecurrenceFrequency::Monthly => "month",
-                RecurrenceFrequency::Yearly => "year",
-            };
-            
-            let interval_str = if recurrence.interval == 1 {
-                format!("every {}", frequency_str)
-            } else {
-                format!("every {} {}s", recurrence.interval, frequency_str)
-            };
-            
-            // Provide clearer feedback about recurring events
-            println!("✅ Created recurring event that repeats {}. (Calendar will show the first instance)", 
-                     interval_str);
-            
-            info!("Event is recurring: {} every {} {}s", 
-                  recurrence.frequency.to_rfc5545(),
-                  recurrence.interval,
-                  frequency_str);
-            
-            if let Some(end_date) = &recurrence.end_date {
-                info!("Recurrence ends on: {}", end_date);
-                println!("   Recurrence ends on: {}", end_date);
-            }
-            
-            if let Some(count) = recurrence.count {
-                info!("Recurrence has {} occurrences", count);
-                println!("   Series will have {} occurrences", count);
-            }
-            
-            if recurrence.frequency == RecurrenceFrequency::Weekly && !recurrence.days_of_week.is_empty() {
-                let day_names: Vec<String> = recurrence.days_of_week.iter()
-                    .map(|&d| match d {
-                        0 => "Sunday",
-                        1 => "Monday",
-                        2 => "Tuesday",
-                        3 => "Wednesday",
-                        4 => "Thursday",
-                        5 => "Friday",
-                        6 => "Saturday",
-                        _ => "Unknown day"
-                    })
-                    .map(|s| s.to_string())
-                    .collect();
-                
-                println!("   Recurring on: {}", day_names.join(", "));
-            }
-            
-            // Add tip about viewing recurring events
-            println!("\nTip: To see all occurrences in Calendar app:");
-            println!("1. Double-click on the event to open its details");
-            println!("2. You'll see the recurrence pattern displayed");
-            println!("3. Scroll forward in your calendar to see future instances");
-        }
-        
-        // Add information about Zoom meeting if created
-        if config.create_zoom_meeting && !zoom_meeting_info.is_empty() {
-            println!("\n✅ Zoom meeting linked to calendar event");
-            println!("Check the event description for meeting details");
-        }
-        
+        info!("Calendar event created: {} at {}", config.title, start_datetime);
         Ok(())
     } else {
         error!("AppleScript error: STDOUT: {} | STDERR: {}", result, error_output);
-        if result.contains("Calendar '") && result.contains("' not found") {
-            if let Some(cal_id) = config.calendars.get(0) {
-                return Err(CalendarError::CalendarNotFound(cal_id.to_string()).into());
-            }
-        }
-        Err(if error_output.is_empty() && result.is_empty() {
-            CalendarError::ScriptError("Unknown error occurred".to_string()).into()
-        } else if !error_output.is_empty() {
-            CalendarError::ScriptError(error_output.to_string()).into()
-        } else {
-            CalendarError::ScriptError(result.to_string()).into()
-        })
+        Err(anyhow!("Failed to create event: {}", error_output))
     }
 }
 
-fn ensure_calendar_running() -> Result<()> {
-    let check_script = r#"tell application "Calendar" to if it is running then return true"#;
-    let check = Command::new("osascript")
+async fn ensure_calendar_running() -> Result<()> {
+    let check_script = r#"tell application "Calendar"
+        if it is not running then
+            launch
+            delay 1
+        end if
+        return true
+    end tell"#;
+
+    let output = tokio::process::Command::new("osascript")
         .arg("-e")
         .arg(check_script)
         .output()
+        .await
         .map_err(|e| CalendarError::ScriptError(e.to_string()))?;
-    if !check.status.success() {
-        Err(CalendarError::NotRunning.into())
-    } else {
+
+    if output.status.success() {
         Ok(())
+    } else {
+        Err(CalendarError::NotRunning.into())
     }
 }
 
-pub fn list_event_properties() -> Result<()> {
-    // First verify Calendar.app is running
-    ensure_calendar_running()?;
+pub async fn list_event_properties() -> Result<()> {
+    ensure_calendar_running().await?;
 
     let script = r#"tell application "Calendar"
         try
@@ -1047,7 +826,11 @@ pub fn list_event_properties() -> Result<()> {
         end try
     end tell"#;
 
-    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .await?;
 
     if output.status.success() {
         println!("Available Calendar Event Properties:");
@@ -1068,7 +851,7 @@ pub fn list_event_properties() -> Result<()> {
     }
 }
 
-pub fn delete_event(title: &str, _date: &str) -> Result<()> {
+pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
     let script = format!(
         r#"tell application "Calendar"
             try
@@ -1100,7 +883,11 @@ pub fn delete_event(title: &str, _date: &str) -> Result<()> {
         title
     );
 
-    let output = Command::new("osascript").arg("-e").arg(&script).output()?;
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .await?;
 
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Success") {
@@ -1112,7 +899,7 @@ pub fn delete_event(title: &str, _date: &str) -> Result<()> {
 }
 
 /// Lookup a contact by name and return their email addresses
-pub fn lookup_contact(name: &str) -> Result<Vec<String>> {
+pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     debug!("Looking up contact: {}", name);
     let script = format!(
         r#"tell application "Contacts"
@@ -1137,10 +924,11 @@ pub fn lookup_contact(name: &str) -> Result<Vec<String>> {
         name.replace("\"", "\\\"")
     );
 
-    let output = Command::new("osascript")
+    let output = tokio::process::Command::new("osascript")
         .arg("-e")
         .arg(&script)
         .output()
+        .await
         .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
 
     if output.status.success() {
@@ -1167,11 +955,11 @@ pub fn lookup_contact(name: &str) -> Result<Vec<String>> {
 }
 
 /// Enhanced event creation with contact lookup
-pub async fn create_event_with_contacts(mut config: EventConfig, contact_names: &[&str]) -> Result<()> {
+pub async fn create_event_with_contacts(config: EventConfig, contact_names: &[&str]) -> Result<()> {
     // Look up emails for each contact name
     let mut found_emails = Vec::new();
     for name in contact_names {
-        match lookup_contact(name) {
+        match lookup_contact(name).await {
             Ok(emails) => {
                 if emails.is_empty() {
                     debug!("No email found for contact: {}", name);
@@ -1184,23 +972,389 @@ pub async fn create_event_with_contacts(mut config: EventConfig, contact_names: 
             }
         }
     }
+
+    // Create a new config with the found emails
+    let mut config = EventConfig {
+        emails: Vec::with_capacity(config.emails.len() + found_emails.len()),
+        ..config
+    };
+    config.emails.extend(found_emails);
     
-    // Add found emails to config
-    if !found_emails.is_empty() {
-        debug!("Adding {} found email(s) to event", found_emails.len());
-        config.emails.extend(found_emails);
-        
-        // Deduplicate and clean emails
-        config.emails = config.emails
-            .into_iter()
-            .map(|e| e.trim().to_string())
-            .collect::<Vec<_>>();
-        config.emails.sort_unstable();
-        config.emails.dedup();
-    }
+    // Deduplicate and clean emails
+    config.emails.sort_unstable();
+    config.emails.dedup();
     
     // Create the event with the updated config
     create_event(config).await
+}
+
+pub async fn import_csv_events(file_path: &Path, target_calendar: Option<String>) -> Result<()> {
+    let file = File::open(file_path)?;
+    let mut rdr = ReaderBuilder::new()
+        .delimiter(b',')  // Use comma as delimiter for CSV
+        .has_headers(true)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .comment(Some(b'#'))
+        .from_reader(file);
+    
+    // Read headers
+    let headers: Vec<String> = rdr.headers()?
+        .iter()
+        .map(|h| h.trim().to_lowercase())
+        .collect();
+
+    debug!("Found headers: {:?}", headers);
+    
+    // Validate required headers are present
+    let required_headers = ["title", "date", "start_time"];
+    for header in &required_headers {
+        if !headers.contains(&header.to_string()) {
+            return Err(anyhow!("Required header '{}' not found in CSV. Required headers: title, date, start_time", header));
+        }
+    }
+    
+    let header_positions: std::collections::HashMap<String, usize> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| (h.to_string(), i))
+        .collect();
+
+    let mut success_count = 0;
+    let mut error_count = 0;
+
+    // Get default calendar for fallback
+    let app_config = Config::load()?;
+    let default_calendar = app_config
+        .calendar
+        .default_calendar
+        .unwrap_or_else(|| "Calendar".to_string());
+
+    // Process each record
+    for (row_num, result) in rdr.records().enumerate() {
+        let record = match result {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Failed to read row {}: {}", row_num + 1, e);
+                error_count += 1;
+                continue;
+            }
+        };
+        debug!("Processing record values: {:?}", record);
+
+        // Extract required fields with safe access
+        let title = match record.get(header_positions["title"]) {
+            Some(t) if !t.trim().is_empty() => t.trim(),
+            _ => {
+                error!("Row {}: Missing or empty title", row_num + 1);
+                error_count += 1;
+                continue;
+            }
+        };
+
+        let date = match record.get(header_positions["date"]) {
+            Some(d) if validate_date_format(d.trim()) => d.trim(),
+            _ => {
+                error!("Row {}: Invalid or missing date format (required: YYYY-MM-DD)", row_num + 1);
+                error_count += 1;
+                continue;
+            }
+        };
+
+        let start_time = match record.get(header_positions["start_time"]) {
+            Some(t) if validate_time_format(t.trim()) => t.trim(),
+            _ => {
+                error!("Row {}: Invalid or missing time format (required: HH:MM)", row_num + 1);
+                error_count += 1;
+                continue;
+            }
+        };
+        
+        let mut config = EventConfig::new(title, date, start_time);
+
+        // Set optional end time if present
+        if let Some(&pos) = header_positions.get("end_time") {
+            if let Some(end_time) = record.get(pos) {
+                let end_time = end_time.trim();
+                if !end_time.is_empty() {
+                    if validate_time_format(end_time) {
+                        config.end_time = Some(end_time.to_string());
+                    } else {
+                        error!("Row {}: Invalid end time format (required: HH:MM)", row_num + 1);
+                        error_count += 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Collect attendee emails
+        let mut attendee_emails = Vec::new();
+
+        // Handle calendar field - if it's an email, add as attendee
+        if let Some(&pos) = header_positions.get("calendar") {
+            if let Some(value) = record.get(pos) {
+                let value = value.trim();
+                if !value.is_empty() && validate_email(value) {
+                    debug!("Found email in calendar field: {}", value);
+                    attendee_emails.push(value.to_string());
+                }
+            }
+        }
+
+        // Handle attendees field
+        if let Some(&pos) = header_positions.get("attendees") {
+            if let Some(attendees) = record.get(pos) {
+                if !attendees.is_empty() {
+                    debug!("Processing attendees field: {}", attendees);
+                    for email in attendees.split(|c| c == ';' || c == ',') {
+                        let email = email.trim();
+                        if !email.is_empty() && validate_email(email) {
+                            debug!("Found valid email in attendees: {}", email);
+                            attendee_emails.push(email.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Set calendar - prefer command line target, then default
+        if let Some(cal) = &target_calendar {
+            debug!("Using command line calendar: {}", cal);
+            config.calendars = vec![cal.to_string()];
+        } else {
+            debug!("Using default calendar: {}", default_calendar);
+            config.calendars = vec![default_calendar.clone()];
+        }
+
+        // Set description
+        if let Some(&pos) = header_positions.get("description") {
+            if let Some(desc) = record.get(pos) {
+                let desc = desc.trim();
+                if !desc.is_empty() {
+                    config.description = Some(desc.to_string());
+                }
+            }
+        }
+
+        // Set location
+        if let Some(&pos) = header_positions.get("location") {
+            if let Some(loc) = record.get(pos) {
+                let loc = loc.trim();
+                if !loc.is_empty() {
+                    config.location = Some(loc.to_string());
+                }
+            }
+        }
+
+        // Set deduplicated attendees
+        if !attendee_emails.is_empty() {
+            attendee_emails.sort();
+            attendee_emails.dedup();
+            debug!("Setting {} attendees for event: {}", 
+                attendee_emails.len(), 
+                attendee_emails.join(", "));
+            config.emails = attendee_emails;
+        }
+
+        // Create the event
+        debug!("Creating event with config: {:?}", config);
+        match create_event(config).await {
+            Ok(_) => {
+                success_count += 1;
+            }
+            Err(e) => {
+                error_count += 1;
+                error!("Failed to import event: {}", e);
+            }
+        }
+    }
+
+    if success_count > 0 || error_count > 0 {
+        println!("Import completed: {} events imported successfully, {} failed", success_count, error_count);
+    } else {
+        println!("No events found in the CSV file");
+    }
+    Ok(())
+}
+
+pub async fn import_ics_events(file_path: &Path, target_calendar: Option<String>) -> Result<()> {
+    let buf = BufReader::new(File::open(file_path)?);
+    let parser = IcalParser::new(buf);
+    
+    let mut success_count = 0;
+    let mut error_count = 0;
+
+    for calendar in parser {
+        match calendar {
+            Ok(cal) => {
+                for event in cal.events {
+                    if let Err(e) = import_ical_event(event, &target_calendar).await {
+                        error_count += 1;
+                        error!("Failed to import ICS event: {}", e);
+                    } else {
+                        success_count += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to parse ICS calendar: {}", e);
+                return Err(anyhow!("Failed to parse ICS file: {}", e));
+            }
+        }
+    }
+
+    println!("Import completed: {} events imported successfully, {} failed", success_count, error_count);
+    Ok(())
+}
+
+async fn import_ical_event(event: IcalEvent, target_calendar: &Option<String>) -> Result<()> {
+    // Get required properties
+    let summary = event.properties
+        .iter()
+        .find(|p| p.name == "SUMMARY")
+        .and_then(|p| p.value.as_ref())
+        .ok_or_else(|| anyhow!("Event missing SUMMARY"))?;
+
+    let dt_start = event.properties
+        .iter()
+        .find(|p| p.name == "DTSTART")
+        .and_then(|p| p.value.as_ref())
+        .ok_or_else(|| anyhow!("Event missing DTSTART"))?;
+
+    // Parse start datetime
+    let start_dt = NaiveDateTime::parse_from_str(dt_start, "%Y%m%dT%H%M%S")?;
+    
+    let mut config = EventConfig::new(
+        summary,
+        &start_dt.format("%Y-%m-%d").to_string(),
+        &start_dt.format("%H:%M").to_string(),
+    );
+
+    // Set target calendar if specified
+    if let Some(cal) = target_calendar {
+        config.calendars = vec![cal.to_string()];
+    }
+
+    // Get optional end time
+    if let Some(dt_end) = event.properties
+        .iter()
+        .find(|p| p.name == "DTEND")
+        .and_then(|p| p.value.as_ref()) {
+        if let Ok(end_dt) = NaiveDateTime::parse_from_str(dt_end, "%Y%m%dT%H%M%S") {
+            config.end_time = Some(end_dt.format("%H:%M").to_string());
+        }
+    }
+
+    // Get description
+    if let Some(desc) = event.properties
+        .iter()
+        .find(|p| p.name == "DESCRIPTION")
+        .and_then(|p| p.value.as_ref()) {
+        config.description = Some(desc.to_string());
+    }
+
+    // Get location
+    if let Some(loc) = event.properties
+        .iter()
+        .find(|p| p.name == "LOCATION")
+        .and_then(|p| p.value.as_ref()) {
+        config.location = Some(loc.to_string());
+    }
+
+    // Get attendees
+    let attendees: Vec<String> = event.properties
+        .iter()
+        .filter(|p| p.name == "ATTENDEE")
+        .filter_map(|p| p.value.as_ref())
+        .map(|v| v.trim_start_matches("mailto:").to_string())
+        .collect();
+
+    if !attendees.is_empty() {
+        config.emails = attendees;
+    }
+
+    // Handle recurrence rule if present
+    if let Some(rrule) = event.properties
+        .iter()
+        .find(|p| p.name == "RRULE")
+        .and_then(|p| p.value.as_ref()) {
+        if let Some(recurrence) = parse_ical_recurrence(rrule) {
+            config.recurrence = Some(recurrence);
+        }
+    }
+
+    create_event(config).await
+}
+
+fn parse_ical_recurrence(rrule: &str) -> Option<RecurrencePattern> {
+    let parts = rrule.split(';')  // Removed mut as it's not needed
+        .map(|s| s.split('='))
+        .filter_map(|mut kv| Some((kv.next()?, kv.next()?)));
+
+    let mut frequency = None;
+    let mut interval = 1;
+    let mut end_date = None;
+    let mut count = None;
+    let mut days = Vec::new();
+
+    for (key, value) in parts {
+        match key {
+            "FREQ" => {
+                frequency = match value {
+                    "DAILY" => Some(RecurrenceFrequency::Daily),
+                    "WEEKLY" => Some(RecurrenceFrequency::Weekly),
+                    "MONTHLY" => Some(RecurrenceFrequency::Monthly),
+                    "YEARLY" => Some(RecurrenceFrequency::Yearly),
+                    _ => None
+                };
+            },
+            "INTERVAL" => {
+                if let Ok(val) = value.parse() {
+                    interval = val;
+                }
+            },
+            "UNTIL" => {
+                if let Ok(dt) = NaiveDateTime::parse_from_str(value, "%Y%m%dT%H%M%SZ") {
+                    end_date = Some(dt.format("%Y-%m-%d").to_string());
+                }
+            },
+            "COUNT" => {
+                if let Ok(val) = value.parse() {
+                    count = Some(val);
+                }
+            },
+            "BYDAY" => {
+                days = value.split(',')
+                    .filter_map(|day| match day {
+                        "SU" => Some(0),
+                        "MO" => Some(1),
+                        "TU" => Some(2),
+                        "WE" => Some(3),
+                        "TH" => Some(4),
+                        "FR" => Some(5),
+                        "SA" => Some(6),
+                        _ => None
+                    })
+                    .collect();
+            },
+            _ => {}
+        }
+    }
+
+    frequency.map(|f| {
+        let mut pattern = RecurrencePattern::new(f).with_interval(interval);
+        if let Some(end) = end_date {
+            pattern = pattern.with_end_date(&end);
+        }
+        if let Some(c) = count {
+            pattern = pattern.with_count(c);
+        }
+        if !days.is_empty() {
+            pattern = pattern.with_days_of_week(&days);
+        }
+        pattern
+    })
 }
 
 #[cfg(test)]

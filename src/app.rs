@@ -1,5 +1,5 @@
 use crate::commands::{CommandArgs, CommandExecutor};
-use crate::commands::{calendar, config, help, notes, todo, utilities};
+use crate::commands::{calendar, config, contacts, help, notes, todo, utilities};
 use anyhow::Result;
 use rustyline::DefaultEditor;
 use crate::config::Config;
@@ -17,6 +17,7 @@ impl Application {
             Box::new(notes::NotesCommand),
             Box::new(config::ConfigCommand),
             Box::new(utilities::UtilitiesCommand),
+            Box::new(contacts::ContactGroupsCommand),
         ];
 
         Self {
