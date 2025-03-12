@@ -3,6 +3,7 @@ mod calendar;
 mod calendar_legacy;
 mod commands;
 mod config;
+mod contact_groups;
 mod deepseek_parser;
 mod deepseek_reasoning;
 mod event_search;
