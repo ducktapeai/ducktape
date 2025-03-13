@@ -645,11 +645,18 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     if !config.emails.is_empty() {
         info!("Adding {} attendee(s): {}", config.emails.len(), config.emails.join(", "));
         for email in &config.emails {
+            // Skip adding the calendar owner as attendee if it's the same as the calendar name
+            // This avoids the issue where calendar owners don't appear as attendees
+            if config.calendars.len() == 1 && config.calendars[0] == *email {
+                debug!("Skipping calendar owner {} as explicit attendee", email);
+                continue;
+            }
+            
             attendees_block.push_str(&format!(
                 r#"
                     try
                         tell newEvent
-                            make new attendee with properties {{email:"{}"}}
+                            make new attendee at end of attendees with properties {{email:"{}"}}
                         end tell
                     on error errMsg
                         log "Failed to add attendee {}: " & errMsg
