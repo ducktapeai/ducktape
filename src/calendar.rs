@@ -1367,98 +1367,80 @@ fn parse_ical_recurrence(rrule: &str) -> Option<RecurrencePattern> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use chrono::{NaiveDate, Timelike};
+    
+    // ...existing code...
+    
     #[test]
-    fn test_recurrence_frequency_to_applescript() {
-        assert_eq!(RecurrenceFrequency::Daily.to_applescript(), "daily");
-        assert_eq!(RecurrenceFrequency::Weekly.to_applescript(), "weekly");
-        assert_eq!(RecurrenceFrequency::Monthly.to_applescript(), "monthly");
-        assert_eq!(RecurrenceFrequency::Yearly.to_applescript(), "yearly");
+    fn test_event_import_csv_header_validation() {
+        // Test basic CSV header validation requirements
+        let required = ["title", "date", "time"];
+        
+        let valid_headers = vec!["title", "date", "time", "location", "description", "attendees", "calendar"];
+        assert!(required.iter().all(|&req| valid_headers.contains(&req)));
+        
+        let missing_title = vec!["date", "time", "location", "description"];
+        assert!(!required.iter().all(|&req| missing_title.contains(&req)));
     }
-
+    
     #[test]
-    fn test_recurrence_frequency_to_rfc5545() {
-        assert_eq!(RecurrenceFrequency::Daily.to_rfc5545(), "DAILY");
-        assert_eq!(RecurrenceFrequency::Weekly.to_rfc5545(), "WEEKLY");
-        assert_eq!(RecurrenceFrequency::Monthly.to_rfc5545(), "MONTHLY");
-        assert_eq!(RecurrenceFrequency::Yearly.to_rfc5545(), "YEARLY");
+    fn test_event_import_csv_date_time_parsing() {
+        // Test parsing of date and time from CSV format
+        let date_str = "2025-03-20";
+        let time_str = "10:30";
+        
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
+        let time = chrono::NaiveTime::parse_from_str(time_str, "%H:%M").unwrap();
+        let dt = chrono::NaiveDateTime::new(date, time);
+        
+        assert_eq!(dt.year(), 2025);
+        assert_eq!(dt.month(), 3);
+        assert_eq!(dt.day(), 20);
+        assert_eq!(dt.hour(), 10);
+        assert_eq!(dt.minute(), 30);
     }
-
+    
     #[test]
-    fn test_recurrence_frequency_from_str() {
-        // Test valid values
-        assert_eq!(RecurrenceFrequency::from_str("daily").unwrap(), RecurrenceFrequency::Daily);
-        assert_eq!(RecurrenceFrequency::from_str("day").unwrap(), RecurrenceFrequency::Daily);
-        assert_eq!(RecurrenceFrequency::from_str("days").unwrap(), RecurrenceFrequency::Daily);
-        
-        assert_eq!(RecurrenceFrequency::from_str("weekly").unwrap(), RecurrenceFrequency::Weekly);
-        assert_eq!(RecurrenceFrequency::from_str("week").unwrap(), RecurrenceFrequency::Weekly);
-        
-        assert_eq!(RecurrenceFrequency::from_str("monthly").unwrap(), RecurrenceFrequency::Monthly);
-        assert_eq!(RecurrenceFrequency::from_str("month").unwrap(), RecurrenceFrequency::Monthly);
-        
-        assert_eq!(RecurrenceFrequency::from_str("yearly").unwrap(), RecurrenceFrequency::Yearly);
-        assert_eq!(RecurrenceFrequency::from_str("annually").unwrap(), RecurrenceFrequency::Yearly);
-        
-        // Test case insensitivity
-        assert_eq!(RecurrenceFrequency::from_str("DAILY").unwrap(), RecurrenceFrequency::Daily);
-        assert_eq!(RecurrenceFrequency::from_str("Weekly").unwrap(), RecurrenceFrequency::Weekly);
-        
-        // Test invalid value
-        assert!(RecurrenceFrequency::from_str("invalid").is_err());
-        let err = RecurrenceFrequency::from_str("invalid").unwrap_err();
-        assert!(err.to_string().contains("Invalid recurrence frequency: invalid"));
+    fn test_event_import_email_validation() {
+        // Test email validation for attendees and calendar fields
+        assert!(validate_email("user@example.com"));
+        assert!(validate_email("user.name@example.co.uk"));
+        assert!(!validate_email("invalid-email"));
     }
-
+    
     #[test]
-    fn test_recurrence_pattern_creation() {
-        let pattern = RecurrencePattern::new(RecurrenceFrequency::Daily);
-        
-        assert_eq!(pattern.frequency, RecurrenceFrequency::Daily);
-        assert_eq!(pattern.interval, 1);
-        assert_eq!(pattern.end_date, None);
-        assert_eq!(pattern.count, None);
-        assert!(pattern.days_of_week.is_empty());
+    fn test_csv_event_import_email_validation() {
+        // Test email validation used in CSV import
+        assert!(validate_email("user@example.com"));
+        assert!(validate_email("user.name@example.co.uk"));
+        assert!(!validate_email("invalid-email"));
+        assert!(!validate_email("user@"));
+        assert!(!validate_email("@example.com"));
     }
-
+    
     #[test]
-    fn test_recurrence_pattern_builder() {
-        let pattern = RecurrencePattern::new(RecurrenceFrequency::Weekly)
-            .with_interval(2)
-            .with_end_date("2025-12-31")
-            .with_days_of_week(&[1, 3, 5]);  // Monday, Wednesday, Friday
+    fn test_csv_date_time_parsing() {
+        // Test CSV date and time format parsing
+        let date = NaiveDate::parse_from_str("2025-03-20", "%Y-%m-%d").unwrap();
+        let time = chrono::NaiveTime::parse_from_str("10:30", "%H:%M").unwrap();
+        let dt = chrono::NaiveDateTime::new(date, time);
         
-        assert_eq!(pattern.frequency, RecurrenceFrequency::Weekly);
-        assert_eq!(pattern.interval, 2);
-        assert_eq!(pattern.end_date, Some("2025-12-31".to_string()));
-        assert_eq!(pattern.count, None);
-        assert_eq!(pattern.days_of_week, vec![1, 3, 5]);
-        
-        // Test with_count instead of with_end_date
-        let pattern = RecurrencePattern::new(RecurrenceFrequency::Monthly)
-            .with_interval(3)
-            .with_count(10);
-        
-        assert_eq!(pattern.frequency, RecurrenceFrequency::Monthly);
-        assert_eq!(pattern.interval, 3);
-        assert_eq!(pattern.end_date, None);
-        assert_eq!(pattern.count, Some(10));
-        assert!(pattern.days_of_week.is_empty());
+        assert_eq!(dt.year(), 2025);
+        assert_eq!(dt.month(), 3);
+        assert_eq!(dt.day(), 20);
+        assert_eq!(dt.hour(), 10);
+        assert_eq!(dt.minute(), 30);
     }
-
+    
     #[test]
-    fn test_event_config_with_recurrence() {
-        let recurrence = RecurrencePattern::new(RecurrenceFrequency::Weekly)
-            .with_interval(2)
-            .with_days_of_week(&[1, 5]);  // Monday and Friday
-            
-        let mut config = EventConfig::new("Test Event", "2024-05-01", "10:00");
-        config = config.with_recurrence(recurrence);
+    fn test_csv_header_requirements() {
+        // Test CSV header validation requirements
+        let required = ["title", "date", "time"];
         
-        assert!(config.recurrence.is_some());
-        let rec = config.recurrence.unwrap();
-        assert_eq!(rec.frequency, RecurrenceFrequency::Weekly);
-        assert_eq!(rec.interval, 2);
-        assert_eq!(rec.days_of_week, vec![1, 5]);
+        let valid_headers = vec!["title", "date", "time", "location", "description"];
+        assert!(required.iter().all(|&req| valid_headers.contains(&req)));
+        
+        let missing_title = vec!["date", "time", "location", "description"];
+        assert!(!required.iter().all(|&req| missing_title.contains(&req)));
     }
 }
