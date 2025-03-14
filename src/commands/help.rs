@@ -52,6 +52,14 @@ pub fn print_help() -> Result<()> {
     println!("  --count <number>                         Set number of occurrences");
     println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
     
+    println!("\nContact Groups:");
+    println!("  ducktape contacts                       List all contact groups");
+    println!("  ducktape contacts add <id> <name> <contact1,contact2,...> [description]");
+    println!("  ducktape contacts show <id>             Show details for a contact group");
+    println!("  ducktape contacts remove <id>           Remove a contact group");
+    println!("  ducktape calendar create \"Meeting\" 2023-06-15 14:00 15:00 --group \"team\"");
+    println!("  (Use --group with calendar create to add contacts from a group)");
+    
     println!("\nTodo Commands:");
     println!("  ducktape todo \"<title>\" [--notes \"<notes>\"] [--lists \"list1,list2\"]");
     println!("  ducktape list-todos              Show all todos");
@@ -80,6 +88,7 @@ pub fn print_help() -> Result<()> {
     println!("  - Times should be in 24-hour format (HH:MM)");
     println!("  - Use quotes around titles and text with spaces");
     println!("  - Recurring events: ducktape calendar create \"Weekly Meeting\" 2024-05-01 10:00 11:00 --repeat weekly");
+    println!("  - Contact groups save time by letting you quickly add the same contacts to multiple events");
 
     Ok(())
 }

@@ -151,6 +151,7 @@ pub trait CommandExecutor {
 // Re-export submodules
 pub mod calendar;
 pub mod config;
+pub mod contacts;
 pub mod help;
 pub mod notes;
 pub mod todo;

@@ -109,6 +109,11 @@ ducktape calendar-props
 
 # List all events
 ducktape list-events
+
+# Import calendar events (new!)
+ducktape calendar import "<file_path>" [--format csv|ics] [--calendar "<calendar_name>"]
+ducktape calendar import "events.csv" --format csv --calendar "Work"
+ducktape calendar import "events.ics" --format ics
 ```
 
 ### Calendar Options
@@ -209,6 +214,33 @@ ducktape calendar create "Meeting Title" 2023-06-15 14:00 15:00 --zoom
 # Or using natural language
 "schedule a zoom meeting with the team tomorrow at 3pm for one hour"
 ```
+
+## Calendar Import
+DuckTape supports importing calendar events from CSV and ICS files. 
+
+### CSV Format Requirements
+The CSV file should have the following columns:
+- title (required): Event title
+- date (required): YYYY-MM-DD format
+- start_time (required): HH:MM format (24-hour)
+- end_time (required): HH:MM format (24-hour)
+- calendar (optional): Calendar name to add event to
+- description (optional): Event description
+- location (optional): Event location
+- attendees (optional): Comma-separated email addresses
+
+Example CSV:
+```csv
+title,date,start_time,end_time,calendar,description,location,attendees
+Team Meeting,2024-02-15,14:00,15:00,Work,Weekly sync,Conference Room A,john@example.com;jane@example.com
+```
+
+### ICS Format
+DuckTape supports standard iCalendar (.ics) files following the RFC 5545 specification. When importing ICS files, DuckTape will:
+- Preserve all event properties including attendees, location, and description
+- Handle recurring events with their full recurrence rules
+- Import reminders and alerts
+- Maintain event categories and classifications
 
 ## Features
 
