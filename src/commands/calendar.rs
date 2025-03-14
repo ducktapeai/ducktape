@@ -6,6 +6,7 @@ use crate::calendar;
 use crate::state;
 use log::debug;
 use std::str::FromStr;
+use std::path::Path;
 
 pub struct CalendarCommand;
 
@@ -13,17 +14,18 @@ impl CommandExecutor for CalendarCommand {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
             match args.command.as_str() {
-                "calendars" => calendar::list_calendars(),
-                "calendar-props" => calendar::list_event_properties(),
+                "calendars" => calendar::list_calendars().await,
+                "calendar-props" => calendar::list_event_properties().await,
                 "list-events" => list_events(),
-                "delete-event" => delete_event(args),
+                "delete-event" => delete_event(args).await,
                 "calendar" => {
                     match args.args.get(0).map(|s| s.to_lowercase()).as_deref() {
                         Some("create") => create_calendar_event(args).await,
-                        Some("delete") => delete_calendar_event(args),
+                        Some("delete") => delete_calendar_event(args).await,
                         Some("set-default") => set_default_calendar(args),
+                        Some("import") => import_calendar_events(args).await,
                         _ => {
-                            println!("Unknown calendar command. Use 'calendar create', 'calendar delete', or 'calendar set-default'.");
+                            println!("Unknown calendar command. Use 'calendar create', 'calendar delete', 'calendar set-default', or 'calendar import'");
                             Ok(())
                         }
                     }
@@ -76,17 +78,17 @@ fn list_events() -> Result<()> {
     Ok(())
 }
 
-fn delete_event(args: CommandArgs) -> Result<()> {
+async fn delete_event(args: CommandArgs) -> Result<()> {
     if args.args.len() < 1 {
         println!("Usage: delete-event \"<title>\"");
         return Ok(());
     }
     
-    // Fix the argument order to match calendar::delete_event's parameter order
+    // Add await to properly handle the async function
     calendar::delete_event(
         &args.args[0],
         args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
-    )?;
+    ).await?;
     
     // Also remove from state
     let mut events = state::load_events()?;
@@ -109,6 +111,9 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
         println!("  --days <0,1,2...>                        Set days of week (0=Sun, 1=Mon, etc.)");
         println!("\nZoom options:");
         println!("  --zoom                                   Create a Zoom meeting for this event");
+        println!("\nContact options:");
+        println!("  --contacts \"<name1,name2>\"               Add contacts by name");
+        println!("  --group \"<group_id>\"                     Add contacts from a predefined group");
         return Ok(());
     }
     
@@ -308,6 +313,15 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
         }
     }
 
+    // Handle contact group if provided (takes precedence over individual contacts)
+    if let Some(group) = args.flags.get("--group") {
+        if let Some(group_id) = group {
+            let sanitized_group_id = sanitize_input(group_id, false);
+            debug!("Using contact group: {}", sanitized_group_id);
+            return crate::commands::contacts::create_calendar_event_with_group(config, &sanitized_group_id).await;
+        }
+    }
+    
     // Handle contact names if provided
     if let Some(contacts) = args.flags.get("--contacts") {
         if let Some(contact_str) = contacts {
@@ -375,14 +389,15 @@ fn contains_dangerous_chars(input: &str) -> bool {
     input.contains('<') || input.contains('>')
 }
 
-fn delete_calendar_event(args: CommandArgs) -> Result<()> {
+async fn delete_calendar_event(args: CommandArgs) -> Result<()> {
     if args.args.len() < 2 {
         println!("Usage: calendar delete <title>");
         return Ok(());
     }
     
     let title = &args.args[1];
-    calendar::delete_event(title, args.args.get(2).map(|s| s.as_str()).unwrap_or(""))?;
+    // Add await to properly handle the async function
+    calendar::delete_event(title, args.args.get(2).map(|s| s.as_str()).unwrap_or("")).await?;
     
     let mut events = state::load_events()?;
     events.retain(|e| e.title != args.args[1]);
@@ -406,4 +421,36 @@ fn set_default_calendar(args: CommandArgs) -> Result<()> {
     Ok(())
 }
 
-// Removed unused parse_calendar_command function
+async fn import_calendar_events(args: CommandArgs) -> Result<()> {
+    if args.args.len() < 2 {
+        println!("Usage: ducktape calendar import \"<file_path>\" [--format csv|ics] [--calendar \"<calendar_name>\"]");
+        println!("Example: ducktape calendar import \"events.csv\" --format csv --calendar \"Work\"");
+        return Ok(());
+    }
+
+    let file_path = Path::new(&args.args[1]);
+    if !file_path.exists() {
+        println!("Error: File not found at path: {}", args.args[1]);
+        return Ok(());
+    }
+
+    // Get format from --format flag, default to csv
+    let format = args.flags.get("--format")
+        .and_then(|f| f.as_ref())
+        .map(|f| f.to_lowercase())
+        .unwrap_or_else(|| "csv".to_string());
+
+    if !["csv", "ics"].contains(&format.as_str()) {
+        println!("Error: Unsupported format. Use --format csv or --format ics");
+        return Ok(());
+    }
+
+    // Get target calendar if specified
+    let calendar = args.flags.get("--calendar").and_then(|c| c.as_ref()).map(|c| c.to_string());
+
+    match format.as_str() {
+        "csv" => calendar::import_csv_events(file_path, calendar).await,
+        "ics" => calendar::import_ics_events(file_path, calendar).await,
+        _ => unreachable!()
+    }
+}

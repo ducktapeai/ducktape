@@ -3,6 +3,7 @@ pub mod calendar;
 pub mod calendar_legacy;
 pub mod commands;
 pub mod config;
+pub mod contact_groups;
 pub mod deepseek_parser;
 pub mod deepseek_reasoning;
 pub mod event_search;
