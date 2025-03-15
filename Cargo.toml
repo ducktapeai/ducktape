@@ -19,7 +19,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dirs = "5.0"
 reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.35.0", features = ["full"] }
 lru = "0.10"
 once_cell = "1.8"
 regex = "1.10.2"
@@ -27,6 +27,11 @@ directories = "5.0"
 toml = "0.8"
 chrono-tz = "0.8.6"  # Add timezone database support
 scopeguard = "1.2.0"  # For safely cleaning up resources
+axum = { version = "0.7.2", features = ["ws"] }  # Add the ws feature
+tower-http = { version = "0.5.0", features = ["cors"] }
+futures = "0.3.28"  # For working with async streams
+uuid = { version = "1.6.0", features = ["v4"] }
+async-trait = "0.1.74"
 
 # Zoom API Integration
 oauth2 = "4.4.1"

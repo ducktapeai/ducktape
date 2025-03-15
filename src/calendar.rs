@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use chrono::{Datelike, Local, NaiveDateTime, TimeZone, DateTime};
+use chrono::{Datelike, Local, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use log::{debug, error, info};
 use regex::Regex;
@@ -667,7 +667,6 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     }
 
     // Build recurrence rule (RFC 5545 format)
-    let mut recurrence_rule = String::new();
     let recurrence_code = if let Some(recurrence) = &config.recurrence {
         let mut parts = vec![
             format!("FREQ={}", recurrence.frequency.to_rfc5545()),
@@ -692,13 +691,13 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             parts.push(format!("BYDAY={}", days.join(",")));
         }
         
-        recurrence_rule = parts.join(";");
+        let rule_string = parts.join(";");
         format!(
             r#"
                     tell newEvent
                         set its recurrence to "{}"
                     end tell"#,
-            recurrence_rule
+            rule_string
         )
     } else {
         String::new()
