@@ -445,6 +445,25 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                                                     config.calendars = vec![cal_str.to_string()];
                                                 }
                                                 
+                                                // Handle the email flag
+                                                if let Some(Some(emails_str)) = args.flags.get("--email") {
+                                                    let emails: Vec<String> = emails_str
+                                                        .split(',')
+                                                        .map(|e| e.trim().trim_matches('"').to_string())
+                                                        .collect();
+                                                        
+                                                    if !emails.is_empty() {
+                                                        info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
+                                                        config.emails = emails;
+                                                    }
+                                                }
+                                                
+                                                // Handle the zoom flag
+                                                if args.flags.contains_key("--zoom") {
+                                                    info!("WebSocket[{}]: Enabling Zoom meeting creation", connection_id);
+                                                    config.create_zoom_meeting = true;
+                                                }
+                                                
                                                 // Execute the calendar creation
                                                 match crate::calendar::create_event(config).await {
                                                     Ok(_) => {
