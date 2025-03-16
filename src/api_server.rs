@@ -404,133 +404,227 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                         Ok(command) => {
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
                             
-                            // Extract calendar event details from the command
-                            if command.contains("calendar create") {
-                                info!("WebSocket[{}]: Executing calendar create command", connection_id);
-                                
-                                // Parse the command into arguments
-                                match crate::commands::CommandArgs::parse(&command) {
-                                    Ok(args) => {
-                                        // Log the parsed args to help debug
-                                        info!("WebSocket[{}]: Parsed args: command={}, args={:?}, flags={:?}", 
-                                              connection_id, args.command, args.args, args.flags);
-                                        
-                                        // For calendar create commands, we need to handle them specially
-                                        if args.command == "calendar" && args.args.get(0).map(|s| s.as_str()) == Some("create") {
-                                            // Skip "create" (which is args[0]) and process the rest of the args
-                                            if args.args.len() >= 4 { // Needs at least title, date, start_time
-                                                let title = &args.args[1]; // "title" is the second arg
-                                                let date = &args.args[2];  // Date is the third arg
-                                                let start_time = &args.args[3]; // Start time is the fourth arg
-                                                
-                                                // End time and calendar are optional
-                                                let end_time = args.args.get(4).map(|s| s.as_str());
-                                                let calendar = args.args.get(5).map(|s| s.as_str());
-                                                
-                                                info!("WebSocket[{}]: Creating event: {} on {} at {}", 
-                                                      connection_id, title.trim_matches('"'), date, start_time);
-                                                
-                                                // Create the event config
-                                                let mut config = crate::calendar::EventConfig::new(
-                                                    title, date, start_time
-                                                );
-                                                
-                                                // Set optional fields
-                                                if let Some(end) = end_time {
-                                                    config.end_time = Some(end.to_string());
-                                                }
-                                                
-                                                if let Some(cal) = calendar {
-                                                    let cal_str = cal.trim_matches('"');
-                                                    config.calendars = vec![cal_str.to_string()];
-                                                }
-                                                
-                                                // Handle the email flag
-                                                if let Some(Some(emails_str)) = args.flags.get("--email") {
-                                                    let emails: Vec<String> = emails_str
-                                                        .split(',')
-                                                        .map(|e| e.trim().trim_matches('"').to_string())
-                                                        .collect();
+                            // Try to parse the command arguments
+                            match crate::commands::CommandArgs::parse(&command) {
+                                Ok(args) => {
+                                    info!("WebSocket[{}]: Parsed args: command={}, args={:?}, flags={:?}", 
+                                          connection_id, args.command, args.args, args.flags);
+                                    
+                                    if args.command == "calendar" {
+                                        match args.args.get(0).map(|s| s.as_str()) {
+                                            Some("create") => {
+                                                // ...existing calendar create handling...
+                                                if args.command == "calendar" && args.args.get(0).map(|s| s.as_str()) == Some("create") {
+                                                    // Skip "create" (which is args[0]) and process the rest of the args
+                                                    if args.args.len() >= 4 { // Needs at least title, date, start_time
+                                                        let title = &args.args[1]; // "title" is the second arg
+                                                        let date = &args.args[2];  // Date is the third arg
+                                                        let start_time = &args.args[3]; // Start time is the fourth arg
                                                         
-                                                    if !emails.is_empty() {
-                                                        info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
-                                                        config.emails = emails;
-                                                    }
-                                                }
-                                                
-                                                // Handle the zoom flag
-                                                if args.flags.contains_key("--zoom") {
-                                                    info!("WebSocket[{}]: Enabling Zoom meeting creation", connection_id);
-                                                    config.create_zoom_meeting = true;
-                                                }
-                                                
-                                                // Execute the calendar creation
-                                                match crate::calendar::create_event(config).await {
-                                                    Ok(_) => {
-                                                        info!("WebSocket[{}]: Event created successfully", connection_id);
+                                                        // End time and calendar are optional
+                                                        let end_time = args.args.get(4).map(|s| s.as_str());
+                                                        let calendar = args.args.get(5).map(|s| s.as_str());
+                                                        
+                                                        info!("WebSocket[{}]: Creating event: {} on {} at {}", 
+                                                              connection_id, title.trim_matches('"'), date, start_time);
+                                                        
+                                                        // Create the event config
+                                                        let mut config = crate::calendar::EventConfig::new(
+                                                            title, date, start_time
+                                                        );
+                                                        
+                                                        // Set optional fields
+                                                        if let Some(end) = end_time {
+                                                            config.end_time = Some(end.to_string());
+                                                        }
+                                                        
+                                                        if let Some(cal) = calendar {
+                                                            let cal_str = cal.trim_matches('"');
+                                                            config.calendars = vec![cal_str.to_string()];
+                                                        }
+                                                        
+                                                        // Handle the email flag
+                                                        if let Some(Some(emails_str)) = args.flags.get("--email") {
+                                                            let emails: Vec<String> = emails_str
+                                                                .split(',')
+                                                                .map(|e| e.trim().trim_matches('"').to_string())
+                                                                .collect();
+                                                                
+                                                            if !emails.is_empty() {
+                                                                info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
+                                                                config.emails = emails;
+                                                            }
+                                                        }
+                                                        
+                                                        // Handle the zoom flag
+                                                        if args.flags.contains_key("--zoom") {
+                                                            info!("WebSocket[{}]: Enabling Zoom meeting creation", connection_id);
+                                                            config.create_zoom_meeting = true;
+                                                        }
+                                                        
+                                                        // Execute the calendar creation
+                                                        match crate::calendar::create_event(config).await {
+                                                            Ok(_) => {
+                                                                info!("WebSocket[{}]: Event created successfully", connection_id);
+                                                                let response = SwiftChatMessage {
+                                                                    sender: "ducktape".to_string(),
+                                                                    content: format!(
+                                                                        "✅ Created event \"{}\" for {} at {}", 
+                                                                        title.trim_matches('"'), date, start_time
+                                                                    ),
+                                                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                    message_type: "chat".to_string(),  // Add message type
+                                                                };
+                                                                send_response(socket, response).await;
+                                                            },
+                                                            Err(e) => {
+                                                                error!("WebSocket[{}]: Failed to create event: {}", connection_id, e);
+                                                                let response = SwiftChatMessage {
+                                                                    sender: "ducktape".to_string(),
+                                                                    content: format!("❌ Failed to create event: {}", e),
+                                                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                    message_type: "error".to_string(),  // Add error message type
+                                                                };
+                                                                send_response(socket, response).await;
+                                                            }
+                                                        }
+                                                    } else {
+                                                        error!("WebSocket[{}]: Invalid command format - not enough arguments", connection_id);
                                                         let response = SwiftChatMessage {
                                                             sender: "ducktape".to_string(),
-                                                            content: format!(
-                                                                "✅ Created event \"{}\" for {} at {}", 
-                                                                title.trim_matches('"'), date, start_time
-                                                            ),
-                                                            timestamp: chrono::Utc::now().to_rfc3339(),
-                                                            message_type: "chat".to_string(),  // Add message type
-                                                        };
-                                                        send_response(socket, response).await;
-                                                    },
-                                                    Err(e) => {
-                                                        error!("WebSocket[{}]: Failed to create event: {}", connection_id, e);
-                                                        let response = SwiftChatMessage {
-                                                            sender: "ducktape".to_string(),
-                                                            content: format!("❌ Failed to create event: {}", e),
+                                                            content: "❌ Invalid command format".to_string(),
                                                             timestamp: chrono::Utc::now().to_rfc3339(),
                                                             message_type: "error".to_string(),  // Add error message type
                                                         };
                                                         send_response(socket, response).await;
                                                     }
+                                                } else {
+                                                    // For other command types
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: format!("Command parsed but not executed: {}", command),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "chat".to_string(),  // Add message type
+                                                    };
+                                                    send_response(socket, response).await;
                                                 }
-                                            } else {
-                                                error!("WebSocket[{}]: Invalid command format - not enough arguments", connection_id);
+                                            },
+                                            Some("import") => {
+                                                info!("WebSocket[{}]: Executing calendar import command", connection_id);
+                                                
+                                                // Need at least the import path
+                                                if args.args.len() >= 2 {
+                                                    let path_str = args.args[1].trim_matches('"');
+                                                    
+                                                    // Try to find the file using our helper function
+                                                    match find_file_path(path_str, &connection_id) {
+                                                        Some(file_path) => {
+                                                            // Get format from --format flag, default to csv
+                                                            let format = args.flags.get("--format")
+                                                                .and_then(|f| f.as_ref())
+                                                                .map(|f| f.to_lowercase())
+                                                                .unwrap_or_else(|| "csv".to_string());
+                                                            
+                                                            // Get target calendar if specified
+                                                            let calendar = args.flags.get("--calendar")
+                                                                .and_then(|c| c.as_ref())
+                                                                .map(|c| c.trim_matches('"').to_string());
+                                                            
+                                                            info!("WebSocket[{}]: Importing calendar events from {} with format {}", 
+                                                                  connection_id, file_path.display(), format);
+                                                            
+                                                            // Execute import based on format
+                                                            let result = match format.as_str() {
+                                                                "csv" => crate::calendar::import_csv_events(&file_path, calendar).await,
+                                                                "ics" => crate::calendar::import_ics_events(&file_path, calendar).await,
+                                                                _ => Err(anyhow!("Unsupported format. Use --format csv or --format ics"))
+                                                            };
+                                                            
+                                                            // Handle the result
+                                                            // ...existing code...
+                                                            match result {
+                                                                Ok(_) => {
+                                                                    info!("WebSocket[{}]: Calendar import completed successfully", connection_id);
+                                                                    let response = SwiftChatMessage {
+                                                                        sender: "ducktape".to_string(),
+                                                                        content: format!("✅ Successfully imported events from {}", file_path.display()),
+                                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                        message_type: "chat".to_string(),
+                                                                    };
+                                                                    send_response(socket, response).await;
+                                                                },
+                                                                Err(e) => {
+                                                                    error!("WebSocket[{}]: Failed to import events: {}", connection_id, e);
+                                                                    let response = SwiftChatMessage {
+                                                                        sender: "ducktape".to_string(),
+                                                                        content: format!("❌ Failed to import events: {}", e),
+                                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                        message_type: "error".to_string(),
+                                                                    };
+                                                                    send_response(socket, response).await;
+                                                                }
+                                                            }
+                                                        },
+                                                        None => {
+                                                            error!("WebSocket[{}]: File not found: {}", connection_id, path_str);
+                                                            let response = SwiftChatMessage {
+                                                                sender: "ducktape".to_string(),
+                                                                content: format!(
+                                                                    "❌ Could not find file '{}'. \
+                                                                    Please check the file exists and provide the full path. \
+                                                                    For example: /Users/shaunstuart/Desktop/test-import.csv", 
+                                                                    path_str
+                                                                ),
+                                                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                message_type: "error".to_string(),
+                                                            };
+                                                            send_response(socket, response).await;
+                                                        }
+                                                    }
+                                                } else {
+                                                    error!("WebSocket[{}]: Invalid import command - missing file path", connection_id);
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: "❌ Invalid import command. Usage: calendar import \"filepath\"".to_string(),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "error".to_string(),
+                                                    };
+                                                    send_response(socket, response).await;
+                                                }
+                                            },
+                                            // Handle other calendar subcommands
+                                            _ => {
                                                 let response = SwiftChatMessage {
                                                     sender: "ducktape".to_string(),
-                                                    content: "❌ Invalid command format".to_string(),
+                                                    content: format!("Command parsed but not implemented: {}", command),
                                                     timestamp: chrono::Utc::now().to_rfc3339(),
-                                                    message_type: "error".to_string(),  // Add error message type
+                                                    message_type: "chat".to_string(),
                                                 };
                                                 send_response(socket, response).await;
                                             }
-                                        } else {
-                                            // For other command types
-                                            let response = SwiftChatMessage {
-                                                sender: "ducktape".to_string(),
-                                                content: format!("Command parsed but not executed: {}", command),
-                                                timestamp: chrono::Utc::now().to_rfc3339(),
-                                                message_type: "chat".to_string(),  // Add message type
-                                            };
-                                            send_response(socket, response).await;
                                         }
-                                    },
-                                    Err(e) => {
-                                        error!("WebSocket[{}]: Failed to parse command arguments: {}", connection_id, e);
+                                    } else {
+                                        // For other command types
                                         let response = SwiftChatMessage {
                                             sender: "ducktape".to_string(),
-                                            content: format!("❌ Failed to parse command: {}. Raw command was: {}", e, command),
+                                            content: format!("Command parsed but not implemented: {}", command),
                                             timestamp: chrono::Utc::now().to_rfc3339(),
-                                            message_type: "error".to_string(),  // Add error message type
+                                            message_type: "chat".to_string(),
                                         };
                                         send_response(socket, response).await;
                                     }
+                                },
+                                // ...existing error handling...
+                                Err(e) => {
+                                    error!("WebSocket[{}]: Failed to parse command arguments: {}", connection_id, e);
+                                    let response = SwiftChatMessage {
+                                        sender: "ducktape".to_string(),
+                                        content: format!("❌ Failed to parse command: {}. Raw command was: {}", e, command),
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        message_type: "error".to_string(),  // Add error message type
+                                    };
+                                    send_response(socket, response).await;
                                 }
-                            } else {
-                                // For other command types
-                                let response = SwiftChatMessage {
-                                    sender: "ducktape".to_string(),
-                                    content: format!("Command parsed but not executed: {}", command),
-                                    timestamp: chrono::Utc::now().to_rfc3339(),
-                                    message_type: "chat".to_string(),  // Add message type
-                                };
-                                send_response(socket, response).await;
                             }
                         },
                         Err(e) => {
@@ -683,6 +777,66 @@ async fn send_error_response(socket: &mut WebSocket, message: &str) {
             error!("Failed to serialize error response: {}", e);
         }
     }
+}
+
+// Add this helper function to try multiple potential paths
+fn find_file_path(original_path: &str, connection_id: &Uuid) -> Option<std::path::PathBuf> {
+    info!("WebSocket[{}]: Finding file path from: {}", connection_id, original_path);
+    
+    // First try the exact path
+    let path = std::path::Path::new(original_path);
+    if path.exists() {
+        info!("WebSocket[{}]: Found file at exact path: {}", connection_id, path.display());
+        return Some(path.to_path_buf());
+    }
+    
+    // Get the filename component
+    let filename = match path.file_name() {
+        Some(name) => name.to_string_lossy().to_string(),
+        None => {
+            info!("WebSocket[{}]: Could not extract filename from path", connection_id);
+            return None;
+        }
+    };
+    
+    info!("WebSocket[{}]: Extracted filename: {}", connection_id, filename);
+    
+    // Try various potential home directories and variations
+    let potential_paths = vec![
+        // Current user's desktop with and without dot in username
+        format!("/Users/shaunstuart/Desktop/{}", filename),
+        format!("/Users/shaun.stuart/Desktop/{}", filename),
+        // Full absolute paths
+        format!("/Users/shaunstuart/Desktop/test-import.csv"),
+        format!("/Users/shaun.stuart/Desktop/test-import.csv"),
+        // Current directory + filename
+        filename.clone(),
+    ];
+    
+    for try_path in potential_paths {
+        let path_buf = std::path::PathBuf::from(&try_path);
+        info!("WebSocket[{}]: Trying path: {}", connection_id, path_buf.display());
+        
+        if path_buf.exists() {
+            info!("WebSocket[{}]: Found file at: {}", connection_id, path_buf.display());
+            return Some(path_buf);
+        }
+    }
+    
+    // Try home dir detection if available
+    if let Some(home_dir) = dirs::home_dir() {
+        let desktop_path = home_dir.join("Desktop").join(&filename);
+        info!("WebSocket[{}]: Trying home directory path: {}", connection_id, desktop_path.display());
+        
+        if desktop_path.exists() {
+            info!("WebSocket[{}]: Found file using home dir: {}", connection_id, desktop_path.display());
+            return Some(desktop_path);
+        }
+    }
+    
+    // Not found
+    info!("WebSocket[{}]: File not found after trying multiple paths", connection_id);
+    None
 }
 
 // Create and start the API server
