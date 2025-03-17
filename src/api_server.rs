@@ -336,7 +336,7 @@ async fn handle_socket(mut socket: WebSocket) {
     
     loop {
         tokio::select! {
-            // Wait for the next interval tick and send a ping
+            // Periodically send pings to ensure connection stays alive
             _ = interval.tick() => {
                 debug!("WebSocket[{}]: Sending ping", connection_id);
                 if let Err(e) = socket.send(Message::Ping(Vec::new())).await {
@@ -345,7 +345,7 @@ async fn handle_socket(mut socket: WebSocket) {
                 }
             }
             
-            // Wait for a message from the client
+            // Handle incoming messages
             msg_result = socket.recv() => {
                 match msg_result {
                     Some(Ok(Message::Text(text))) => {
