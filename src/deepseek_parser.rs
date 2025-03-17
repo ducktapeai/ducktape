@@ -3,6 +3,22 @@ use reqwest::Client;
 use serde_json::json;
 use std::env;
 
+pub struct DeepSeekParser;
+
+impl DeepSeekParser {
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self)
+    }
+    
+    pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
+        match parse_natural_language(input).await {
+            Ok(command) => Ok(Some(command)),
+            Err(e) => Err(e)
+        }
+    }
+}
+
+// Keep existing functions
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Replace with your actual DeepSeek API endpoint and parameters.
     let deepseek_endpoint = "https://api.deepseek.example/v1/parse";
