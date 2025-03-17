@@ -33,19 +33,7 @@ impl Application {
 
     pub async fn run(&self) -> Result<()> {
         // Initialize logging
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-            .format(|buf, record| {
-                use chrono::Local;
-                use std::io::Write;
-                writeln!(
-                    buf,
-                    "{} [{}] {}",
-                    Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    record.level(),
-                    record.args()
-                )
-            })
-            .init();
+        init_logger();
 
         log::info!("Starting DuckTape Terminal");
         let _config = Config::load()?;
@@ -184,4 +172,19 @@ impl Application {
             }
         }
     }
+}
+
+pub fn init_logger() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format(|buf, record| {
+            use std::io::Write;
+            writeln!(
+                buf,
+                "{} [{}] {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                record.args()
+            )
+        })
+        .init();
 }
