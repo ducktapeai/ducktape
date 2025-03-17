@@ -25,16 +25,20 @@ use anyhow::Result;
 
 pub async fn run(_config_path: Option<PathBuf>) -> Result<()> {
     // Initialize error handling
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Debug)
-        .format_timestamp(None)
-        .format_target(false)
-        .init();
+    init_logger();
 
     // Create and run the application
     let app = app::Application::new();
     info!("Initializing DuckTape application");
     app.run().await
+}
+
+pub fn init_logger() {
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .format_timestamp(None)
+        .format_target(false)
+        .init();
 }
 
 // Re-export commonly used types
