@@ -430,3 +430,18 @@ mod tests {
         assert!(validate_calendar_command(cmd).is_err());
     }
 }
+
+pub struct GrokParser;
+
+impl GrokParser {
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self)
+    }
+    
+    pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
+        match parse_natural_language(input).await {
+            Ok(command) => Ok(Some(command)),
+            Err(e) => Err(e)
+        }
+    }
+}

@@ -17,6 +17,7 @@ pub mod todo;
 pub mod utils;
 pub mod validation;
 pub mod zoom;
+pub mod api_server;
 
 use log::*;
 use std::path::PathBuf;

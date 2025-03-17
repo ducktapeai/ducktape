@@ -13,6 +13,22 @@ use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
+// Add a struct for the parser
+pub struct OpenAIParser;
+
+impl OpenAIParser {
+    pub fn new() -> anyhow::Result<Self> {
+        Ok(Self)
+    }
+    
+    pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
+        match parse_natural_language(input).await {
+            Ok(command) => Ok(Some(command)),
+            Err(e) => Err(e)
+        }
+    }
+}
+
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
