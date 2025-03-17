@@ -32,11 +32,18 @@ impl Application {
     }
 
     pub async fn run(&self) -> Result<()> {
-        // Initialize logging
-        init_logger();
-
         log::info!("Starting DuckTape Terminal");
-        let _config = Config::load()?;
+        let config = Config::load()?;
+        
+        // Start the API server in a background thread
+        log::info!("Starting API server on port 3000");
+        let config_clone = config.clone();
+        let api_handle = tokio::spawn(async move {
+            if let Err(e) = crate::api_server::start_api_server(config_clone).await {
+                log::error!("API server error: {:?}", e);
+            }
+        });
+        
         let mut rl = DefaultEditor::new()?;
         
         println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
@@ -64,6 +71,9 @@ impl Application {
                 }
             }
         }
+        
+        // Signal API server to shutdown if needed
+        api_handle.abort();
         
         Ok(())
     }
