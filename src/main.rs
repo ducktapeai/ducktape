@@ -16,6 +16,7 @@ mod state;
 mod todo;
 mod zoom;
 mod api_server;
+mod command_parser;
 
 use anyhow::Result;
 use app::Application;
@@ -30,6 +31,8 @@ use axum::{
 };
 use tower_http::cors::{CorsLayer, Any};
 use std::net::SocketAddr;
+use command_parser::{UserMessage, process_command};
+use serde_json;
 
 // Simple logging function
 fn log(msg: &str) {
@@ -48,16 +51,18 @@ async fn handle_socket(mut socket: WebSocket) {
         match msg {
             Ok(Message::Text(text)) => {
                 log(&format!("Received text message: {}", text));
-                // Echo the message back to the client
-                if let Err(e) = socket.send(Message::Text(text)).await {
-                    log(&format!("Error sending response: {}", e));
-                }
+                handle_command(&mut socket, text).await;
             }
             Ok(Message::Binary(bin)) => {
                 log("Received binary message");
-                // Echo the binary message back
-                if let Err(e) = socket.send(Message::Binary(bin)).await {
-                    log(&format!("Error sending response: {}", e));
+                if let Ok(text) = String::from_utf8(bin.clone()) {
+                    log(&format!("Binary content: {}", text));
+                    handle_command(&mut socket, text).await;
+                } else {
+                    // Echo the binary message back
+                    if let Err(e) = socket.send(Message::Binary(bin)).await {
+                        log(&format!("Error sending response: {}", e));
+                    }
                 }
             }
             Ok(Message::Ping(_)) => {
@@ -75,6 +80,35 @@ async fn handle_socket(mut socket: WebSocket) {
             Err(e) => {
                 log(&format!("Error receiving message: {}", e));
                 break;
+            }
+        }
+    }
+}
+
+async fn handle_command(socket: &mut WebSocket, text: String) {
+    match serde_json::from_str::<UserMessage>(&text) {
+        Ok(message) => {
+            log(&format!("Processing command: {}", message.content));
+            let response = process_command(message);
+            
+            match serde_json::to_string(&response) {
+                Ok(json) => {
+                    if let Err(e) = socket.send(Message::Text(json)).await {
+                        log(&format!("Error sending response: {}", e));
+                    }
+                },
+                Err(e) => {
+                    log(&format!("Error serializing response: {}", e));
+                    if let Err(e) = socket.send(Message::Text("Error processing command".to_string())).await {
+                        log(&format!("Error sending error message: {}", e));
+                    }
+                }
+            }
+        },
+        Err(e) => {
+            log(&format!("Error parsing user message: {}", e));
+            if let Err(e) = socket.send(Message::Text("Invalid message format".to_string())).await {
+                log(&format!("Error sending error message: {}", e));
             }
         }
     }
