@@ -24,9 +24,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 
 pub async fn run(_config_path: Option<PathBuf>) -> Result<()> {
-    // Initialize error handling
-    init_logger();
-
     // Create and run the application
     let app = app::Application::new();
     info!("Initializing DuckTape application");

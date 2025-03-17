@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     #[serde(default)]
     pub calendar: CalendarConfig,
@@ -16,25 +16,25 @@ pub struct Config {
     pub language_model: LanguageModelConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct CalendarConfig {
     pub default_calendar: Option<String>,
     pub default_reminder_minutes: Option<i32>,
     pub default_duration_minutes: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct TodoConfig {
     pub default_list: Option<String>,
     pub default_reminder: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct NotesConfig {
     pub default_folder: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum LLMProvider {
     OpenAI,
@@ -48,7 +48,7 @@ impl Default for LLMProvider {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LanguageModelConfig {
     pub provider: LLMProvider,
 }

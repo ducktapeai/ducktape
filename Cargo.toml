@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "A terminal-based calendar management tool"
+default-run = "ducktape"  # Add this line to set the default binary
 
 [dependencies]
 rustyline = "11.0.0"
