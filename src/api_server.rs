@@ -331,55 +331,82 @@ async fn handle_socket(mut socket: WebSocket) {
         }
     }
     
-    while let Some(msg) = socket.recv().await {
-        match msg {
-            Ok(Message::Text(text)) => {
-                info!("WebSocket[{}]: Received text message ({} bytes)", connection_id, text.len());
-                debug!("WebSocket[{}]: Message content: {}", connection_id, text);
-                
-                process_message(connection_id, text, &mut socket).await;
-            },
-            Ok(Message::Binary(bin)) => {
-                info!("WebSocket[{}]: Received binary message of {} bytes", connection_id, bin.len());
-                
-                match String::from_utf8(bin) {
-                    Ok(text) => {
-                        debug!("WebSocket[{}]: Decoded binary content: {}", connection_id, text);
+    // Set up a heartbeat timer using socket.ping()
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(45));
+    
+    loop {
+        tokio::select! {
+            // Wait for the next interval tick and send a ping
+            _ = interval.tick() => {
+                debug!("WebSocket[{}]: Sending ping", connection_id);
+                if let Err(e) = socket.send(Message::Ping(Vec::new())).await {
+                    error!("WebSocket[{}]: Failed to send ping: {}", connection_id, e);
+                    break;
+                }
+            }
+            
+            // Wait for a message from the client
+            msg_result = socket.recv() => {
+                match msg_result {
+                    Some(Ok(Message::Text(text))) => {
+                        info!("WebSocket[{}]: Received text message ({} bytes)", connection_id, text.len());
+                        debug!("WebSocket[{}]: Message content: {}", connection_id, text);
+                        
                         process_message(connection_id, text, &mut socket).await;
                     },
-                    Err(e) => {
-                        error!("WebSocket[{}]: Failed to decode binary as UTF-8: {}", connection_id, e);
-                        // Send error response
-                        let response = WebSocketResponse {
-                            success: false,
-                            message: "Could not decode binary data as UTF-8".to_string(),
-                            data: None,
-                        };
+                    Some(Ok(Message::Binary(bin))) => {
+                        info!("WebSocket[{}]: Received binary message of {} bytes", connection_id, bin.len());
                         
-                        if let Ok(json) = serde_json::to_string(&response) {
-                            if let Err(e) = socket.send(Message::Text(json)).await {
-                                error!("WebSocket[{}]: Error sending error response: {}", connection_id, e);
+                        match String::from_utf8(bin) {
+                            Ok(text) => {
+                                debug!("WebSocket[{}]: Decoded binary content: {}", connection_id, text);
+                                process_message(connection_id, text, &mut socket).await;
+                            },
+                            Err(e) => {
+                                error!("WebSocket[{}]: Failed to decode binary as UTF-8: {}", connection_id, e);
+                                // Send error response
+                                let response = WebSocketResponse {
+                                    success: false,
+                                    message: "Could not decode binary data as UTF-8".to_string(),
+                                    data: None,
+                                };
+                                
+                                if let Ok(json) = serde_json::to_string(&response) {
+                                    if let Err(e) = socket.send(Message::Text(json)).await {
+                                        error!("WebSocket[{}]: Error sending error response: {}", connection_id, e);
+                                    }
+                                }
                             }
                         }
+                    },
+                    Some(Ok(Message::Ping(data))) => {
+                        debug!("WebSocket[{}]: Received ping, sending pong", connection_id);
+                        if let Err(e) = socket.send(Message::Pong(data)).await {
+                            error!("WebSocket[{}]: Failed to send pong: {}", connection_id, e);
+                        }
+                    },
+                    Some(Ok(Message::Pong(_))) => {
+                        debug!("WebSocket[{}]: Received pong", connection_id);
+                    },
+                    Some(Ok(Message::Close(reason))) => {
+                        if let Some(r) = reason {
+                            info!("WebSocket[{}]: Connection closed by client with code {} and reason: {}", 
+                                  connection_id, r.code, r.reason);
+                        } else {
+                            // Fix: Add the connection_id to the format string
+                            info!("WebSocket[{}]: Connection closed by client", connection_id);
+                        }
+                        break;
+                    },
+                    Some(Err(e)) => {
+                        error!("WebSocket[{}]: Communication error: {}", connection_id, e);
+                        break;
+                    },
+                    None => {
+                        info!("WebSocket[{}]: Connection closed (no more messages)", connection_id);
+                        break;
                     }
                 }
-            },
-            Ok(Message::Close(reason)) => {
-                if let Some(r) = reason {
-                    info!("WebSocket[{}]: Connection closed by client with code {} and reason: {}", 
-                          connection_id, r.code, r.reason);
-                } else {
-                    // Fix: Add the connection_id to the format string
-                    info!("WebSocket[{}]: Connection closed by client", connection_id);
-                }
-                break;
-            },
-            Err(e) => {
-                error!("WebSocket[{}]: Communication error: {}", connection_id, e);
-                break;
-            },
-            _ => {
-                debug!("WebSocket[{}]: Received ping/pong message", connection_id);
             }
         }
     }
