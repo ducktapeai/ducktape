@@ -6,3 +6,5 @@ target/
 *.rs.bk
 *.logtarget/
 .DS_Store
+
+# ignore .env files
