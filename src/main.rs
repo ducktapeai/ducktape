@@ -17,6 +17,7 @@ mod todo;
 mod zoom;
 mod api_server;
 mod command_parser;
+mod env_debug;
 
 use anyhow::Result;
 use app::Application;
@@ -29,6 +30,14 @@ use serde_json;
 async fn main() -> Result<()> {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    
+    // Load environment variables at startup
+    if let Err(e) = dotenv::dotenv() {
+        println!("Warning: Failed to load .env file: {}", e);
+    }
+    
+    // Force set the API key
+    env_debug::force_set_api_key();
     
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
