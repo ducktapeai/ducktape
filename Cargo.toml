@@ -33,6 +33,7 @@ tower-http = { version = "0.5.0", features = ["cors"] }
 futures = "0.3.28"  # For working with async streams
 uuid = { version = "1.6.0", features = ["v4"] }
 async-trait = "0.1.74"
+dotenv = "0.15.0"  # Add these lines to your dependencies section
 
 # Zoom API Integration
 oauth2 = "4.4.1"
