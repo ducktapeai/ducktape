@@ -19,11 +19,12 @@ use uuid::Uuid;
 // use tokio::sync::mpsc;
 // use crate::app::Application;
 
-use crate::calendar::{EventConfig, create_event, get_available_calendars, validate_email};
+use crate::calendar::{EventConfig, create_event, get_available_calendars, validate_email, import_csv_events, import_ics_events};
 use crate::todo::{TodoConfig, create_todo};
 use crate::notes::{NoteConfig, create_note};
 use crate::config::Config;
 use crate::grok_parser;
+use std::path::Path;
 // Remove this unused import:
 // use crate::commands;
 
@@ -431,133 +432,237 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                         Ok(command) => {
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
                             
-                            // Extract calendar event details from the command
-                            if command.contains("calendar create") {
-                                info!("WebSocket[{}]: Executing calendar create command", connection_id);
-                                
-                                // Parse the command into arguments
-                                match crate::commands::CommandArgs::parse(&command) {
-                                    Ok(args) => {
-                                        // Log the parsed args to help debug
-                                        info!("WebSocket[{}]: Parsed args: command={}, args={:?}, flags={:?}", 
-                                              connection_id, args.command, args.args, args.flags);
-                                        
-                                        // For calendar create commands, we need to handle them specially
-                                        if args.command == "calendar" && args.args.get(0).map(|s| s.as_str()) == Some("create") {
-                                            // Skip "create" (which is args[0]) and process the rest of the args
-                                            if args.args.len() >= 4 { // Needs at least title, date, start_time
-                                                let title = &args.args[1]; // "title" is the second arg
-                                                let date = &args.args[2];  // Date is the third arg
-                                                let start_time = &args.args[3]; // Start time is the fourth arg
+                            // Parse the command into arguments
+                            match crate::commands::CommandArgs::parse(&command) {
+                                Ok(args) => {
+                                    // Log the parsed args to help debug
+                                    info!("WebSocket[{}]: Parsed args: command={}, args={:?}, flags={:?}", 
+                                          connection_id, args.command, args.args, args.flags);
+                                    
+                                    if args.command == "calendar" {
+                                        // Handle different calendar subcommands
+                                        match args.args.get(0).map(|s| s.as_str()) {
+                                            Some("create") => {
+                                                // Existing calendar create command handling...
+                                                // Skip "create" (which is args[0]) and process the rest of the args
+                                                if args.args.len() >= 4 { // Needs at least title, date, start_time
+                                                    let title = &args.args[1]; // "title" is the second arg
+                                                    let date = &args.args[2];  // Date is the third arg
+                                                    let start_time = &args.args[3]; // Start time is the fourth arg
+                                                    
+                                                    // End time and calendar are optional
+                                                    let end_time = args.args.get(4).map(|s| s.as_str());
+                                                    let calendar = args.args.get(5).map(|s| s.as_str());
+                                                    
+                                                    info!("WebSocket[{}]: Creating event: {} on {} at {}", 
+                                                          connection_id, title.trim_matches('"'), date, start_time);
+                                                    
+                                                    // Create the event config
+                                                    let mut config = crate::calendar::EventConfig::new(
+                                                        title, date, start_time
+                                                    );
+                                                    
+                                                    // Set optional fields
+                                                    if let Some(end) = end_time {
+                                                        config.end_time = Some(end.to_string());
+                                                    }
+                                                    
+                                                    if let Some(cal) = calendar {
+                                                        let cal_str = cal.trim_matches('"');
+                                                        config.calendars = vec![cal_str.to_string()];
+                                                    }
+                                                    
+                                                    // Handle the email flag
+                                                    if let Some(Some(emails_str)) = args.flags.get("--email") {
+                                                        let emails: Vec<String> = emails_str
+                                                            .split(',')
+                                                            .map(|e| e.trim().trim_matches('"').to_string())
+                                                            .collect();
+                                                            
+                                                        if !emails.is_empty() {
+                                                            info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
+                                                            config.emails = emails;
+                                                        }
+                                                    }
+                                                    
+                                                    // Handle the zoom flag
+                                                    if args.flags.contains_key("--zoom") {
+                                                        info!("WebSocket[{}]: Enabling Zoom meeting creation", connection_id);
+                                                        config.create_zoom_meeting = true;
+                                                    }
+                                                    
+                                                    // Execute the calendar creation
+                                                    match crate::calendar::create_event(config).await {
+                                                        Ok(_) => {
+                                                            info!("WebSocket[{}]: Event created successfully", connection_id);
+                                                            let response = SwiftChatMessage {
+                                                                sender: "ducktape".to_string(),
+                                                                content: format!(
+                                                                    "✅ Created event \"{}\" for {} at {}", 
+                                                                    title.trim_matches('"'), date, start_time
+                                                                ),
+                                                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                message_type: "chat".to_string(),
+                                                            };
+                                                            send_response(socket, response).await;
+                                                        },
+                                                        Err(e) => {
+                                                            error!("WebSocket[{}]: Failed to create event: {}", connection_id, e);
+                                                            let response = SwiftChatMessage {
+                                                                sender: "ducktape".to_string(),
+                                                                content: format!("❌ Failed to create event: {}", e),
+                                                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                                                message_type: "error".to_string(),
+                                                            };
+                                                            send_response(socket, response).await;
+                                                        }
+                                                    }
+                                                } else {
+                                                    error!("WebSocket[{}]: Invalid command format - not enough arguments", connection_id);
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: "❌ Invalid command format".to_string(),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "error".to_string(),
+                                                    };
+                                                    send_response(socket, response).await;
+                                                }
+                                            },
+                                            Some("import") => {
+                                                // Handle calendar import command
+                                                info!("WebSocket[{}]: Processing calendar import command", connection_id);
                                                 
-                                                // End time and calendar are optional
-                                                let end_time = args.args.get(4).map(|s| s.as_str());
-                                                let calendar = args.args.get(5).map(|s| s.as_str());
-                                                
-                                                info!("WebSocket[{}]: Creating event: {} on {} at {}", 
-                                                      connection_id, title.trim_matches('"'), date, start_time);
-                                                
-                                                // Create the event config
-                                                let mut config = crate::calendar::EventConfig::new(
-                                                    title, date, start_time
-                                                );
-                                                
-                                                // Set optional fields
-                                                if let Some(end) = end_time {
-                                                    config.end_time = Some(end.to_string());
+                                                if args.args.len() < 2 {
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: "❌ Usage: calendar import \"<file_path>\" [--format csv|ics] [--calendar \"<calendar_name>\"]".to_string(),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "error".to_string(),
+                                                    };
+                                                    send_response(socket, response).await;
+                                                    return;
                                                 }
                                                 
-                                                if let Some(cal) = calendar {
-                                                    let cal_str = cal.trim_matches('"');
-                                                    config.calendars = vec![cal_str.to_string()];
-                                                }
+                                                // Get the file path and expand it if needed
+                                                let mut file_path_str = args.args[1].clone();
+                                                file_path_str = file_path_str.trim_matches('"').to_string();
                                                 
-                                                // Handle the email flag
-                                                if let Some(Some(emails_str)) = args.flags.get("--email") {
-                                                    let emails: Vec<String> = emails_str
-                                                        .split(',')
-                                                        .map(|e| e.trim().trim_matches('"').to_string())
-                                                        .collect();
-                                                        
-                                                    if !emails.is_empty() {
-                                                        info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
-                                                        config.emails = emails;
+                                                // Expand tilde to home directory
+                                                if file_path_str.starts_with('~') {
+                                                    if let Some(home_dir) = dirs::home_dir() {
+                                                        file_path_str = file_path_str.replacen("~", home_dir.to_string_lossy().as_ref(), 1);
                                                     }
                                                 }
                                                 
-                                                // Handle the zoom flag
-                                                if args.flags.contains_key("--zoom") {
-                                                    info!("WebSocket[{}]: Enabling Zoom meeting creation", connection_id);
-                                                    config.create_zoom_meeting = true;
+                                                let file_path = Path::new(&file_path_str);
+                                                
+                                                if !file_path.exists() {
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: format!("❌ File not found: {}", file_path_str),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "error".to_string(),
+                                                    };
+                                                    send_response(socket, response).await;
+                                                    return;
                                                 }
                                                 
-                                                // Execute the calendar creation
-                                                match crate::calendar::create_event(config).await {
+                                                // Get format from --format flag, default to csv
+                                                let format = args.flags.get("--format")
+                                                    .and_then(|f| f.as_ref())
+                                                    .map(|f| f.to_lowercase())
+                                                    .unwrap_or_else(|| "csv".to_string());
+                                                
+                                                if !["csv", "ics"].contains(&format.as_str()) {
+                                                    let response = SwiftChatMessage {
+                                                        sender: "ducktape".to_string(),
+                                                        content: "❌ Unsupported format. Use --format csv or --format ics".to_string(),
+                                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                                        message_type: "error".to_string(),
+                                                    };
+                                                    send_response(socket, response).await;
+                                                    return;
+                                                }
+                                                
+                                                // Get target calendar if specified
+                                                let calendar = args.flags.get("--calendar")
+                                                    .and_then(|c| c.as_ref())
+                                                    .map(|c| c.trim_matches('"').to_string());
+                                                
+                                                info!("WebSocket[{}]: Importing {} file: {} to calendar: {:?}", 
+                                                      connection_id, format, file_path_str, calendar);
+                                                
+                                                // Call the appropriate import function
+                                                let result = match format.as_str() {
+                                                    "csv" => import_csv_events(file_path, calendar).await,
+                                                    "ics" => import_ics_events(file_path, calendar).await,
+                                                    _ => unreachable!()
+                                                };
+                                                
+                                                match result {
                                                     Ok(_) => {
-                                                        info!("WebSocket[{}]: Event created successfully", connection_id);
                                                         let response = SwiftChatMessage {
                                                             sender: "ducktape".to_string(),
-                                                            content: format!(
-                                                                "✅ Created event \"{}\" for {} at {}", 
-                                                                title.trim_matches('"'), date, start_time
-                                                            ),
+                                                            content: format!("✅ Successfully imported events from {}", file_path_str),
                                                             timestamp: chrono::Utc::now().to_rfc3339(),
-                                                            message_type: "chat".to_string(),  // Add message type
+                                                            message_type: "chat".to_string(),
                                                         };
                                                         send_response(socket, response).await;
                                                     },
                                                     Err(e) => {
-                                                        error!("WebSocket[{}]: Failed to create event: {}", connection_id, e);
+                                                        error!("WebSocket[{}]: Failed to import events: {}", connection_id, e);
                                                         let response = SwiftChatMessage {
                                                             sender: "ducktape".to_string(),
-                                                            content: format!("❌ Failed to create event: {}", e),
+                                                            content: format!("❌ Failed to import events: {}", e),
                                                             timestamp: chrono::Utc::now().to_rfc3339(),
-                                                            message_type: "error".to_string(),  // Add error message type
+                                                            message_type: "error".to_string(),
                                                         };
                                                         send_response(socket, response).await;
                                                     }
                                                 }
-                                            } else {
-                                                error!("WebSocket[{}]: Invalid command format - not enough arguments", connection_id);
+                                            },
+                                            Some(cmd) => {
+                                                // Handle other calendar commands (list, delete, etc.)
+                                                // This is a placeholder for other commands
                                                 let response = SwiftChatMessage {
                                                     sender: "ducktape".to_string(),
-                                                    content: "❌ Invalid command format".to_string(),
+                                                    content: format!("Command '{}' parsed but not yet implemented in WebSocket server", cmd),
                                                     timestamp: chrono::Utc::now().to_rfc3339(),
-                                                    message_type: "error".to_string(),  // Add error message type
+                                                    message_type: "chat".to_string(),
+                                                };
+                                                send_response(socket, response).await;
+                                            },
+                                            None => {
+                                                let response = SwiftChatMessage {
+                                                    sender: "ducktape".to_string(),
+                                                    content: "❌ Invalid calendar command format".to_string(),
+                                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                                    message_type: "error".to_string(),
                                                 };
                                                 send_response(socket, response).await;
                                             }
-                                        } else {
-                                            // For other command types
-                                            let response = SwiftChatMessage {
-                                                sender: "ducktape".to_string(),
-                                                content: format!("Command parsed but not executed: {}", command),
-                                                timestamp: chrono::Utc::now().to_rfc3339(),
-                                                message_type: "chat".to_string(),  // Add message type
-                                            };
-                                            send_response(socket, response).await;
                                         }
-                                    },
-                                    Err(e) => {
-                                        error!("WebSocket[{}]: Failed to parse command arguments: {}", connection_id, e);
+                                    } else {
+                                        // For other command types (todo, notes, etc.)
                                         let response = SwiftChatMessage {
                                             sender: "ducktape".to_string(),
-                                            content: format!("❌ Failed to parse command: {}. Raw command was: {}", e, command),
+                                            content: format!("Command '{}' parsed but not yet implemented in WebSocket server", args.command),
                                             timestamp: chrono::Utc::now().to_rfc3339(),
-                                            message_type: "error".to_string(),  // Add error message type
+                                            message_type: "chat".to_string(),
                                         };
                                         send_response(socket, response).await;
                                     }
+                                },
+                                Err(e) => {
+                                    error!("WebSocket[{}]: Failed to parse command arguments: {}", connection_id, e);
+                                    let response = SwiftChatMessage {
+                                        sender: "ducktape".to_string(),
+                                        content: format!("❌ Failed to parse command: {}. Raw command was: {}", e, command),
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        message_type: "error".to_string(),
+                                    };
+                                    send_response(socket, response).await;
                                 }
-                            } else {
-                                // For other command types
-                                let response = SwiftChatMessage {
-                                    sender: "ducktape".to_string(),
-                                    content: format!("Command parsed but not executed: {}", command),
-                                    timestamp: chrono::Utc::now().to_rfc3339(),
-                                    message_type: "chat".to_string(),  // Add message type
-                                };
-                                send_response(socket, response).await;
                             }
                         },
                         Err(e) => {
@@ -566,7 +671,7 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                                 sender: "ducktape".to_string(),
                                 content: format!("❌ Error: {}", e),
                                 timestamp: chrono::Utc::now().to_rfc3339(),
-                                message_type: "error".to_string(),  // Add error message type
+                                message_type: "error".to_string(),
                             };
                             send_response(socket, response).await;
                         }
@@ -579,7 +684,7 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                     sender: "bot".to_string(),
                     content: format!("You said: {}", content),
                     timestamp: chrono::Utc::now().to_rfc3339(),
-                    message_type: "chat".to_string(),  // Add message type
+                    message_type: "chat".to_string(),
                 };
                 send_response(socket, response).await;
             } else if let (Some(message_type), Some(_action), Some(data)) = (&swift_message.message_type, &swift_message.action, &swift_message.data) {
