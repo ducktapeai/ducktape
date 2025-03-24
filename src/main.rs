@@ -42,15 +42,32 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
     
-    // Check if we should start in API server mode
-    if args.len() > 1 && args[1] == "--api-server" {
-        // Load config and start API server
-        let config = Config::load()?;
-        api_server::start_api_server(config).await?;
-        return Ok(());
+    // Check command line flags
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "--api-server" => {
+                // Load config and start API server only
+                let config = Config::load()?;
+                api_server::start_api_server(config).await?;
+                return Ok(());
+            },
+            "--full" => {
+                // Start both terminal and API server (original behavior)
+                let app = Application::new();
+                app.run().await?;
+                return Ok(());
+            },
+            _ => {
+                println!("Usage: ducktape [--api-server|--full]");
+                println!("  --api-server  Start in API server mode only");
+                println!("  --full        Start both terminal and API server");
+                println!("  (no flags)    Start in terminal mode only");
+                return Ok(());
+            }
+        }
     }
     
-    // Otherwise, run the CLI application
+    // Default: Run in terminal-only mode
     let app = Application::new();
-    app.run().await
+    app.run_terminal_only().await
 }

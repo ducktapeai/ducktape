@@ -25,6 +25,27 @@ cargo build
 cargo run
 ```
 
+## Running Modes
+DuckTape can be run in three different modes:
+
+1. Terminal-only mode (default):
+```bash
+ducktape
+```
+Starts DuckTape in a terminal interface without the API server. Best for command-line usage.
+
+2. API server-only mode:
+```bash
+ducktape --api-server
+```
+Starts only the API server on port 3000. Useful for integrating with the DuckTape Desktop app or other clients.
+
+3. Full mode:
+```bash
+ducktape --full
+```
+Starts both the terminal interface and API server. Use this if you want to use both interfaces simultaneously.
+
 ## Environment Variables
 DuckTape uses several environment variables to store sensitive configuration information:
 
