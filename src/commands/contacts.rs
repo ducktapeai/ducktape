@@ -4,7 +4,7 @@ use std::pin::Pin;
 
 use crate::calendar::EventConfig;
 use crate::commands::{CommandArgs, CommandExecutor};
-use crate::contact_groups::{ContactGroup, ContactGroups, create_event_with_group};
+use crate::contact_groups::{create_event_with_group, ContactGroup, ContactGroups};
 
 /// Handle contact group commands
 pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
@@ -30,10 +30,10 @@ pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
             let group_id = args[1].to_string();
             let name = args[2].to_string();
             let contacts: Vec<String> = args[3].split(',').map(|s| s.trim().to_string()).collect();
-            let description = if args.len() > 4 { 
-                Some(args[4].to_string()) 
-            } else { 
-                None 
+            let description = if args.len() > 4 {
+                Some(args[4].to_string())
+            } else {
+                None
             };
 
             // Create and add the new group
@@ -52,7 +52,7 @@ pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
                 return Err(anyhow!("Usage: contacts remove <group_id>"));
             }
             let group_id = args[1];
-            
+
             // Remove the specified group
             let mut groups = ContactGroups::load()?;
             if let Some(_group) = groups.remove_group(group_id) {
@@ -67,7 +67,7 @@ pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
                 return Err(anyhow!("Usage: contacts show <group_id>"));
             }
             let group_id = args[1];
-            
+
             // Show details for a specific group
             let groups = ContactGroups::load()?;
             if let Some(group) = groups.get_group(group_id) {

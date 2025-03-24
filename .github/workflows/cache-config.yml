@@ -1,0 +1,42 @@
+name: Cache Config
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cache-config.yml'
+      - '**/Cargo.lock'
+      - '**/Cargo.toml'
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            ~/.rustup
+            ~/.cache/cargo-audit
+            ~/.cache/cargo-deny
+            ~/Library/Caches/org.rust-lang.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Save cache
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            ~/.rustup
+            ~/.cache/cargo-audit
+            ~/.cache/cargo-deny
+            ~/Library/Caches/org.rust-lang.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}

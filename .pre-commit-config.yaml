@@ -1,0 +1,55 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: local
+    hooks:
+      - id: rust-fmt
+        name: Rust fmt
+        entry: cargo fmt --
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: rust-clippy
+        name: Rust clippy
+        entry: cargo clippy -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: rust-test
+        name: Rust test
+        entry: cargo test
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: security-check
+        name: Security check
+        entry: ./security-check.sh
+        language: system
+        pass_filenames: false
+
+      - id: check-env
+        name: Check .env files
+        entry: python -c 'import sys, os; sys.exit(0 if all(all(l.strip() and not l.strip().startswith("#") and "=" in l for l in open(f)) for f in [".env.example"]) else 1)'
+        language: system
+        files: \.env\.example$
+
+      - id: cargo-audit
+        name: Cargo audit
+        entry: cargo audit
+        language: system
+        pass_filenames: false
+        stages: [push]

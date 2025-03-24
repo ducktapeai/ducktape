@@ -1,10 +1,10 @@
-use anyhow::Result;
 use anyhow::anyhow;
-use std::path::PathBuf;
-use std::process::Command;
+use anyhow::Result;
+use chrono::Local;
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
-use chrono::Local;
+use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct NoteConfig<'a> {
@@ -27,9 +27,10 @@ impl<'a> NoteConfig<'a> {
 fn escape_applescript_string(input: &str) -> String {
     // First replace double quotes with escaped quotes for AppleScript
     let escaped = input.replace("\"", "\"\"");
-    
+
     // Remove any control characters that could interfere with AppleScript execution
-    escaped.chars()
+    escaped
+        .chars()
         .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
         .collect::<String>()
 }
@@ -117,8 +118,7 @@ struct Note {
 // Rest of unused functions can be removed if not needed for future development
 #[allow(dead_code)]
 pub fn create_note_local(title: &str, content: &str, tags: &[String]) -> Result<()> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
     let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);
@@ -205,8 +205,7 @@ pub fn create_note_apple(config: NoteConfig) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn list_notes_local() -> Result<()> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
     let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);
@@ -275,8 +274,7 @@ pub fn read_note_local(title: &str) -> Result<()> {
 
 #[allow(dead_code)]
 fn get_notes_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
     let mut notes_dir = home_dir;
     notes_dir.push(".ducktape");
     notes_dir.push(NOTES_DIR);

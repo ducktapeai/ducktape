@@ -1,9 +1,9 @@
-use anyhow::Result;
 use crate::commands::{CommandArgs, CommandExecutor};
+use crate::state::{self, TodoItem};
+use crate::todo;
+use anyhow::Result;
 use std::future::Future;
 use std::pin::Pin;
-use crate::todo;
-use crate::state::{self, TodoItem};
 
 pub struct TodoCommand;
 

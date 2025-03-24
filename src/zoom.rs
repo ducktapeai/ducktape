@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use log::{debug, error, info};
 use reqwest::Client;
-use secrecy::{Secret, ExposeSecret};
+use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::str::FromStr;
@@ -22,11 +22,11 @@ impl ZoomCredentials {
         let account_id = env::var("ZOOM_ACCOUNT_ID")
             .map(Secret::new)
             .map_err(|_| anyhow!("ZOOM_ACCOUNT_ID not found in environment"))?;
-        
+
         let client_id = env::var("ZOOM_CLIENT_ID")
             .map(Secret::new)
             .map_err(|_| anyhow!("ZOOM_CLIENT_ID not found in environment"))?;
-        
+
         let client_secret = env::var("ZOOM_CLIENT_SECRET")
             .map(Secret::new)
             .map_err(|_| anyhow!("ZOOM_CLIENT_SECRET not found in environment"))?;
@@ -57,15 +57,18 @@ impl ZoomCredentials {
 
         let client = Client::new();
         let token_url = "https://zoom.us/oauth/token";
-        
+
         // Log the request for debugging
-        debug!("Requesting Zoom OAuth token with account_id: {}", self.account_id.expose_secret());
-        
+        debug!(
+            "Requesting Zoom OAuth token with account_id: {}",
+            self.account_id.expose_secret()
+        );
+
         let response = client
             .post(token_url)
             .basic_auth(
                 self.client_id.expose_secret(),
-                Some(self.client_secret.expose_secret())
+                Some(self.client_secret.expose_secret()),
             )
             .form(&[
                 ("grant_type", "account_credentials"),
@@ -77,12 +80,14 @@ impl ZoomCredentials {
         // Check for errors and provide more detailed error messages
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unable to get error response".into());
-            
+
             // Log the full error for debugging
             error!("Zoom OAuth error response: {}", error_text);
-            
+
             // Check for common error conditions
             let error_message = if error_text.contains("invalid_client") {
                 "Invalid Zoom credentials. Please verify your Account ID, Client ID and Client Secret are correct and the app is enabled in Zoom Marketplace."
@@ -91,7 +96,7 @@ impl ZoomCredentials {
             } else {
                 &error_text
             };
-            
+
             return Err(anyhow!("Zoom OAuth error ({}): {}", status, error_message));
         }
 
@@ -107,8 +112,13 @@ impl ZoomCredentials {
             expires_in: u64,
         }
 
-        let token_data: TokenResponse = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow!("Failed to parse OAuth response: {} - Response was: {}", e, response_text))?;
+        let token_data: TokenResponse = serde_json::from_str(&response_text).map_err(|e| {
+            anyhow!(
+                "Failed to parse OAuth response: {} - Response was: {}",
+                e,
+                response_text
+            )
+        })?;
 
         // Store and return the token
         self.access_token = Some(Secret::new(token_data.access_token.clone()));
@@ -156,20 +166,29 @@ impl ZoomClient {
             .build()
             .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
-        Ok(Self { credentials, client })
+        Ok(Self {
+            credentials,
+            client,
+        })
     }
 
     // Create a Zoom meeting
-    pub async fn create_meeting(&mut self, options: ZoomMeetingOptions) -> Result<ZoomMeetingResponse> {
+    pub async fn create_meeting(
+        &mut self,
+        options: ZoomMeetingOptions,
+    ) -> Result<ZoomMeetingResponse> {
         debug!("Creating Zoom meeting with topic: {}", options.topic);
-        
+
         // Get access token
         let token = self.credentials.get_access_token().await?;
-        
+
         // Sanitize input data
         let sanitized_topic = sanitize_zoom_field(&options.topic, 200);
-        let sanitized_agenda = options.agenda.as_deref().map(|a| sanitize_zoom_field(a, 2000));
-        
+        let sanitized_agenda = options
+            .agenda
+            .as_deref()
+            .map(|a| sanitize_zoom_field(a, 2000));
+
         // Construct request body
         let body = serde_json::json!({
             "topic": sanitized_topic,
@@ -190,7 +209,8 @@ impl ZoomClient {
 
         // Make the API call
         let url = format!("{}/users/me/meetings", ZOOM_API_BASE);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
@@ -202,14 +222,18 @@ impl ZoomClient {
         // Check for errors
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unable to get error response".into());
             error!("Zoom API error: {} - {}", status, error_text);
             return Err(anyhow!("Zoom API error ({}): {}", status, error_text));
         }
 
         // Parse response
-        let meeting: ZoomMeetingResponse = response.json().await
+        let meeting: ZoomMeetingResponse = response
+            .json()
+            .await
             .map_err(|e| anyhow!("Failed to parse Zoom API response: {}", e))?;
 
         info!("Successfully created Zoom meeting: {}", meeting.id);
@@ -219,13 +243,14 @@ impl ZoomClient {
     #[allow(dead_code)]
     pub async fn delete_meeting(&mut self, meeting_id: u64) -> Result<()> {
         debug!("Deleting Zoom meeting: {}", meeting_id);
-        
+
         // Get access token
         let token = self.credentials.get_access_token().await?;
-        
+
         // Make the API call
         let url = format!("{}/meetings/{}", ZOOM_API_BASE, meeting_id);
-        let response = self.client
+        let response = self
+            .client
             .delete(&url)
             .header("Authorization", format!("Bearer {}", token))
             .send()
@@ -235,7 +260,9 @@ impl ZoomClient {
         // Check for errors
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unable to get error response".into());
             error!("Zoom API error: {} - {}", status, error_text);
             return Err(anyhow!("Zoom API error ({}): {}", status, error_text));
@@ -246,32 +273,42 @@ impl ZoomClient {
     }
 
     #[allow(dead_code)]
-    async fn make_request(&mut self, endpoint: &str, method: &str, body: Option<&str>) -> Result<String> {
+    async fn make_request(
+        &mut self,
+        endpoint: &str,
+        method: &str,
+        body: Option<&str>,
+    ) -> Result<String> {
         let token = self.credentials.get_access_token().await?;
         let url = format!("{}{}", ZOOM_API_BASE, endpoint);
-        
-        let mut request = self.client
+
+        let mut request = self
+            .client
             .request(reqwest::Method::from_str(method)?, &url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json");
-            
+
         if let Some(body_str) = body {
             request = request.body(body_str.to_string());
         }
-        
+
         let response = request
             .send()
             .await
             .map_err(|e| anyhow!("Failed to send request: {}", e))?;
-            
+
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unable to get error response".into());
             return Err(anyhow!("API error ({}): {}", status, error_text));
         }
-        
-        response.text().await
+
+        response
+            .text()
+            .await
             .map_err(|e| anyhow!("Failed to read response body: {}", e))
     }
 }
@@ -286,7 +323,7 @@ fn sanitize_zoom_field(input: &str, max_length: usize) -> String {
         .chars()
         .take(max_length)
         .collect();
-    
+
     filtered
 }
 
@@ -297,9 +334,9 @@ pub fn format_zoom_time(date: &str, time: &str) -> Result<String> {
         .map_err(|_| anyhow!("Invalid date format"))?
         .and_time(
             chrono::NaiveTime::parse_from_str(time, "%H:%M")
-                .map_err(|_| anyhow!("Invalid time format"))?
+                .map_err(|_| anyhow!("Invalid time format"))?,
         );
-    
+
     // Format for Zoom API: "2023-10-24T14:30:00Z"
     Ok(dt.format("%Y-%m-%dT%H:%M:00Z").to_string())
 }
@@ -308,19 +345,22 @@ pub fn format_zoom_time(date: &str, time: &str) -> Result<String> {
 pub fn calculate_meeting_duration(start_time: &str, end_time: &str) -> Result<u32> {
     let start = chrono::NaiveTime::parse_from_str(start_time, "%H:%M")
         .map_err(|_| anyhow!("Invalid start time format"))?;
-    
+
     let end = chrono::NaiveTime::parse_from_str(end_time, "%H:%M")
         .map_err(|_| anyhow!("Invalid end time format"))?;
-    
+
     // Calculate duration in minutes
     let duration_minutes = if end > start {
         (end - start).num_minutes() as u32
     } else {
         // If end time is earlier than start time, assume it's the next day
-        (end.signed_duration_since(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()) + 
-         chrono::NaiveTime::from_hms_opt(24, 0, 0).unwrap().signed_duration_since(start)).num_minutes() as u32
+        (end.signed_duration_since(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+            + chrono::NaiveTime::from_hms_opt(24, 0, 0)
+                .unwrap()
+                .signed_duration_since(start))
+        .num_minutes() as u32
     };
-    
+
     // Minimum duration is 15 minutes
     Ok(std::cmp::max(duration_minutes, 15))
 }
@@ -345,22 +385,22 @@ mod tests {
         let result = calculate_meeting_duration("14:30", "14:40").unwrap();
         assert_eq!(result, 15); // Should use minimum 15 minutes
     }
-    
+
     #[test]
     fn test_sanitize_zoom_field() {
         // Test normal input
         let result = sanitize_zoom_field("Test Meeting", 100);
         assert_eq!(result, "Test Meeting");
-        
+
         // Test trimming
         let result = sanitize_zoom_field("  Test Meeting  ", 100);
         assert_eq!(result, "Test Meeting");
-        
+
         // Test control character removal
         let input = "Test\u{007F}Meeting\u{0000}";
         let result = sanitize_zoom_field(input, 100);
         assert_eq!(result, "TestMeeting");
-        
+
         // Test max length - should truncate cleanly at word boundary
         let input = "This is a very long meeting name that exceeds the limit";
         let result = sanitize_zoom_field(input, 19);

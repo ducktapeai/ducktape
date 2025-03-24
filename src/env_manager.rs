@@ -1,119 +1,90 @@
+use log::info;
 use std::env;
-use std::fs::{self, OpenOptions, File};
-use std::io::{self, Write, BufReader, BufRead};
-use std::path::{Path, PathBuf};
-use log::{info, error, debug};
+use std::fs::{File, OpenOptions};
+use std::io::{self, Write};
+use std::path::PathBuf;
 
-// Define important environment variables
-pub const IMPORTANT_VARS: &[&str] = &[
-    "XAI_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY",
-    "ZOOM_ACCOUNT_ID", "ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET",
-    "GOOGLE_CALENDAR_CREDENTIALS"
+pub const REQUIRED_ENV_VARS: &[&str] = &[
+    "XAI_API_KEY",
+    "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "ZOOM_ACCOUNT_ID",
+    "ZOOM_CLIENT_ID",
+    "ZOOM_CLIENT_SECRET",
 ];
 
-// Hardcoded fallback API key - use yours from the environment export
-const FALLBACK_XAI_API_KEY: &str = "REMOVED-XAI-KEY";
+// Names of optional environment variables
+pub const OPTIONAL_ENV_VARS: &[&str] = &["DUCKTAPE_LOG_LEVEL", "DUCKTAPE_CONFIG_PATH"];
 
-// Get all possible locations for .env file
-fn get_env_file_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    
-    // Current directory
-    paths.push(PathBuf::from(".env"));
-    
-    // Home directory
-    if let Some(home) = dirs::home_dir() {
-        paths.push(home.join(".env"));
-    }
-    
-    // Project root directory
-    if let Ok(current_dir) = env::current_dir() {
-        paths.push(current_dir.join(".env"));
-    }
-    
-    // Add absolute path for the user's specific directory
-    paths.push(PathBuf::from("/Users/shaunstuart/RustroverProjects/ducktape/.env"));
-    
-    paths
-}
+const FALLBACK_XAI_API_KEY: &str =
+    "REMOVED-XAI-KEY";
 
-// Initialize environment variables from all possible sources
-pub fn init_environment() {
-    // First try dotenv crate
-    match dotenv::dotenv() {
-        Ok(path) => info!("Loaded environment from dotenv: {:?}", path),
-        Err(e) => debug!("Dotenv error: {}", e),
-    }
-    
-    // Then try manual loading from all possible locations
-    let paths = get_env_file_paths();
-    for path in &paths {
-        if path.exists() {
-            info!("Found .env file at {:?}", path);
-            if let Err(e) = load_env_file(path) {
-                error!("Error loading env file at {:?}: {}", path, e);
-            } else {
-                info!("Successfully loaded environment from {:?}", path);
+pub fn check_env_vars() -> bool {
+    let mut all_present = true;
+
+    for var in REQUIRED_ENV_VARS {
+        match env::var(var) {
+            Ok(val) if !val.trim().is_empty() => (),
+            _ => {
+                if var == &"XAI_API_KEY" {
+                    info!("Setting fallback XAI_API_KEY");
+                    env::set_var("XAI_API_KEY", FALLBACK_XAI_API_KEY);
+                } else {
+                    println!("❌ Missing required environment variable: {}", var);
+                    all_present = false;
+                }
             }
         }
     }
-    
-    // Apply fallbacks for critical variables
-    ensure_critical_vars();
-    
-    // Log current environment state
-    info!("Environment variables after initialization:");
-    for var in IMPORTANT_VARS {
-        let is_set = env::var(var).is_ok();
-        info!("  {}: {}", var, if is_set { "SET" } else { "NOT SET" });
+
+    all_present
+}
+
+pub fn load_env_file() -> io::Result<()> {
+    // Try to load from .env file
+    match dotenvy::dotenv() {
+        Ok(path) => {
+            info!("Loaded environment from {:?}", path);
+            Ok(())
+        }
+        Err(e) => {
+            info!("No .env file found or error loading it: {}", e);
+            create_env_template()
+        }
     }
 }
 
-// Load environment variables from a file
-fn load_env_file(path: &Path) -> io::Result<()> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    
-    for line in reader.lines() {
-        let line = line?;
-        let line = line.trim();
-        
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
-            continue;
-        }
-        
-        // Parse KEY=VALUE format
-        if let Some(pos) = line.find('=') {
-            let (key, value) = line.split_at(pos);
-            let key = key.trim();
-            // Skip the '=' character
-            let value = value[1..].trim();
-            
-            // Only set if not already set in environment
-            if env::var(key).is_err() {
-                env::set_var(key, value);
-                debug!("Set environment variable: {}", key);
-            }
-        }
+fn create_env_template() -> io::Result<()> {
+    let env_path = PathBuf::from(".env");
+
+    // Don't overwrite existing .env file
+    if env_path.exists() {
+        return Ok(());
     }
-    
+
+    let mut file = File::create(env_path)?;
+
+    // Write required variables
+    for var in REQUIRED_ENV_VARS {
+        writeln!(file, "{}=", var)?;
+    }
+
+    // Write optional variables with comments
+    for var in OPTIONAL_ENV_VARS {
+        writeln!(file, "# {}=", var)?;
+    }
+
     Ok(())
 }
 
-// Ensure critical variables have values
-fn ensure_critical_vars() {
-    // Make sure XAI_API_KEY is set
-    if env::var("XAI_API_KEY").is_err() {
-        info!("Setting fallback XAI_API_KEY");
-        env::set_var("XAI_API_KEY", FALLBACK_XAI_API_KEY);
-    }
-}
-
-// Get API key with fallback
-pub fn get_api_key(name: &str) -> String {
+pub fn get_env_var(name: &str) -> String {
     match env::var(name) {
-        Ok(value) => value,
+        Ok(value) => {
+            if name == "XAI_API_KEY" && value.trim().is_empty() {
+                return FALLBACK_XAI_API_KEY.to_string();
+            }
+            value
+        }
         Err(_) => {
             if name == "XAI_API_KEY" {
                 return FALLBACK_XAI_API_KEY.to_string();
@@ -123,36 +94,40 @@ pub fn get_api_key(name: &str) -> String {
     }
 }
 
+// Rest of the file remains unchanged...
+
 // Save environment variables to .env file
-pub fn save_environment(variables: &std::collections::HashMap<String, String>) -> io::Result<PathBuf> {
+pub fn save_environment(
+    variables: &std::collections::HashMap<String, String>,
+) -> io::Result<PathBuf> {
     // Choose appropriate location - prefer current directory
     let env_path = PathBuf::from(".env");
-    
+
     // Create or update file
     let mut content = String::new();
-    
+
     // Add each variable
     for (key, value) in variables {
         if !value.is_empty() {
             content.push_str(&format!("{}={}\n", key, value));
         }
     }
-    
+
     // Write to file
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
         .open(&env_path)?;
-    
+
     file.write_all(content.as_bytes())?;
-    
+
     // Also update process environment
     for (key, value) in variables {
         if !value.is_empty() {
             env::set_var(key, value);
         }
     }
-    
+
     Ok(env_path)
 }
