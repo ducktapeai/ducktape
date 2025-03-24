@@ -1,0 +1,37 @@
+{
+  "git": {
+    "requireCleanWorkingDir": true,
+    "requireUpstream": true,
+    "commitMessage": "chore: release v${version}",
+    "tagName": "v${version}",
+    "tagAnnotation": "Release v${version}",
+    "changelog": "git log --pretty=format:\"* %s (%h)\" ${from}...${to}"
+  },
+  "github": {
+    "release": true,
+    "releaseName": "Release ${version}",
+    "tokenRef": "GITHUB_TOKEN"
+  },
+  "npm": false,
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": "angular",
+      "infile": "CHANGELOG.md"
+    }
+  },
+  "hooks": {
+    "before:init": [
+      "cargo test",
+      "./security-check.sh",
+      "cargo fmt -- --check",
+      "cargo clippy -- -D warnings"
+    ],
+    "after:bump": [
+      "cargo build --release",
+      "cargo package"
+    ],
+    "after:release": [
+      "cargo publish"
+    ]
+  }
+}

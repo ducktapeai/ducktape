@@ -23,8 +23,6 @@ use anyhow::Result;
 use app::Application;
 use config::Config;
 use std::env;
-use command_parser::{UserMessage, process_command};
-use serde_json;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -32,7 +30,7 @@ async fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     
     // Load environment variables at startup
-    if let Err(e) = dotenv::dotenv() {
+    if let Err(e) = dotenvy::dotenv() {
         println!("Warning: Failed to load .env file: {}", e);
     }
     

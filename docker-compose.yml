@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/ducktape
+      - cargo-cache:/usr/local/cargo/registry
+    environment:
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+    env_file:
+      - .env
+    command: ["cargo", "run", "--", "--api-server"]
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/usr/src/ducktape
+      - cargo-cache:/usr/local/cargo/registry
+    environment:
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+      - TEST_REDIS_URL=redis://redis:6379
+    env_file:
+      - .env
+    command: ["cargo", "test", "--all-features"]
+    depends_on:
+      - redis
+
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/usr/src/ducktape
+      - cargo-cache:/usr/local/cargo/registry
+    command: ["./run-benchmarks.sh"]
+
+  security-check:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/usr/src/ducktape
+      - cargo-cache:/usr/local/cargo/registry
+    command: ["./security-check.sh"]
+
+volumes:
+  cargo-cache:
+  redis-data:

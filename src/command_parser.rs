@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize)]
 pub struct ParsedCommand {
@@ -11,7 +11,7 @@ pub struct ParsedCommand {
 pub struct UserMessage {
     pub content: String,
     pub timestamp: String,
-    pub id: String, 
+    pub id: String,
     pub sender: String,
 }
 
@@ -45,8 +45,9 @@ struct ScheduleCommand {
 
 fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
     // Use regex to parse the schedule command
-    let re = Regex::new(r"schedule a (\w+) (\w+) with (\w+) (\w+) at (\d+(?::\d+)?(?:am|pm)?)").ok()?;
-    
+    let re =
+        Regex::new(r"schedule a (\w+) (\w+) with (\w+) (\w+) at (\d+(?::\d+)?(?:am|pm)?)").ok()?;
+
     if let Some(caps) = re.captures(message) {
         return Some(ScheduleCommand {
             event_type: caps.get(1)?.as_str().to_string(),
@@ -56,28 +57,31 @@ fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
             time: caps.get(5)?.as_str().to_string(),
         });
     }
-    
+
     None
 }
 
 pub fn process_command(message: UserMessage) -> CommandResponse {
     let parsed = parse_command(&message.content);
-    
+
     match parsed {
         Some(cmd) => {
-            let response = format!("Processing command: {}. Details: {}", 
-                cmd.command_type, cmd.details.to_string());
-                
+            let response = format!(
+                "Processing command: {}. Details: {}",
+                cmd.command_type,
+                cmd.details.to_string()
+            );
+
             CommandResponse {
                 content: response,
                 success: true,
                 command_id: message.id,
             }
-        },
+        }
         None => CommandResponse {
             content: "Sorry, I didn't understand that command.".to_string(),
             success: false,
             command_id: message.id,
-        }
+        },
     }
 }

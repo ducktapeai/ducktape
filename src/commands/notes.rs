@@ -1,8 +1,8 @@
-use anyhow::Result;
 use crate::commands::{CommandArgs, CommandExecutor};
+use crate::notes;
+use anyhow::Result;
 use std::future::Future;
 use std::pin::Pin;
-use crate::notes;
 
 pub struct NotesCommand;
 
@@ -30,20 +30,20 @@ fn create_note(args: CommandArgs) -> Result<()> {
         println!("Usage: note \"<title>\" --content \"<content>\" [--folder \"<folder>\"]");
         return Ok(());
     }
-    
+
     let content = args
         .flags
         .get("--content")
         .and_then(|c| c.as_ref())
         .map(|s| s.as_str())
         .unwrap_or("");
-    
+
     let mut config = notes::NoteConfig::new(&args.args[0], content);
-    
+
     if let Some(folder) = args.flags.get("--folder") {
         config.folder = folder.as_deref();
     }
-    
+
     notes::create_note(config)
 }
 

@@ -27,7 +27,7 @@ pub fn create_reminder(config: ReminderConfig) -> Result<()> {
     if let Some(notes) = config.notes {
         properties.push_str(&format!(", body:\"{}\"", notes));
     }
-    
+
     let script = format!(
         r#"tell application "Reminders"
             try
@@ -39,11 +39,8 @@ pub fn create_reminder(config: ReminderConfig) -> Result<()> {
         end tell"#,
         properties
     );
-    
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()?;
+
+    let output = Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Success") {
         println!("Reminder created: {}", config.title);
@@ -65,12 +62,9 @@ pub fn list_reminders() -> Result<()> {
             return "Error: " & errMsg
         end try
     end tell"#;
-    
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()?;
-        
+
+    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Error") {
         Err(anyhow!("Failed to list reminders: {}", result))

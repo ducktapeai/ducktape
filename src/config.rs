@@ -117,7 +117,7 @@ mod tests {
     use super::*;
     use std::env;
     use tempfile::tempdir;
-    
+
     #[test]
     fn test_config_default() {
         let config = Config::default();
@@ -127,7 +127,10 @@ mod tests {
         );
         assert_eq!(config.calendar.default_reminder_minutes, Some(15));
         assert_eq!(config.todo.default_list, Some("Reminders".to_string()));
-        assert!(matches!(config.language_model.provider, LLMProvider::OpenAI));
+        assert!(matches!(
+            config.language_model.provider,
+            LLMProvider::OpenAI
+        ));
     }
 
     #[test]
@@ -135,7 +138,7 @@ mod tests {
         // Create a test config directly
         let temp_dir = tempdir()?;
         let config_path = temp_dir.path().join("config.toml");
-        
+
         // Create the test config
         let test_config = Config {
             calendar: CalendarConfig {
@@ -154,26 +157,47 @@ mod tests {
                 provider: LLMProvider::Grok,
             },
         };
-        
+
         // Serialize and write directly to file
         let content = toml::to_string_pretty(&test_config)?;
         fs::write(&config_path, content)?;
-        
+
         // Read it back using TOML parser
         let file_content = fs::read_to_string(&config_path)?;
         let loaded_config: Config = toml::from_str(&file_content)?;
-        
+
         // Verify the loaded config matches what we saved
-        assert_eq!(loaded_config.calendar.default_calendar, test_config.calendar.default_calendar);
-        assert_eq!(loaded_config.calendar.default_reminder_minutes, test_config.calendar.default_reminder_minutes);
-        assert_eq!(loaded_config.calendar.default_duration_minutes, test_config.calendar.default_duration_minutes);
-        assert_eq!(loaded_config.todo.default_list, test_config.todo.default_list);
-        assert_eq!(loaded_config.todo.default_reminder, test_config.todo.default_reminder);
-        assert_eq!(loaded_config.notes.default_folder, test_config.notes.default_folder);
-        
+        assert_eq!(
+            loaded_config.calendar.default_calendar,
+            test_config.calendar.default_calendar
+        );
+        assert_eq!(
+            loaded_config.calendar.default_reminder_minutes,
+            test_config.calendar.default_reminder_minutes
+        );
+        assert_eq!(
+            loaded_config.calendar.default_duration_minutes,
+            test_config.calendar.default_duration_minutes
+        );
+        assert_eq!(
+            loaded_config.todo.default_list,
+            test_config.todo.default_list
+        );
+        assert_eq!(
+            loaded_config.todo.default_reminder,
+            test_config.todo.default_reminder
+        );
+        assert_eq!(
+            loaded_config.notes.default_folder,
+            test_config.notes.default_folder
+        );
+
         // Test that different LLM providers are correctly serialized/deserialized
-        assert!(matches!(loaded_config.language_model.provider, LLMProvider::Grok));
-        
+        assert!(matches!(
+            loaded_config.language_model.provider,
+            LLMProvider::Grok
+        ));
+
         Ok(())
     }
 }

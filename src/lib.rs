@@ -10,25 +10,25 @@ pub mod contact_groups;
 // pub mod contacts;  // Commented out if it doesn't exist
 pub mod deepseek_parser;
 pub mod deepseek_reasoning;
-pub mod env_store;  // Add this line
-pub mod env_loader;  // Add this line
+pub mod env_loader; // Add this line
+pub mod env_store; // Add this line
 pub mod event_search;
 pub mod file_search;
 pub mod grok_parser;
 pub mod notes;
 pub mod openai_parser;
 // pub mod parsing_utils;  // Commented out if it doesn't exist
+pub mod env_manager;
 pub mod reminders;
 pub mod state;
 pub mod todo;
 pub mod utils;
 pub mod validation;
-pub mod zoom;
-pub mod env_manager; // New module
+pub mod zoom; // New module
 
+use anyhow::Result;
 use log::*;
 use std::path::PathBuf;
-use anyhow::Result;
 
 pub async fn run(_config_path: Option<PathBuf>) -> Result<()> {
     // Create and run the application

@@ -13,7 +13,12 @@ pub struct TodoConfig<'a> {
 
 impl<'a> TodoConfig<'a> {
     pub fn new(title: &'a str) -> Self {
-        Self { title, notes: None, lists: Vec::new(), reminder_time: None }
+        Self {
+            title,
+            notes: None,
+            lists: Vec::new(),
+            reminder_time: None,
+        }
     }
 }
 
@@ -21,9 +26,10 @@ impl<'a> TodoConfig<'a> {
 fn escape_applescript_string(input: &str) -> String {
     // First replace double quotes with escaped quotes for AppleScript
     let escaped = input.replace("\"", "\"\"");
-    
+
     // Remove any control characters that could interfere with AppleScript execution
-    escaped.chars()
+    escaped
+        .chars()
         .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
         .collect::<String>()
 }
@@ -43,7 +49,7 @@ pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
                 // Format as "MM/dd/yyyy hh:mm:ss AM/PM"
                 let formatted = naive_dt.format("%m/%d/%Y %I:%M:%S %p").to_string();
                 format!(", remind me date:date \"{}\"", formatted)
-            },
+            }
             Err(e) => {
                 println!("Invalid reminder time format: {}", e);
                 String::new()
@@ -59,10 +65,10 @@ pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
         let escaped_list = escape_applescript_string(list);
         let escaped_title = escape_applescript_string(config.title);
         let escaped_notes = escape_applescript_string(config.notes.as_deref().unwrap_or(""));
-        
+
         // Updated AppleScript with escaped inputs
         let script = format!(
-r#"tell application "Reminders"
+            r#"tell application "Reminders"
     try
         set remLists to lists whose name is "{}"
         if (count of remLists) > 0 then
@@ -83,10 +89,7 @@ end tell"#,
             reminder_prop
         );
 
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output()?;
+        let output = Command::new("osascript").arg("-e").arg(&script).output()?;
         let result = String::from_utf8_lossy(&output.stdout);
 
         if result.contains("Success") {

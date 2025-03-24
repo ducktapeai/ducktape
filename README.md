@@ -1,14 +1,39 @@
 # DuckTape 🦆
 
-Time possible the most important commodity. At DuckTape we recognise that.
-So we figured why dont we combine how we interact with time and mix it with a touch of AI.
-Effectively you "TimeAI"
-Our goal is ambitious, to interact naturally (lets remove the clicking in Calendars) and get to a place where suggestions happen.
-Your time, your way, with what AI thinks can help your day run smoothly. Work towards a common goal you might have.
+A terminal-based calendar management tool with natural language processing and AI integration.
 
-We have started this journey off as unified CLI (soon to be App) for Apple Calendar, Reminders, and Notes with natural language support.
+## Installation
 
-So why wait, give it some TimeAI 🦆
+From crates.io:
+```bash
+cargo install ducktape
+```
+
+From source:
+```bash
+git clone https://github.com/DuckTapeAI/ducktape.git
+cd ducktape
+cargo install --path .
+```
+
+## Quick Start
+
+1. Set up your environment variables in a `.env` file:
+```bash
+OPENAI_API_KEY=your_key_here  # Required if using OpenAI
+GROK_API_KEY=your_key_here    # Required if using Grok
+DEEPSEEK_API_KEY=your_key_here # Required if using DeepSeek
+```
+
+2. Run DuckTape:
+```bash
+ducktape
+```
+
+For API server mode:
+```bash
+ducktape --api-server
+```
 
 ## Description
 
@@ -333,3 +358,11 @@ DuckTape maintains state in the following files:
 - Never edit the generated JSON state files manually
 - Consider using application-specific passwords for calendar access if using iCloud
 - Store Zoom API credentials securely in your system keychain
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
