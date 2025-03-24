@@ -1,0 +1,40 @@
+# Development files
+.env
+.env.*
+.git/
+.github/
+.gitignore
+.pre-commit-config.yaml
+.vscode/
+.idea/
+rustfmt.toml
+deny.toml
+security-check.sh
+run-integration-tests.sh
+test-websocket.html
+
+# Documentation
+docs/development.md
+
+# Desktop app
+DucktapeDesktop/
+
+# Build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Test files
+tests/
+**/*_test.rs
+**/*.test
+
+# Temporary files
+*.swp
+*.swo
+.DS_Store
+*.log
+
+# Debug files
+*.pdb
+*.dSYM/
