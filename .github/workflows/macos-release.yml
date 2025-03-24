@@ -1,0 +1,41 @@
+name: macOS Release Testing
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - 'release/*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-matrix:
+    name: Test on macOS with Rust ${{ matrix.rust }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, beta]
+        
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust ${{ matrix.rust }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Build
+        run: cargo build --verbose
+        
+      - name: Run tests
+        run: cargo test --verbose
+        
+      - name: Test examples
+        run: cargo test --examples
