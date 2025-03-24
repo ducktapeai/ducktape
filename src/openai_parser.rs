@@ -68,7 +68,136 @@ async fn get_available_calendars() -> Result<Vec<String>> {
         .collect())
 }
 
+/// Sanitize user input to prevent injection or other security issues
+fn sanitize_user_input(input: &str) -> String {
+    input.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
+/// Validate returned calendar command for security
+fn validate_calendar_command(command: &str) -> Result<()> {
+    // Check for suspicious patterns
+    if command.contains("&&") || command.contains("|") || 
+       command.contains(";") || command.contains("`") {
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
+    }
+    
+    // Validate interval values are reasonable if present
+    if let Some(interval_idx) = command.find("--interval") {
+        let interval_part = &command[interval_idx + 10..];
+        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
+        if let Some(caps) = re.captures(interval_part) {
+            if let Some(interval_match) = caps.get(1) {
+                let interval_str = interval_match.as_str();
+                if let Ok(interval) = interval_str.parse::<u32>() {
+                    if interval > 100 {
+                        return Err(anyhow!("Unreasonably large interval value: {}", interval));
+                    }
+                }
+            }
+        }
+    }
+    
+    // Validate count values are reasonable if present
+    if let Some(count_idx) = command.find("--count") {
+        let count_part = &command[count_idx + 7..];
+        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
+        if let Some(caps) = re.captures(count_part) {
+            if let Some(count_match) = caps.get(1) {
+                let count_str = count_match.as_str();
+                if let Ok(count) = count_str.parse::<u32>() {
+                    if count > 500 {
+                        return Err(anyhow!("Unreasonably large count value: {}", count));
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Add Zoom meeting flag when zoom-related keywords are detected
+fn enhance_command_with_zoom(command: &str, input: &str) -> String {
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+    
+    let input_lower = input.to_lowercase();
+    let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
+    
+    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
+    
+    if has_zoom_keyword && !command.contains("--zoom") {
+        return format!("{} --zoom", command);
+    }
+    
+    command.to_string()
+}
+
+/// Enhance command with recurrence flags based on natural language
+fn enhance_recurrence_command(command: &str) -> String {
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+
+    let mut enhanced = command.to_string();
+    
+    // Check for recurring event keywords in the input but missing flags
+    let has_recurring_keyword = 
+        command.to_lowercase().contains("every day") ||
+        command.to_lowercase().contains("every week") ||
+        command.to_lowercase().contains("every month") ||
+        command.to_lowercase().contains("every year") ||
+        command.to_lowercase().contains("daily") ||
+        command.to_lowercase().contains("weekly") ||
+        command.to_lowercase().contains("monthly") ||
+        command.to_lowercase().contains("yearly") ||
+        command.to_lowercase().contains("annually");
+
+    // If recurring keywords found but no --repeat flag, add it
+    if has_recurring_keyword && !command.contains("--repeat") && !command.contains("--recurring") {
+        if command.contains("every day") || command.contains("daily") {
+            enhanced = format!("{} --repeat daily", enhanced);
+        } else if command.contains("every week") || command.contains("weekly") {
+            enhanced = format!("{} --repeat weekly", enhanced);
+        } else if command.contains("every month") || command.contains("monthly") {
+            enhanced = format!("{} --repeat monthly", enhanced);
+        } else if command.contains("every year") || command.contains("yearly") || command.contains("annually") {
+            enhanced = format!("{} --repeat yearly", enhanced);
+        }
+    }
+    
+    // Look for interval patterns like "every 2 weeks" and add --interval
+    let re_interval = regex::Regex::new(r"every (\d+) (day|days|week|weeks|month|months|year|years)").unwrap();
+    if let Some(caps) = re_interval.captures(&command.to_lowercase()) {
+        if let Some(interval_str) = caps.get(1) {
+            if let Ok(interval) = interval_str.as_str().parse::<u32>() {
+                if interval > 0 && interval < 100 && // Reasonable limit
+                   !command.contains("--interval") {
+                    enhanced = format!("{} --interval {}", enhanced, interval);
+                }
+            }
+        }
+    }
+    
+    enhanced
+}
+
 pub async fn parse_natural_language(input: &str) -> Result<String> {
+    // Input validation
+    if input.is_empty() {
+        return Err(anyhow!("Empty input provided"));
+    }
+    
+    if input.len() > 1000 {
+        return Err(anyhow!("Input too long (max 1000 characters)"));
+    }
+    
+    // Sanitize input
+    let sanitized_input = sanitize_user_input(input);
+
     let api_key = env::var("OPENAI_API_KEY")
         .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
 
@@ -296,7 +425,16 @@ Rules:
         }
     }
 
-    Ok(results.join("\n"))
+    // After processing commands and before returning results
+    let mut final_results = Vec::new();
+    for command in results {
+        let enhanced = enhance_recurrence_command(&command);
+        let enhanced = enhance_command_with_zoom(&enhanced, &sanitized_input);
+        validate_calendar_command(&enhanced)?;
+        final_results.push(enhanced);
+    }
+
+    Ok(final_results.join("\n"))
 }
 
 // Enhanced email extraction with improved validation
@@ -338,6 +476,87 @@ fn extract_emails(input: &str) -> Result<Vec<String>> {
 mod tests {
     use super::*;
     use tokio;
+
+    #[test]
+    fn test_sanitize_user_input() {
+        let input = "Meeting with John\u{0000} tomorrow";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Meeting with John tomorrow");
+        
+        let input = "Lunch\nmeeting";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Lunch\nmeeting");
+    }
+
+    #[test]
+    fn test_enhance_command_with_zoom() {
+        // Test adding zoom flag for zoom keyword
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a zoom meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(enhanced.contains("--zoom"));
+        
+        // Test adding zoom flag for video call keyword
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a video call with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(enhanced.contains("--zoom"));
+        
+        // Test not adding zoom flag for non-zoom input
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a regular meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert!(!enhanced.contains("--zoom"));
+        
+        // Test not duplicating zoom flag
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" --zoom";
+        let input = "Schedule a zoom meeting with the team";
+        let enhanced = enhance_command_with_zoom(cmd, input);
+        assert_eq!(enhanced.matches("--zoom").count(), 1);
+    }
+
+    #[test]
+    fn test_enhance_recurrence_command() {
+        // Test adding daily recurrence
+        let input = "ducktape calendar create \"Daily Standup\" 2024-03-15 10:00 11:00 \"Work\" every day";
+        let enhanced = enhance_recurrence_command(input);
+        assert!(enhanced.contains("--repeat daily"));
+        
+        // Test adding weekly recurrence with interval
+        let input = "ducktape calendar create \"Bi-weekly Meeting\" 2024-03-15 10:00 11:00 \"Work\" every 2 weeks";
+        let enhanced = enhance_recurrence_command(input);
+        assert!(enhanced.contains("--repeat weekly"));
+        assert!(enhanced.contains("--interval 2"));
+        
+        // Test adding monthly recurrence
+        let input = "ducktape calendar create \"Monthly Review\" 2024-03-15 10:00 11:00 \"Work\" monthly";
+        let enhanced = enhance_recurrence_command(input);
+        assert!(enhanced.contains("--repeat monthly"));
+        
+        // Test non-calendar command remains unchanged
+        let input = "ducktape todo \"Buy groceries\"";
+        let enhanced = enhance_recurrence_command(input);
+        assert_eq!(input, enhanced);
+    }
+
+    #[test]
+    fn test_validate_calendar_command() {
+        // Test valid command
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --repeat weekly --interval 2";
+        assert!(validate_calendar_command(cmd).is_ok());
+        
+        // Test command with shell injection attempt
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00; rm -rf /";
+        assert!(validate_calendar_command(cmd).is_err());
+        
+        // Test unreasonable interval
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --interval 500";
+        assert!(validate_calendar_command(cmd).is_err());
+        
+        // Test unreasonable count
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --count 1000";
+        assert!(validate_calendar_command(cmd).is_err());
+    }
 
     #[tokio::test]
     async fn test_parse_natural_language() -> Result<()> {

@@ -78,6 +78,40 @@ impl Application {
         Ok(())
     }
 
+    pub async fn run_terminal_only(&self) -> Result<()> {
+        log::info!("Starting DuckTape Terminal");
+        
+        let mut rl = DefaultEditor::new()?;
+        
+        println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
+        let prompt = "🦆 ";
+        
+        loop {
+            match rl.readline(prompt) {
+                Ok(line) => {
+                    let _ = rl.add_history_entry(line.as_str());
+                    if let Err(err) = self.process_input(&line).await {
+                        log::error!("Failed to process command: {:?}", err);
+                    }
+                },
+                Err(rustyline::error::ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break;
+                },
+                Err(rustyline::error::ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break;
+                },
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
     async fn process_input(&self, input: &str) -> Result<()> {
         if input.starts_with("ducktape") {
             let args = CommandArgs::parse(input)?;
