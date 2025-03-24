@@ -1,13 +1,13 @@
+use crate::config::Config;
 use anyhow::{anyhow, Result};
+use chrono::{Local, Timelike};
+use lru::LruCache;
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::env;
-use lru::LruCache;
-use once_cell::sync::Lazy;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
-use chrono::{Local, Timelike};
-use crate::config::Config;
 
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
@@ -41,28 +41,28 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     if input.is_empty() {
         return Err(anyhow!("Empty input provided"));
     }
-    
+
     if input.len() > 1000 {
         return Err(anyhow!("Input too long (max 1000 characters)"));
     }
-    
+
     // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
-    
+
     // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")
         .map_err(|_| anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"))?;
 
-    let api_base = env::var("XAI_API_BASE")
-        .unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
+    let api_base = env::var("XAI_API_BASE").unwrap_or_else(|_| "https://api.x.ai/v1".to_string());
 
     // Check cache first using a properly declared mutable lock
     let cached = {
-        let mut lock_result = RESPONSE_CACHE.lock()
+        let mut lock_result = RESPONSE_CACHE
+            .lock()
             .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
         lock_result.get(&sanitized_input).cloned()
     };
-    
+
     if let Some(cached_response) = cached {
         return Ok(cached_response);
     }
@@ -160,15 +160,19 @@ Rules:
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_text = response.text().await
+        let error_text = response
+            .text()
+            .await
             .unwrap_or_else(|_| "Unable to read error response".to_string());
-        
+
         return Err(anyhow!("X.AI API error ({}): {}", status, error_text));
     }
 
-    let response_json: Value = response.json().await
+    let response_json: Value = response
+        .json()
+        .await
         .map_err(|e| anyhow!("Failed to parse API response: {}", e))?;
-        
+
     // Safely extract the response content
     let commands = response_json["choices"][0]["message"]["content"]
         .as_str()
@@ -184,10 +188,10 @@ Rules:
     // Enhanced command processing
     let enhanced_command = enhance_recurrence_command(&commands);
     let enhanced_command = enhance_command_with_zoom(&enhanced_command, &sanitized_input);
-    
+
     // Final validation of the returned commands
     validate_calendar_command(&enhanced_command)?;
-    
+
     Ok(enhanced_command)
 }
 
@@ -196,16 +200,24 @@ fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     if !command.contains("calendar create") {
         return command.to_string();
     }
-    
+
     let input_lower = input.to_lowercase();
-    let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
-    
-    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
-    
+    let zoom_keywords = [
+        "zoom",
+        "video call",
+        "video meeting",
+        "virtual meeting",
+        "video conference",
+    ];
+
+    let has_zoom_keyword = zoom_keywords
+        .iter()
+        .any(|&keyword| input_lower.contains(keyword));
+
     if has_zoom_keyword && !command.contains("--zoom") {
         return format!("{} --zoom", command);
     }
-    
+
     command.to_string()
 }
 
@@ -216,18 +228,17 @@ fn enhance_recurrence_command(command: &str) -> String {
     }
 
     let mut enhanced = command.to_string();
-    
+
     // Check for recurring event keywords in the input but missing flags
-    let has_recurring_keyword = 
-        command.to_lowercase().contains("every day") ||
-        command.to_lowercase().contains("every week") ||
-        command.to_lowercase().contains("every month") ||
-        command.to_lowercase().contains("every year") ||
-        command.to_lowercase().contains("daily") ||
-        command.to_lowercase().contains("weekly") ||
-        command.to_lowercase().contains("monthly") ||
-        command.to_lowercase().contains("yearly") ||
-        command.to_lowercase().contains("annually");
+    let has_recurring_keyword = command.to_lowercase().contains("every day")
+        || command.to_lowercase().contains("every week")
+        || command.to_lowercase().contains("every month")
+        || command.to_lowercase().contains("every year")
+        || command.to_lowercase().contains("daily")
+        || command.to_lowercase().contains("weekly")
+        || command.to_lowercase().contains("monthly")
+        || command.to_lowercase().contains("yearly")
+        || command.to_lowercase().contains("annually");
 
     // If recurring keywords found but no --repeat flag, add it
     if has_recurring_keyword && !command.contains("--repeat") && !command.contains("--recurring") {
@@ -237,31 +248,37 @@ fn enhance_recurrence_command(command: &str) -> String {
             enhanced = format!("{} --repeat weekly", enhanced);
         } else if command.contains("every month") || command.contains("monthly") {
             enhanced = format!("{} --repeat monthly", enhanced);
-        } else if command.contains("every year") || command.contains("yearly") || command.contains("annually") {
+        } else if command.contains("every year")
+            || command.contains("yearly")
+            || command.contains("annually")
+        {
             enhanced = format!("{} --repeat yearly", enhanced);
         }
     }
-    
+
     // Look for interval patterns like "every 2 weeks" and add --interval
-    let re_interval = regex::Regex::new(r"every (\d+) (day|days|week|weeks|month|months|year|years)").unwrap();
+    let re_interval =
+        regex::Regex::new(r"every (\d+) (day|days|week|weeks|month|months|year|years)").unwrap();
     if let Some(caps) = re_interval.captures(&command.to_lowercase()) {
         if let Some(interval_str) = caps.get(1) {
             if let Ok(interval) = interval_str.as_str().parse::<u32>() {
                 if interval > 0 && interval < 100 && // Reasonable limit
-                   !command.contains("--interval") {
+                   !command.contains("--interval")
+                {
                     enhanced = format!("{} --interval {}", enhanced, interval);
                 }
             }
         }
     }
-    
+
     enhanced
 }
 
 /// Sanitize user input to prevent injection or other security issues
 fn sanitize_user_input(input: &str) -> String {
     // Remove any control characters
-    input.chars()
+    input
+        .chars()
         .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
         .collect::<String>()
 }
@@ -269,15 +286,20 @@ fn sanitize_user_input(input: &str) -> String {
 /// Validate returned calendar command for security
 fn validate_calendar_command(command: &str) -> Result<()> {
     // Check for suspicious patterns
-    if command.contains("&&") || command.contains("|") || 
-       command.contains(";") || command.contains("`") {
-        return Err(anyhow!("Generated command contains potentially unsafe characters"));
+    if command.contains("&&")
+        || command.contains("|")
+        || command.contains(";")
+        || command.contains("`")
+    {
+        return Err(anyhow!(
+            "Generated command contains potentially unsafe characters"
+        ));
     }
-    
+
     // Validate interval values are reasonable if present
     if let Some(interval_idx) = command.find("--interval") {
         let interval_part = &command[interval_idx + 10..]; // Skip past "--interval "
-        
+
         // Extract the interval value - look for the first number after "--interval "
         let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
         if let Some(caps) = re.captures(interval_part) {
@@ -291,11 +313,11 @@ fn validate_calendar_command(command: &str) -> Result<()> {
             }
         }
     }
-    
+
     // Validate count values are reasonable if present
     if let Some(count_idx) = command.find("--count") {
         let count_part = &command[count_idx + 7..]; // Skip past "--count "
-        
+
         // Extract the count value using regex for more reliable parsing
         let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
         if let Some(caps) = re.captures(count_part) {
@@ -309,7 +331,7 @@ fn validate_calendar_command(command: &str) -> Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -330,11 +352,12 @@ mod tests {
         for input in inputs {
             // Use a properly declared mutable lock for checking the cache
             let cached_response = {
-                let mut lock_result = RESPONSE_CACHE.lock()
+                let mut lock_result = RESPONSE_CACHE
+                    .lock()
                     .map_err(|e| anyhow!("Failed to acquire cache lock: {}", e.to_string()))?;
                 lock_result.get(input).cloned()
             };
-                
+
             if let Some(cached_response) = cached_response {
                 assert!(cached_response.contains("ducktape"));
                 continue;
@@ -344,7 +367,7 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
-            
+
             if let Ok(mut cache) = RESPONSE_CACHE.lock() {
                 cache.put(input.to_string(), mock_response.clone());
             } else {
@@ -362,21 +385,22 @@ mod tests {
     #[test]
     fn test_enhance_recurrence_command() {
         // Test adding recurrence
-        let input = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" every week";
+        let input =
+            "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" every week";
         let enhanced = enhance_recurrence_command(input);
         assert!(enhanced.contains("--repeat weekly"));
-        
+
         // Test adding interval
         let input = "ducktape calendar create \"Bi-weekly Meeting\" 2024-03-15 10:00 11:00 \"Work\" every 2 weeks";
         let enhanced = enhance_recurrence_command(input);
         assert!(enhanced.contains("--interval 2"));
-        
+
         // Test non-calendar command (should remain unchanged)
         let input = "ducktape todo \"Buy groceries\"";
         let enhanced = enhance_recurrence_command(input);
         assert_eq!(input, enhanced);
     }
-    
+
     #[test]
     fn test_enhance_command_with_zoom() {
         // Test adding zoom flag for zoom keyword
@@ -384,49 +408,51 @@ mod tests {
         let input = "Schedule a zoom meeting with the team";
         let enhanced = enhance_command_with_zoom(cmd, input);
         assert!(enhanced.contains("--zoom"));
-        
+
         // Test adding zoom flag for video call keyword
         let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
         let input = "Schedule a video call with the team";
         let enhanced = enhance_command_with_zoom(cmd, input);
         assert!(enhanced.contains("--zoom"));
-        
+
         // Test not adding zoom flag for non-zoom input
         let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
         let input = "Schedule a regular meeting with the team";
         let enhanced = enhance_command_with_zoom(cmd, input);
         assert!(!enhanced.contains("--zoom"));
-        
+
         // Test not duplicating zoom flag
-        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" --zoom";
+        let cmd =
+            "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\" --zoom";
         let input = "Schedule a zoom meeting with the team";
         let enhanced = enhance_command_with_zoom(cmd, input);
         assert_eq!(enhanced.matches("--zoom").count(), 1);
     }
-    
+
     #[test]
     fn test_sanitize_user_input() {
         let input = "Meeting with John\u{0000} tomorrow";
         let sanitized = sanitize_user_input(input);
         assert_eq!(sanitized, "Meeting with John tomorrow");
-        
+
         let input = "Lunch\nmeeting";
         let sanitized = sanitize_user_input(input);
         assert_eq!(sanitized, "Lunch\nmeeting"); // Preserves newlines
     }
-    
+
     #[test]
     fn test_validate_calendar_command() {
         // Test valid command
         let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --repeat weekly --interval 2";
         assert!(validate_calendar_command(cmd).is_ok());
-        
+
         // Test invalid command with shell injection attempt
         let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00; rm -rf /";
         assert!(validate_calendar_command(cmd).is_err());
-        
+
         // Test unreasonable interval
-        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --interval 500";
+        let cmd =
+            "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --interval 500";
         assert!(validate_calendar_command(cmd).is_err());
     }
 }
@@ -437,11 +463,11 @@ impl GrokParser {
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
-    
+
     pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
         match parse_natural_language(input).await {
             Ok(command) => Ok(Some(command)),
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 }

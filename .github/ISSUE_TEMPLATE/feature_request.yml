@@ -1,0 +1,91 @@
+name: Feature Request
+description: Suggest an idea for DuckTape
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature!
+  
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: "I'm always frustrated when [...]"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: "It would be great if DuckTape could [...]"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of DuckTape would this feature affect?
+      multiple: true
+      options:
+        - Calendar Integration
+        - Natural Language Processing
+        - WebSocket API
+        - Command Line Interface
+        - Event Management
+        - Notes & Reminders
+        - Zoom Integration
+        - Configuration
+        - Security
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Important
+        - Critical
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions or features you've considered
+      placeholder: "I've also thought about doing it this way instead: [...]"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context or screenshots about the feature request here
+      placeholder: "More details about how this would be used..."
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Ideas
+      description: If you have any ideas about how to implement this feature, share them here
+      placeholder: "Maybe we could use..."
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this feature request, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow DuckTape's Code of Conduct
+          required: true

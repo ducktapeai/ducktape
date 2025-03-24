@@ -6,14 +6,16 @@ use std::env;
 pub async fn get_superbowl_info() -> Result<String> {
     // Adjust endpoint and parameters as needed.
     let endpoint = "https://api.deepseek.example/v1/reason";
-    
+
     // More secure API key handling that doesn't expose the key in error messages
     let api_key = env::var("DEEPSEEK_API_KEY")
         .map_err(|_| anyhow!("DEEPSEEK_API_KEY environment variable not set. Please set this variable in your environment"))?;
 
     // Add additional checks for API key security
     if api_key.trim().is_empty() {
-        return Err(anyhow!("DEEPSEEK_API_KEY is empty. Please set a valid API key"));
+        return Err(anyhow!(
+            "DEEPSEEK_API_KEY is empty. Please set a valid API key"
+        ));
     }
 
     // Create HTTP client with timeout for security
@@ -47,6 +49,8 @@ pub async fn get_superbowl_info() -> Result<String> {
             Err(anyhow!("Invalid date format received from API"))
         }
     } else {
-        Err(anyhow!("Could not retrieve Super Bowl date from API response"))
+        Err(anyhow!(
+            "Could not retrieve Super Bowl date from API response"
+        ))
     }
 }

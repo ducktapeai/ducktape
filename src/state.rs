@@ -1,10 +1,10 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Duration, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
+use std::io::Read;
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
-use std::io::Read;
 
 const STATE_DIR: &str = ".ducktape";
 const TODOS_FILE: &str = "todos.json";
@@ -73,8 +73,7 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new() -> Result<Self> {
-        let home_dir = dirs::home_dir()
-            .ok_or_else(|| anyhow!("Could not find home directory"))?;
+        let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
         let mut state_dir = home_dir;
         state_dir.push(STATE_DIR);
         std::fs::create_dir_all(&state_dir)?;
@@ -89,25 +88,25 @@ impl StateManager {
             if metadata.len() > MAX_FILE_SIZE {
                 return Err(anyhow!("File size exceeds security limits"));
             }
-            
+
             let file = File::open(path)?;
             let reader = BufReader::new(file);
-            
+
             // Use the from_reader function with proper security limits
             let json_value: serde_json::Value = serde_json::from_reader(reader)
                 .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
-            
+
             // Count elements to prevent DoS attacks
             if let Some(array) = json_value.as_array() {
                 if array.len() > 10000 {
                     return Err(anyhow!("Too many items in file (maximum 10000)"));
                 }
             }
-            
+
             // Convert to the desired type
             let items: Vec<T> = serde_json::from_value(json_value)
                 .map_err(|e| anyhow!("Failed to deserialize data: {}", e))?;
-            
+
             Ok(items)
         } else {
             Ok(Vec::new())
@@ -178,23 +177,26 @@ impl StateManager {
                 if metadata.len() > MAX_FILE_SIZE {
                     return Err(anyhow!("File {} exceeds security limits", filename));
                 }
-                
+
                 // Read file content with size limits
                 let mut file = File::open(&path)?;
                 let mut content = Vec::with_capacity(metadata.len() as usize);
                 file.read_to_end(&mut content)?;
-                
+
                 // Use a depth limit for JSON parsing
                 let items: serde_json::Value = serde_json::from_slice(&content)
                     .map_err(|e| anyhow!("Error parsing {}: {}", filename, e))?;
-                
+
                 // Count elements to prevent DoS attacks
                 if let Some(array) = items.as_array() {
                     if array.len() > 10000 {
-                        return Err(anyhow!("Too many items in file {} (maximum 10000)", filename));
+                        return Err(anyhow!(
+                            "Too many items in file {} (maximum 10000)",
+                            filename
+                        ));
                     }
                 }
-                
+
                 let file = OpenOptions::new()
                     .write(true)
                     .truncate(true)

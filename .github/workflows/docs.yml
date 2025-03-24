@@ -1,0 +1,79 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.rs'
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.rs'
+      - '**/*.md'
+      - 'docs/**'
+
+jobs:
+  rustdoc:
+    name: Check Documentation
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check documentation
+        run: cargo doc --no-deps --document-private-items
+
+      - name: Check doc examples
+        run: cargo test --doc
+
+      - name: Check dead links
+        run: |
+          cargo install cargo-deadlinks
+          cargo deadlinks
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
+          force_orphan: true
+
+  markdown_lint:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+
+      - name: Check Markdown files
+        run: markdownlint '**/*.md' --ignore node_modules
+
+  link_checker:
+    name: Check Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v1.8.0
+        with:
+          args: --verbose --no-progress '**/*.md' '**/*.rs'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

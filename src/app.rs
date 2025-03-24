@@ -1,13 +1,13 @@
-use crate::commands::{CommandArgs, CommandExecutor};
-use crate::commands::help;
 use crate::commands::calendar;
-use crate::commands::todo;
-use crate::commands::notes;
 use crate::commands::config;
-use crate::commands::utilities;
 use crate::commands::contacts;
-use anyhow::{Result, anyhow};
+use crate::commands::help;
+use crate::commands::notes;
+use crate::commands::todo;
+use crate::commands::utilities;
+use crate::commands::{CommandArgs, CommandExecutor};
 use crate::config::{Config, LLMProvider};
+use anyhow::{anyhow, Result};
 use rustyline::DefaultEditor;
 
 pub struct Application {
@@ -34,7 +34,7 @@ impl Application {
     pub async fn run(&self) -> Result<()> {
         log::info!("Starting DuckTape Terminal");
         let config = Config::load()?;
-        
+
         // Start the API server in a background thread
         log::info!("Starting API server on port 3000");
         let config_clone = config.clone();
@@ -43,12 +43,12 @@ impl Application {
                 log::error!("API server error: {:?}", e);
             }
         });
-        
+
         let mut rl = DefaultEditor::new()?;
-        
+
         println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
         let prompt = "🦆 ";
-        
+
         loop {
             match rl.readline(prompt) {
                 Ok(line) => {
@@ -56,36 +56,36 @@ impl Application {
                     if let Err(err) = self.process_input(&line).await {
                         log::error!("Failed to process command: {:?}", err);
                     }
-                },
+                }
                 Err(rustyline::error::ReadlineError::Interrupted) => {
                     println!("CTRL-C");
                     break;
-                },
+                }
                 Err(rustyline::error::ReadlineError::Eof) => {
                     println!("CTRL-D");
                     break;
-                },
+                }
                 Err(err) => {
                     println!("Error: {:?}", err);
                     break;
                 }
             }
         }
-        
+
         // Signal API server to shutdown if needed
         api_handle.abort();
-        
+
         Ok(())
     }
 
     pub async fn run_terminal_only(&self) -> Result<()> {
         log::info!("Starting DuckTape Terminal");
-        
+
         let mut rl = DefaultEditor::new()?;
-        
+
         println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
         let prompt = "🦆 ";
-        
+
         loop {
             match rl.readline(prompt) {
                 Ok(line) => {
@@ -93,22 +93,22 @@ impl Application {
                     if let Err(err) = self.process_input(&line).await {
                         log::error!("Failed to process command: {:?}", err);
                     }
-                },
+                }
                 Err(rustyline::error::ReadlineError::Interrupted) => {
                     println!("CTRL-C");
                     break;
-                },
+                }
                 Err(rustyline::error::ReadlineError::Eof) => {
                     println!("CTRL-D");
                     break;
-                },
+                }
                 Err(err) => {
                     println!("Error: {:?}", err);
                     break;
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -127,12 +127,13 @@ impl Application {
 
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
-        
+
         // Determine if this is a natural language command that needs AI processing
         // or a direct command with parameters
-        let processed_input = if input.starts_with("calendar") || 
-                               input.starts_with("todo") || 
-                               input.starts_with("note") {
+        let processed_input = if input.starts_with("calendar")
+            || input.starts_with("todo")
+            || input.starts_with("note")
+        {
             input.to_string()
         } else {
             // For natural language, we need to process via one of the AI models
@@ -140,34 +141,34 @@ impl Application {
                 LLMProvider::OpenAI => {
                     match crate::openai_parser::parse_natural_language(input).await {
                         Ok(command) => command,
-                        Err(e) => return Err(anyhow!("OpenAI parser error: {}", e))
+                        Err(e) => return Err(anyhow!("OpenAI parser error: {}", e)),
                     }
-                },
+                }
                 LLMProvider::Grok => {
                     match crate::grok_parser::parse_natural_language(input).await {
                         Ok(command) => command,
-                        Err(e) => return Err(anyhow!("Grok parser error: {}", e))
+                        Err(e) => return Err(anyhow!("Grok parser error: {}", e)),
                     }
-                },
+                }
                 LLMProvider::DeepSeek => {
                     match crate::deepseek_parser::parse_natural_language(input).await {
                         Ok(command) => command,
-                        Err(e) => return Err(anyhow!("DeepSeek parser error: {}", e))
+                        Err(e) => return Err(anyhow!("DeepSeek parser error: {}", e)),
                     }
                 }
             }
         };
-        
+
         log::info!("Processed command: {}", processed_input);
-        
+
         // Split the processed command into tokens
         let tokens: Vec<&str> = processed_input.split_whitespace().collect();
         if tokens.is_empty() {
             return Err(anyhow!("Empty command"));
         }
-        
+
         let command = tokens[0];
-        
+
         // Find a command executor that can handle this command
         for executor in &self.command_executors {
             if executor.can_handle(command) {
@@ -176,7 +177,7 @@ impl Application {
                 return executor.execute(args).await;
             }
         }
-        
+
         Err(anyhow!("Unknown command: {}", command))
     }
 
@@ -186,26 +187,29 @@ impl Application {
                 return executor.execute(args).await;
             }
         }
-        
+
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
     }
 
     async fn process_natural_language(&self, input: &str) -> Result<()> {
         use crate::grok_parser;
-        
+
         println!("Processing natural language: '{}'", input);
-        
+
         match grok_parser::parse_natural_language(input).await {
             Ok(command) => {
                 println!("Translated to command: {}", command);
-                
+
                 // Check if the generated command starts with ducktape
                 if command.starts_with("ducktape") {
                     let args = CommandArgs::parse(&command)?;
                     self.execute_command(args).await
                 } else {
-                    println!("Generated command doesn't start with 'ducktape': {}", command);
+                    println!(
+                        "Generated command doesn't start with 'ducktape': {}",
+                        command
+                    );
                     Ok(())
                 }
             }
