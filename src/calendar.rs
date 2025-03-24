@@ -321,9 +321,10 @@ pub fn validate_email(email: &str) -> bool {
 
 /// Check for potentially dangerous characters that could cause AppleScript injection
 fn contains_dangerous_characters(input: &str) -> bool {
-    input.contains('\'') || input.contains('\"') || input.contains('`') || 
+    input.contains('\"') || 
     input.contains(';') || input.contains('&') || input.contains('|') ||
     input.contains('<') || input.contains('>') || input.contains('$')
+    
 }
 
 /// Check for characters that could break AppleScript specifically
