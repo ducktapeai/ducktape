@@ -57,7 +57,7 @@ test-case = "3.1"
 tempfile = "3.8"
 criterion = { version = "0.5", features = ["html_reports"] }
 cargo-audit = "0.21.2"
-cargo-deny = "0.15.1"
+cargo-deny = "0.18.2"
 cargo-udeps = "0.1.40"
 
 [[bench]]
