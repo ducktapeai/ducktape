@@ -1,27 +1,23 @@
 version: 2
 updates:
+  # Maintain dependencies for Cargo
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-    target-branch: "main"
     labels:
       - "dependencies"
       - "rust"
-    commit-message:
-      prefix: "chore(deps)"
     groups:
       rust-prod-deps:
         patterns:
           - "*"
-        exclude-patterns:
-          - "cargo-*"
-          - "test-*"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
+        update-types:
+          - "minor"
+          - "patch"
 
+  # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -30,5 +26,3 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    commit-message:
-      prefix: "chore(ci)"
