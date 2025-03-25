@@ -12,3 +12,7 @@ target/
 .git.bak/**/*
 target/
 target/**/*
+.git.bak
+.git.bak/**/*
+target/
+target/**/*
