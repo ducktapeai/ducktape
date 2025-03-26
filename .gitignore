@@ -10,6 +10,7 @@
 # Rust
 /target/
 **/*.rs.bk
+*.pdb
 Cargo.lock
 
 # Logs
@@ -23,3 +24,11 @@ Cargo.lock
 # Backups
 .git.bak
 .git.bak/**/*
+
+# IDEs
+.idea/
+.vscode/
+
+# Swap files
+*.swp
+*.swo
