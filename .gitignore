@@ -1,18 +1,25 @@
-# Ignore the ducktape.code-workspace file
+# Environment files
+.env
+.env.local
+.env.*
+!.env.example
+
+# Workspace
 *.code-workspace
 
-# Other files and directories to ignore
-target/
-*.rs.bk
-*.logtarget/
-.DS_Store
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
 
-# ignore .env files
+# Logs
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Backups
 .git.bak
 .git.bak/**/*
-target/
-target/**/*
-.git.bak
-.git.bak/**/*
-target/
-target/**/*
