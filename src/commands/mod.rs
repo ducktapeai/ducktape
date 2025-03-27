@@ -14,11 +14,8 @@ pub struct CommandArgs {
 impl CommandArgs {
     pub fn parse(input: &str) -> Result<Self> {
         // Normalize input by replacing non-breaking spaces and multiple spaces with a single space
-        let normalized_input = input
-            .replace('\u{a0}', " ")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
+        let normalized_input =
+            input.replace('\u{a0}', " ").split_whitespace().collect::<Vec<_>>().join(" ");
 
         log::debug!("Normalized input: {}", normalized_input);
 
@@ -136,18 +133,9 @@ impl CommandArgs {
             i += 1;
         }
 
-        log::debug!(
-            "Parsed command: {:?}, args: {:?}, flags: {:?}",
-            command,
-            args,
-            flags
-        );
+        log::debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, args, flags);
 
-        Ok(CommandArgs {
-            command,
-            args,
-            flags,
-        })
+        Ok(CommandArgs { command, args, flags })
     }
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::process::Command;
 
 pub fn list_calendars() -> Result<()> {
@@ -10,10 +10,7 @@ pub fn list_calendars() -> Result<()> {
         end tell
     "#;
 
-    Command::new("osascript")
-        .arg("-e")
-        .arg(launch_script)
-        .output()?;
+    Command::new("osascript").arg("-e").arg(launch_script).output()?;
 
     let script = r#"tell application "Calendar"
         try

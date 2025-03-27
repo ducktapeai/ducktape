@@ -41,7 +41,9 @@ fn list_todos() -> Result<()> {
 
 fn handle_todo_command(args: CommandArgs) -> Result<()> {
     if args.args.is_empty() {
-        println!("Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"list1,list2,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]");
+        println!(
+            "Usage: todo \"<task title>\" [--notes \"<task notes>\"] [--lists \"list1,list2,...\"] [--reminder-time \"YYYY-MM-DD HH:MM\"]"
+        );
         return Ok(());
     }
     let mut config = todo::TodoConfig::new(&args.args[0]);
@@ -70,13 +72,7 @@ fn handle_todo_command(args: CommandArgs) -> Result<()> {
         lists: args
             .flags
             .get("--lists")
-            .map(|l| {
-                l.as_deref()
-                    .unwrap_or("")
-                    .split(',')
-                    .map(|s| s.trim().to_owned())
-                    .collect()
-            })
+            .map(|l| l.as_deref().unwrap_or("").split(',').map(|s| s.trim().to_owned()).collect())
             .unwrap_or(vec!["Reminders".to_owned()]),
         reminder_time: args.flags.get("--reminder-time").and_then(|r| r.clone()),
     };

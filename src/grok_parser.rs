@@ -1,10 +1,10 @@
 use crate::config::Config;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike};
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
@@ -70,10 +70,8 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Get available calendars and configuration
     let available_calendars = get_available_calendars().await?;
     let config = Config::load()?;
-    let default_calendar = config
-        .calendar
-        .default_calendar
-        .unwrap_or_else(|| "Calendar".to_string());
+    let default_calendar =
+        config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
 
     let current_date = Local::now();
     let current_hour = current_date.hour();
@@ -123,10 +121,7 @@ Rules:
         next_hour = (current_hour + 1).min(23)
     );
 
-    let context = format!(
-        "Current date and time: {}",
-        Local::now().format("%Y-%m-%d %H:%M")
-    );
+    let context = format!("Current date and time: {}", Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, sanitized_input);
 
     // API request with proper error handling and timeouts
@@ -202,17 +197,10 @@ fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     }
 
     let input_lower = input.to_lowercase();
-    let zoom_keywords = [
-        "zoom",
-        "video call",
-        "video meeting",
-        "virtual meeting",
-        "video conference",
-    ];
+    let zoom_keywords =
+        ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
 
-    let has_zoom_keyword = zoom_keywords
-        .iter()
-        .any(|&keyword| input_lower.contains(keyword));
+    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
 
     if has_zoom_keyword && !command.contains("--zoom") {
         return format!("{} --zoom", command);
@@ -291,9 +279,7 @@ fn validate_calendar_command(command: &str) -> Result<()> {
         || command.contains(";")
         || command.contains("`")
     {
-        return Err(anyhow!(
-            "Generated command contains potentially unsafe characters"
-        ));
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
     }
 
     // Validate interval values are reasonable if present

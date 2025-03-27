@@ -1,14 +1,14 @@
 #[allow(unused_imports)]
 use crate::calendar;
 use crate::config::Config;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike}; // Remove NaiveTime since it's unused
 use log::debug; // Only keep the debug import since others are unused
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
@@ -85,9 +85,7 @@ fn validate_calendar_command(command: &str) -> Result<()> {
         || command.contains(";")
         || command.contains("`")
     {
-        return Err(anyhow!(
-            "Generated command contains potentially unsafe characters"
-        ));
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
     }
 
     // Validate interval values are reasonable if present
@@ -132,17 +130,10 @@ fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     }
 
     let input_lower = input.to_lowercase();
-    let zoom_keywords = [
-        "zoom",
-        "video call",
-        "video meeting",
-        "virtual meeting",
-        "video conference",
-    ];
+    let zoom_keywords =
+        ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
 
-    let has_zoom_keyword = zoom_keywords
-        .iter()
-        .any(|&keyword| input_lower.contains(keyword));
+    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
 
     if has_zoom_keyword && !command.contains("--zoom") {
         return format!("{} --zoom", command);
@@ -235,10 +226,8 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Get available calendars and configuration early
     let available_calendars = get_available_calendars().await?;
     let config = Config::load()?;
-    let default_calendar = config
-        .calendar
-        .default_calendar
-        .unwrap_or_else(|| "Calendar".to_string());
+    let default_calendar =
+        config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
 
     let current_date = Local::now();
     let current_hour = current_date.hour();
@@ -283,10 +272,7 @@ Rules:
     }
 
     // Add current date context
-    let context = format!(
-        "Current date and time: {}",
-        Local::now().format("%Y-%m-%d %H:%M")
-    );
+    let context = format!("Current date and time: {}", Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, input);
 
     let client = Client::new();
@@ -482,10 +468,7 @@ fn extract_emails(input: &str) -> Result<Vec<String>> {
             if !part.contains('\'') && !part.contains('\"') && !part.contains('`') {
                 emails.push(part.to_string());
             } else {
-                debug!(
-                    "Skipping email with potentially dangerous characters: {}",
-                    part
-                );
+                debug!("Skipping email with potentially dangerous characters: {}", part);
             }
         }
     }
@@ -602,9 +585,8 @@ mod tests {
         for input in inputs {
             // Improved cache access with proper mutex handling
             let cached_response = {
-                let mut lock_result = RESPONSE_CACHE
-                    .lock()
-                    .map_err(|_| anyhow!("Failed to acquire cache lock"))?;
+                let mut lock_result =
+                    RESPONSE_CACHE.lock().map_err(|_| anyhow!("Failed to acquire cache lock"))?;
                 lock_result.get(input).cloned()
             };
 

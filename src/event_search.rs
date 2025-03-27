@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Datelike, Local, NaiveDate, NaiveTime}; // Added missing imports
 use log::{debug, info};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::Read;
 use std::path::Path;
 use std::{fs::File, io::Write};
@@ -158,14 +158,11 @@ Respond ONLY with the JSON array. Do not include any explanatory text."#,
 
     // Create an explicit search query that forces web search
     let search_prompt = format!(
-        "Search the web for the next time {} plays or performs. I need REAL upcoming events with accurate dates, times, and locations. Find the official schedule.", 
+        "Search the web for the next time {} plays or performs. I need REAL upcoming events with accurate dates, times, and locations. Find the official schedule.",
         query
     );
 
-    debug!(
-        "Sending Grok API request with system prompt: {}",
-        system_prompt
-    );
+    debug!("Sending Grok API request with system prompt: {}", system_prompt);
     debug!("User prompt: {}", search_prompt);
 
     let response = client
@@ -194,11 +191,7 @@ Respond ONLY with the JSON array. Do not include any explanatory text."#,
     let response_text = response.text().await?;
 
     if !status.is_success() {
-        return Err(anyhow!(
-            "Grok API error: Status {}, Response: {}",
-            status,
-            response_text
-        ));
+        return Err(anyhow!("Grok API error: Status {}, Response: {}", status, response_text));
     }
 
     // Parse the response
@@ -233,17 +226,10 @@ Respond ONLY with the JSON array. Do not include any explanatory text."#,
 
     // Parse the JSON into our event structure
     let events: Vec<EventSearchResult> = serde_json::from_str(&json_content).map_err(|e| {
-        anyhow!(
-            "Failed to parse events from response: {}, content: {}",
-            e,
-            json_content
-        )
+        anyhow!("Failed to parse events from response: {}, content: {}", e, json_content)
     })?;
 
-    info!(
-        "Successfully parsed {} events from Grok response",
-        events.len()
-    );
+    info!("Successfully parsed {} events from Grok response", events.len());
     Ok(events)
 }
 
@@ -252,9 +238,7 @@ fn extract_json_from_text(text: &str) -> Result<String> {
     // Look for JSON array between ```json and ``` markers
     if let Some(start_idx) = text.find("```json") {
         if let Some(end_idx) = text[start_idx + 7..].find("```") {
-            return Ok(text[start_idx + 7..start_idx + 7 + end_idx]
-                .trim()
-                .to_string());
+            return Ok(text[start_idx + 7..start_idx + 7 + end_idx].trim().to_string());
         }
     }
 
@@ -447,11 +431,7 @@ pub fn event_to_calendar_command(event: &EventSearchResult, calendar: Option<&st
         calendar.unwrap_or("Calendar")
     } else {
         // Use the default calendar from config if available
-        config
-            .calendar
-            .default_calendar
-            .as_deref()
-            .unwrap_or("Calendar")
+        config.calendar.default_calendar.as_deref().unwrap_or("Calendar")
     };
 
     format_command(event, calendar_name)
@@ -499,20 +479,13 @@ fn format_command(event: &EventSearchResult, calendar_name: &str) -> String {
 /// Helper function to sanitize JSON strings to prevent injection attacks
 fn sanitize_json_string(input: &str) -> String {
     // Remove control characters that might interfere with JSON parsing
-    input
-        .chars()
-        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
-        .collect()
+    input.chars().filter(|&c| !c.is_control() || c == '\n' || c == '\t').collect()
 }
 
 pub fn save_search_results(results: &[EventSearchResult], file_path: &str) -> Result<()> {
     // Limit the number of results to save
     let max_items = 1000;
-    let limited_results = if results.len() > max_items {
-        &results[0..max_items]
-    } else {
-        results
-    };
+    let limited_results = if results.len() > max_items { &results[0..max_items] } else { results };
 
     let json_content = serde_json::to_string_pretty(limited_results)
         .map_err(|e| anyhow!("Failed to serialize results: {}", e))?;
@@ -526,9 +499,7 @@ pub fn save_search_results(results: &[EventSearchResult], file_path: &str) -> Re
         .ok_or_else(|| anyhow!("File name contains invalid characters"))?;
 
     if file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
-        return Err(anyhow!(
-            "Invalid file name - potential path traversal attempt"
-        ));
+        return Err(anyhow!("Invalid file name - potential path traversal attempt"));
     }
 
     let mut file = File::create(file_path).map_err(|e| anyhow!("Failed to create file: {}", e))?;
@@ -615,10 +586,9 @@ pub fn format_search_results(results: &[EventSearchResult]) -> String {
 
         // Attempt to parse the event date/time for relative time display
         // Fixed to use start_time instead of time
-        if let (Ok(date), Some(time_str)) = (
-            NaiveDate::parse_from_str(&event.date, "%Y-%m-%d"),
-            &event.start_time,
-        ) {
+        if let (Ok(date), Some(time_str)) =
+            (NaiveDate::parse_from_str(&event.date, "%Y-%m-%d"), &event.start_time)
+        {
             if let Ok(time) = NaiveTime::parse_from_str(time_str, "%H:%M") {
                 let event_dt = date.and_time(time);
                 let now_naive = now.naive_local();

@@ -1,7 +1,7 @@
-use anyhow::anyhow;
 use anyhow::Result;
+use anyhow::anyhow;
 use chrono::Local;
-use std::fs::{create_dir_all, OpenOptions};
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -15,11 +15,7 @@ pub struct NoteConfig<'a> {
 
 impl<'a> NoteConfig<'a> {
     pub fn new(title: &'a str, content: &'a str) -> Self {
-        Self {
-            title,
-            content,
-            folder: None,
-        }
+        Self { title, content, folder: None }
     }
 }
 
@@ -129,22 +125,12 @@ pub fn create_note_local(title: &str, content: &str, tags: &[String]) -> Result<
     file_path.push(format!("{}.md", filename));
 
     let created_at = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let tags_str = if !tags.is_empty() {
-        format!("\nTags: {}", tags.join(", "))
-    } else {
-        String::new()
-    };
+    let tags_str =
+        if !tags.is_empty() { format!("\nTags: {}", tags.join(", ")) } else { String::new() };
 
-    let content = format!(
-        "# {}\nCreated: {}{}\n\n{}\n",
-        title, created_at, tags_str, content
-    );
+    let content = format!("# {}\nCreated: {}{}\n\n{}\n", title, created_at, tags_str, content);
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(file_path)?;
+    let mut file = OpenOptions::new().write(true).create(true).truncate(true).open(file_path)?;
 
     file.write_all(content.as_bytes())?;
     println!("Note '{}' created successfully", title);

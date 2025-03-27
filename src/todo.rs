@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::process::Command;
 
 #[derive(Debug)]
@@ -13,12 +13,7 @@ pub struct TodoConfig<'a> {
 
 impl<'a> TodoConfig<'a> {
     pub fn new(title: &'a str) -> Self {
-        Self {
-            title,
-            notes: None,
-            lists: Vec::new(),
-            reminder_time: None,
-        }
+        Self { title, notes: None, lists: Vec::new(), reminder_time: None }
     }
 }
 
@@ -35,11 +30,7 @@ fn escape_applescript_string(input: &str) -> String {
 }
 
 pub fn create_todo(config: TodoConfig) -> Result<(), anyhow::Error> {
-    let target_lists = if config.lists.is_empty() {
-        vec!["Reminders"]
-    } else {
-        config.lists
-    };
+    let target_lists = if config.lists.is_empty() { vec!["Reminders"] } else { config.lists };
 
     // Format reminder time to AppleScript-friendly string if provided
     let reminder_prop = if let Some(time_str) = config.reminder_time {

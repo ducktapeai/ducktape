@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use reqwest::Client;
 use serde_json::json;
 use std::env;
@@ -13,9 +13,7 @@ pub async fn get_superbowl_info() -> Result<String> {
 
     // Add additional checks for API key security
     if api_key.trim().is_empty() {
-        return Err(anyhow!(
-            "DEEPSEEK_API_KEY is empty. Please set a valid API key"
-        ));
+        return Err(anyhow!("DEEPSEEK_API_KEY is empty. Please set a valid API key"));
     }
 
     // Create HTTP client with timeout for security
@@ -49,8 +47,6 @@ pub async fn get_superbowl_info() -> Result<String> {
             Err(anyhow!("Invalid date format received from API"))
         }
     } else {
-        Err(anyhow!(
-            "Could not retrieve Super Bowl date from API response"
-        ))
+        Err(anyhow!("Could not retrieve Super Bowl date from API response"))
     }
 }

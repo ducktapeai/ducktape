@@ -20,11 +20,11 @@ fn test_csv_import_preparation() -> Result<()> {
     let file_path = dir.path().join("test-events.csv");
     let mut file = File::create(&file_path)?;
 
+    writeln!(file, "title,date,time,end_time,description,location,attendees,calendar")?;
     writeln!(
         file,
-        "title,date,time,end_time,description,location,attendees,calendar"
+        "Test Event,2025-03-20,10:00,11:00,Event description,Office,test@example.com,user@example.com"
     )?;
-    writeln!(file, "Test Event,2025-03-20,10:00,11:00,Event description,Office,test@example.com,user@example.com")?;
 
     // Just check that the file exists and has the right content
     assert!(file_path.exists());

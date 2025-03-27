@@ -59,7 +59,7 @@ pub fn print_env_status() {
 }
 
 /// Sets a placeholder API key for development/testing only
-/// 
+///
 /// # Warning
 /// This function should only be used during development and testing,
 /// never in production environments. Proper API keys should be set
@@ -69,10 +69,7 @@ pub fn force_set_api_key() -> bool {
     if env::var("XAI_API_KEY").is_err() {
         let api_key = "xai-placeholder-development-key-not-for-production-use";
         env::set_var("XAI_API_KEY", api_key);
-        info!(
-            "🔑 Set placeholder XAI_API_KEY for development (length: {})",
-            api_key.len()
-        );
+        info!("🔑 Set placeholder XAI_API_KEY for development (length: {})", api_key.len());
         return true;
     }
 
