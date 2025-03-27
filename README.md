@@ -1,6 +1,8 @@
 # DuckTape 🦆
 
 ## Description
+A terminal-based calendar management tool with natural language processing and AI integration. 
+Plans underway to integrate as an Application.
 
 DuckTape is an AI-powered command-line interface that makes it easy to manage your Apple Calendar, Reminders, and Notes. Just type what you want to do in natural language, and DuckTape's AI will understand and execute the appropriate command.
 
@@ -22,7 +24,6 @@ DuckTape is an AI-powered command-line interface that makes it easy to manage yo
 | ICS Import       | ✅          | Full support for iCalendar format                  |
 | WebSocket API    | ✅          | Complete API for desktop client connections        |
 
-A terminal-based calendar management tool with natural language processing and AI integration.
 
 ## Installation
 
