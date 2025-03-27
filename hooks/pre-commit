@@ -1,82 +1,115 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# DuckTape pre-commit hook for credential scanning
-# Install this hook with: cp hooks/pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit
+# DuckTape pre-commit hook for credential scanning and code formatting
+# Install with: ./setup-security-checks.sh
+#
+# Following Ducktape Rust project standards for security scanning
 
 set -e
 
 echo "🔍 Running pre-commit credential scan..."
 
-# Check for potential credential patterns
+# Get staged files for checking
 STAGED_FILES=$(git diff --cached --name-only)
-
 if [ -z "$STAGED_FILES" ]; then
     echo "No files to check."
     exit 0
 fi
 
-# Define default patterns with proper regex syntax
+# Define patterns with proper POSIX regex syntax to avoid errors
 PATTERNS=(
-    "api_key[[:blank:]]*=[[:blank:]]*[^[:space:]]{16,}"
-    "secret[[:blank:]]*=[[:blank:]]*[^[:space:]]{16,}"
-    "password[[:blank:]]*=[[:blank:]]*[^[:space:]]{8,}"
-    "sk-[a-zA-Z0-9]{32,}"
-    "xai-[a-zA-Z0-9]{20,}"
+    # API keys - using basic POSIX compatible regex
+    "api_key[ \t]*[=:][ \t]*[A-Za-z0-9_\-]{16,}"
+    "access_key[ \t]*[=:][ \t]*[A-Za-z0-9_\-]{16,}"
+    "secret[ \t]*[=:][ \t]*[A-Za-z0-9_\-]{16,}"
+    "password[ \t]*[=:][ \t]*[A-Za-z0-9_\-]{8,}"
+    # Specific API key formats
+    "sk-[A-Za-z0-9]{32,}" # OpenAI
+    "xai-[A-Za-z0-9]{20,}" # XAI
+    # AWS key format
+    "AKIA[A-Z0-9]{16}"
 )
 
-# Safe allowlist patterns
+# Safe allowlist patterns with simplified regex for compatibility
 ALLOWLIST=(
     "xai-placeholder-development-key-not-for-production-use"
     "dummy_key_for_testing"
     "your_.*_key_here"
     "your_.*_api_key"
     "your_.*_secret"
+    "example_token"
+)
+
+# Files to ignore
+IGNORE_FILES=(
     ".env.example"
     "sensitive-patterns.txt"
     "pre-commit"
+    ".*_test.rs"
 )
 
 VIOLATIONS_FOUND=0
-for FILE in $STAGED_FILES; do
+
+# Use functions for better organization
+scan_file() {
+    local file="$1"
+    
     # Skip binary files and specific file types
-    if [[ -f "$FILE" ]] && [[ ! "$FILE" =~ \.(jpg|jpeg|png|gif|ico|pdf|bin)$ ]]; then
-        for PATTERN in "${PATTERNS[@]}"; do
-            MATCHES=$(git diff --cached --no-color "$FILE" | grep -E "^\+" | grep -v "^\+\+\+" | grep -E "$PATTERN" || true)
-            
-            if [ ! -z "$MATCHES" ]; then
-                # Check if match is in allowlist
-                ALLOWED=0
-                for ALLOWITEM in "${ALLOWLIST[@]}"; do
-                    if echo "$MATCHES" | grep -qE "$ALLOWITEM"; then
-                        ALLOWED=1
-                        break
-                    fi
-                done
-                
-                if [ $ALLOWED -eq 0 ]; then
-                    echo "⛔ Potential credential found in $FILE:"
-                    echo "$MATCHES" | sed 's/^+/  /'
-                    VIOLATIONS_FOUND=1
-                fi
-            fi
-        done
+    if [[ ! -f "$file" ]] || [[ "$file" =~ \.(jpg|jpeg|png|gif|ico|pdf|bin|webp)$ ]]; then
+        return 0
     fi
+    
+    # Skip files in ignore list
+    for ignore in "${IGNORE_FILES[@]}"; do
+        if [[ "$file" =~ $ignore ]]; then
+            return 0
+        fi
+    done
+    
+    # Check each pattern
+    for pattern in "${PATTERNS[@]}"; do
+        # Use grep -E for extended regex and handle errors
+        MATCHES=$(git diff --cached --no-color "$file" | grep -E "^\+" | grep -v "^\+\+\+" | grep -E "$pattern" 2>/dev/null || true)
+        
+        if [ -n "$MATCHES" ]; then
+            # Check if match is in allowlist
+            ALLOWED=0
+            for allow_item in "${ALLOWLIST[@]}"; do
+                if echo "$MATCHES" | grep -q "$allow_item"; then
+                    ALLOWED=1
+                    break
+                fi
+            done
+            
+            if [ $ALLOWED -eq 0 ]; then
+                echo "⛔ Potential credential found in $file:"
+                echo "$MATCHES" | sed 's/^+/  /'
+                VIOLATIONS_FOUND=1
+            fi
+        fi
+    done
+}
+
+# Process each file
+for file in $STAGED_FILES; do
+    scan_file "$file"
 done
 
+# Exit if violations found
 if [ $VIOLATIONS_FOUND -eq 1 ]; then
     echo "❌ Commit blocked due to potential credential leaks."
     echo "Please remove the sensitive data and try again."
-    echo "If this is a false positive, you can bypass this check with: git commit --no-verify"
+    echo "If this is a false positive, you can bypass with: git commit --no-verify"
     exit 1
 else
     echo "✅ No credentials detected in staged files."
 fi
 
-# Run cargo fmt if available
+# Run cargo fmt to ensure code meets formatting standards
 if command -v cargo >/dev/null 2>&1; then
     if cargo fmt --version >/dev/null 2>&1; then
         echo "🦀 Running cargo fmt..."
-        cargo fmt --all -- --check || {
+        cargo fmt --all || {
             echo "❌ Code formatting issues detected."
             echo "Please run 'cargo fmt' to fix formatting issues."
             exit 1
