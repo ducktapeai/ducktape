@@ -1,7 +1,22 @@
 # DuckTape 🦆
 
 > **Note**: DuckTape currently only works on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac)
-> We have windows on our roadmap
+
+### Integration Status
+
+| Integration      | Status      | Description                                        |
+|------------------|:-----------:|----------------------------------------------------|
+| macOS            | ✅          | Full support for Apple Calendar, Notes, Reminders  |
+| Windows          | ❌          | Not currently supported                            |
+| Linux            | ❌          | Not currently supported                            |
+| OpenAI           | ✅          | Complete integration with API                      |
+| Grok (XAI)       | ✅          | Complete integration with API                      |
+| DeepSeek         | 🚧          | Integration in progress                            |
+| Zoom             | ✅          | Meeting creation via Server-to-Server OAuth        |
+| Native Calendar  | ✅          | Full read/write with Apple Calendar                |
+| CSV Import       | ✅          | Full support for event importing                   |
+| ICS Import       | ✅          | Full support for iCalendar format                  |
+| WebSocket API    | ✅          | Complete API for desktop client connections        |
 
 A terminal-based calendar management tool with natural language processing and AI integration.
 
