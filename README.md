@@ -10,7 +10,7 @@ DuckTape is an AI-powered command-line interface that makes it easy to manage yo
 
 ### Integration Status
 
-|Integration       | Status      | Description                                        |
+| Integration      | Status      | Description                                        |
 |------------------|:-----------:|----------------------------------------------------|
 | macOS            | ✅          | Full support for Apple Calendar, Notes, Reminders  |
 | Windows          | ❌          | Not currently supported                            |
