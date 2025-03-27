@@ -66,10 +66,7 @@ fn test_todo_operations() -> Result<()> {
     assert!(!todos.is_empty(), "No todos found after adding one");
     let first_todo = &todos[0];
     assert_eq!(first_todo.title, "Buy Groceries");
-    assert!(
-        !first_todo.lists.is_empty(),
-        "Todo should have at least one list"
-    );
+    assert!(!first_todo.lists.is_empty(), "Todo should have at least one list");
     assert_eq!(first_todo.lists[0], "Shopping");
 
     Ok(())

@@ -85,8 +85,12 @@ pub fn print_help() -> Result<()> {
     println!("  - Dates can be in YYYY-MM-DD format");
     println!("  - Times should be in 24-hour format (HH:MM)");
     println!("  - Use quotes around titles and text with spaces");
-    println!("  - Recurring events: ducktape calendar create \"Weekly Meeting\" 2024-05-01 10:00 11:00 --repeat weekly");
-    println!("  - Contact groups save time by letting you quickly add the same contacts to multiple events");
+    println!(
+        "  - Recurring events: ducktape calendar create \"Weekly Meeting\" 2024-05-01 10:00 11:00 --repeat weekly"
+    );
+    println!(
+        "  - Contact groups save time by letting you quickly add the same contacts to multiple events"
+    );
 
     Ok(())
 }

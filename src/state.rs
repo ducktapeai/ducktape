@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Duration, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
@@ -115,11 +115,7 @@ impl StateManager {
 
     pub fn save<T: Persistent>(&self, items: &[T]) -> Result<()> {
         let path = self.state_dir.join(T::filename());
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)?;
+        let file = OpenOptions::new().write(true).create(true).truncate(true).open(path)?;
 
         let writer = BufWriter::new(file);
         serde_json::to_writer_pretty(writer, items)?;
@@ -190,18 +186,12 @@ impl StateManager {
                 // Count elements to prevent DoS attacks
                 if let Some(array) = items.as_array() {
                     if array.len() > 10000 {
-                        return Err(anyhow!(
-                            "Too many items in file {} (maximum 10000)",
-                            filename
-                        ));
+                        return Err(anyhow!("Too many items in file {} (maximum 10000)", filename));
                     }
                 }
 
-                let file = OpenOptions::new()
-                    .write(true)
-                    .truncate(true)
-                    .create(true)
-                    .open(&path)?;
+                let file =
+                    OpenOptions::new().write(true).truncate(true).create(true).open(&path)?;
                 serde_json::to_writer(file, &items)?;
             }
         }

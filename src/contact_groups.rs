@@ -1,11 +1,11 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 
-use crate::calendar::{create_event_with_contacts, EventConfig};
+use crate::calendar::{EventConfig, create_event_with_contacts};
 
 /// Represents a group of contacts
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,9 +28,7 @@ pub struct ContactGroups {
 impl ContactGroups {
     /// Create a new empty ContactGroups instance
     pub fn new() -> Self {
-        Self {
-            groups: HashMap::new(),
-        }
+        Self { groups: HashMap::new() }
     }
 
     /// Add a new contact group
@@ -97,17 +95,14 @@ impl ContactGroups {
         println!("Available contact groups:");
         if self.groups.is_empty() {
             println!("  No contact groups defined");
-            println!("\nTo create a group: ducktape contacts add <group_id> <name> <contact1,contact2,...>");
+            println!(
+                "\nTo create a group: ducktape contacts add <group_id> <name> <contact1,contact2,...>"
+            );
             return;
         }
 
         for (id, group) in &self.groups {
-            println!(
-                "  {} - {} ({} contacts)",
-                id,
-                group.name,
-                group.contacts.len()
-            );
+            println!("  {} - {} ({} contacts)", id, group.name, group.contacts.len());
             if let Some(desc) = &group.description {
                 println!("    Description: {}", desc);
             }
@@ -126,11 +121,7 @@ pub async fn create_event_with_group(config: EventConfig, group_id: &str) -> Res
         .get_group(group_id)
         .ok_or_else(|| anyhow!("Contact group '{}' not found", group_id))?;
 
-    info!(
-        "Using contact group '{}' with {} contacts",
-        group.name,
-        group.contacts.len()
-    );
+    info!("Using contact group '{}' with {} contacts", group.name, group.contacts.len());
 
     // Convert contacts to str slice reference format
     let contacts: Vec<&str> = group.contacts.iter().map(AsRef::as_ref).collect();

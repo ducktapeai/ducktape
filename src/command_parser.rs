@@ -72,11 +72,7 @@ pub fn process_command(message: UserMessage) -> CommandResponse {
                 cmd.details.to_string()
             );
 
-            CommandResponse {
-                content: response,
-                success: true,
-                command_id: message.id,
-            }
+            CommandResponse { content: response, success: true, command_id: message.id }
         }
         None => CommandResponse {
             content: "Sorry, I didn't understand that command.".to_string(),

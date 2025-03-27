@@ -24,7 +24,9 @@ impl CommandExecutor for CalendarCommand {
                     Some("set-default") => set_default_calendar(args),
                     Some("import") => import_calendar_events(args).await,
                     _ => {
-                        println!("Unknown calendar command. Use 'calendar create', 'calendar delete', 'calendar set-default', or 'calendar import'");
+                        println!(
+                            "Unknown calendar command. Use 'calendar create', 'calendar delete', 'calendar set-default', or 'calendar import'"
+                        );
                         Ok(())
                     }
                 },
@@ -51,11 +53,7 @@ fn list_events() -> Result<()> {
         println!("  - {}", event.title);
         println!(
             "    Time: {}",
-            if event.all_day {
-                "All day".to_string()
-            } else {
-                event.time.clone()
-            }
+            if event.all_day { "All day".to_string() } else { event.time.clone() }
         );
         println!("    Date: {}", event.date);
         println!("    Calendars: {}", event.calendars.join(", "));
@@ -83,11 +81,8 @@ async fn delete_event(args: CommandArgs) -> Result<()> {
     }
 
     // Add await to properly handle the async function
-    calendar::delete_event(
-        &args.args[0],
-        args.args.get(1).map(|s| s.as_str()).unwrap_or(""),
-    )
-    .await?;
+    calendar::delete_event(&args.args[0], args.args.get(1).map(|s| s.as_str()).unwrap_or(""))
+        .await?;
 
     // Also remove from state
     let mut events = state::load_events()?;
@@ -200,7 +195,9 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
                     // Max 1 week in minutes
                     config.reminder = Some(minutes);
                 } else {
-                    println!("Warning: Reminder minutes should be between 1 and 10080 (1 week). Using default.");
+                    println!(
+                        "Warning: Reminder minutes should be between 1 and 10080 (1 week). Using default."
+                    );
                 }
             }
         }
@@ -214,10 +211,7 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
             match chrono_tz::Tz::from_str(&sanitized_tz) {
                 Ok(_) => config.timezone = Some(sanitized_tz),
                 Err(_) => {
-                    println!(
-                        "Warning: Invalid timezone '{}'. Using system default.",
-                        sanitized_tz
-                    );
+                    println!("Warning: Invalid timezone '{}'. Using system default.", sanitized_tz);
                 }
             }
         }
@@ -235,10 +229,7 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
     }
 
     // Handle recurrence flags - support both --repeat and --recurring
-    let repeat_flag = args
-        .flags
-        .get("--repeat")
-        .or_else(|| args.flags.get("--recurring"));
+    let repeat_flag = args.flags.get("--repeat").or_else(|| args.flags.get("--recurring"));
 
     if let Some(repeat) = repeat_flag {
         if let Some(frequency_str) = repeat {
@@ -255,7 +246,9 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
                                 if interval_val > 0 && interval_val <= 365 {
                                     recurrence = recurrence.with_interval(interval_val);
                                 } else {
-                                    println!("Warning: Interval should be between 1 and 365. Using default of 1.");
+                                    println!(
+                                        "Warning: Interval should be between 1 and 365. Using default of 1."
+                                    );
                                 }
                             }
                         }
@@ -268,7 +261,9 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
                             if calendar::validate_date_format(until_str) {
                                 recurrence = recurrence.with_end_date(until_str);
                             } else {
-                                println!("Warning: Invalid end date format. Please use YYYY-MM-DD format.");
+                                println!(
+                                    "Warning: Invalid end date format. Please use YYYY-MM-DD format."
+                                );
                             }
                         }
                     }
@@ -281,7 +276,9 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
                                 if count_val > 0 && count_val <= 500 {
                                     recurrence = recurrence.with_count(count_val);
                                 } else {
-                                    println!("Warning: Count should be between 1 and 500. Using default of no limit.");
+                                    println!(
+                                        "Warning: Count should be between 1 and 500. Using default of no limit."
+                                    );
                                 }
                             }
                         }
@@ -344,11 +341,8 @@ async fn create_calendar_event(args: CommandArgs) -> Result<()> {
     if let Some(contacts) = args.flags.get("--contacts") {
         if let Some(contact_str) = contacts {
             let contact_str = sanitize_input(contact_str, true);
-            let contact_names: Vec<&str> = contact_str
-                .split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .collect();
+            let contact_names: Vec<&str> =
+                contact_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
 
             if !contact_names.is_empty() {
                 debug!("Looking up contacts: {:?}", contact_names);
@@ -421,11 +415,11 @@ async fn delete_calendar_event(args: CommandArgs) -> Result<()> {
 
     let title = &args.args[1];
     let date = args.args.get(2).map(|s| s.as_str()).unwrap_or("");
-    
+
     // The third argument (if present) might be an email or calendar name, but we don't need it
     // for the delete_event function, so we'll just ignore it
     debug!("Attempting to delete event: title='{}', date='{}'", title, date);
-    
+
     // Add await to properly handle the async function
     calendar::delete_event(title, date).await?;
 
@@ -454,7 +448,9 @@ fn set_default_calendar(args: CommandArgs) -> Result<()> {
 
 async fn import_calendar_events(args: CommandArgs) -> Result<()> {
     if args.args.len() < 2 {
-        println!("Usage: ducktape calendar import \"<file_path>\" [--format csv|ics] [--calendar \"<calendar_name>\"]");
+        println!(
+            "Usage: ducktape calendar import \"<file_path>\" [--format csv|ics] [--calendar \"<calendar_name>\"]"
+        );
         println!(
             "Example: ducktape calendar import \"events.csv\" --format csv --calendar \"Work\""
         );
@@ -481,11 +477,7 @@ async fn import_calendar_events(args: CommandArgs) -> Result<()> {
     }
 
     // Get target calendar if specified
-    let calendar = args
-        .flags
-        .get("--calendar")
-        .and_then(|c| c.as_ref())
-        .map(|c| c.to_string());
+    let calendar = args.flags.get("--calendar").and_then(|c| c.as_ref()).map(|c| c.to_string());
 
     match format.as_str() {
         "csv" => calendar::import_csv_events(file_path, calendar).await,

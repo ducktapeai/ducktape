@@ -7,7 +7,7 @@ use crate::commands::todo;
 use crate::commands::utilities;
 use crate::commands::{CommandArgs, CommandExecutor};
 use crate::config::{Config, LLMProvider};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rustyline::DefaultEditor;
 
 pub struct Application {
@@ -26,9 +26,7 @@ impl Application {
             Box::new(contacts::ContactGroupsCommand),
         ];
 
-        Self {
-            command_executors: executors,
-        }
+        Self { command_executors: executors }
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -206,10 +204,7 @@ impl Application {
                     let args = CommandArgs::parse(&command)?;
                     self.execute_command(args).await
                 } else {
-                    println!(
-                        "Generated command doesn't start with 'ducktape': {}",
-                        command
-                    );
+                    println!("Generated command doesn't start with 'ducktape': {}", command);
                     Ok(())
                 }
             }

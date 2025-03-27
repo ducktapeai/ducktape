@@ -1,12 +1,12 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use ducktape::calendar::Calendar;
 use ducktape::command_parser::CommandParser;
 use ducktape::command_processor::CommandProcessor;
 use ducktape::config::Config;
-use ducktape::calendar::Calendar;
 
 fn benchmark_command_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("command_parsing");
-    
+
     group.bench_function("parse_calendar_command", |b| {
         b.iter(|| {
             let input = black_box("schedule a meeting with John tomorrow at 2pm");
@@ -29,11 +29,9 @@ fn benchmark_command_parsing(c: &mut Criterion) {
 fn benchmark_calendar_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("calendar_operations");
     let calendar = Calendar::new().unwrap();
-    
+
     group.bench_function("search_events", |b| {
-        b.iter(|| {
-            calendar.search_events(black_box("meeting"), None, None)
-        });
+        b.iter(|| calendar.search_events(black_box("meeting"), None, None));
     });
 
     group.bench_function("create_simple_event", |b| {
@@ -56,12 +54,11 @@ fn benchmark_nlp_processing(c: &mut Criterion) {
     let mut group = c.benchmark_group("nlp_processing");
     let config = Config::load().unwrap();
     let processor = CommandProcessor::new(config);
-    
+
     group.bench_function("process_natural_command", |b| {
         b.iter(|| {
-            processor.process_command(
-                black_box("create a weekly team meeting every Tuesday at 10am")
-            )
+            processor
+                .process_command(black_box("create a weekly team meeting every Tuesday at 10am"))
         });
     });
 

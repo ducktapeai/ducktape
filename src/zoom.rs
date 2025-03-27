@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::{debug, error, info};
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
@@ -31,12 +31,7 @@ impl ZoomCredentials {
             .map(Secret::new)
             .map_err(|_| anyhow!("ZOOM_CLIENT_SECRET not found in environment"))?;
 
-        Ok(Self {
-            account_id,
-            client_id,
-            client_secret,
-            access_token: None,
-        })
+        Ok(Self { account_id, client_id, client_secret, access_token: None })
     }
 
     #[allow(dead_code)]
@@ -66,10 +61,7 @@ impl ZoomCredentials {
 
         let response = client
             .post(token_url)
-            .basic_auth(
-                self.client_id.expose_secret(),
-                Some(self.client_secret.expose_secret()),
-            )
+            .basic_auth(self.client_id.expose_secret(), Some(self.client_secret.expose_secret()))
             .form(&[
                 ("grant_type", "account_credentials"),
                 ("account_id", self.account_id.expose_secret()),
@@ -80,10 +72,8 @@ impl ZoomCredentials {
         // Check for errors and provide more detailed error messages
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unable to get error response".into());
+            let error_text =
+                response.text().await.unwrap_or_else(|_| "Unable to get error response".into());
 
             // Log the full error for debugging
             error!("Zoom OAuth error response: {}", error_text);
@@ -113,11 +103,7 @@ impl ZoomCredentials {
         }
 
         let token_data: TokenResponse = serde_json::from_str(&response_text).map_err(|e| {
-            anyhow!(
-                "Failed to parse OAuth response: {} - Response was: {}",
-                e,
-                response_text
-            )
+            anyhow!("Failed to parse OAuth response: {} - Response was: {}", e, response_text)
         })?;
 
         // Store and return the token
@@ -166,10 +152,7 @@ impl ZoomClient {
             .build()
             .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
-        Ok(Self {
-            credentials,
-            client,
-        })
+        Ok(Self { credentials, client })
     }
 
     // Create a Zoom meeting
@@ -184,10 +167,7 @@ impl ZoomClient {
 
         // Sanitize input data
         let sanitized_topic = sanitize_zoom_field(&options.topic, 200);
-        let sanitized_agenda = options
-            .agenda
-            .as_deref()
-            .map(|a| sanitize_zoom_field(a, 2000));
+        let sanitized_agenda = options.agenda.as_deref().map(|a| sanitize_zoom_field(a, 2000));
 
         // Construct request body
         let body = serde_json::json!({
@@ -222,10 +202,8 @@ impl ZoomClient {
         // Check for errors
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unable to get error response".into());
+            let error_text =
+                response.text().await.unwrap_or_else(|_| "Unable to get error response".into());
             error!("Zoom API error: {} - {}", status, error_text);
             return Err(anyhow!("Zoom API error ({}): {}", status, error_text));
         }
@@ -260,10 +238,8 @@ impl ZoomClient {
         // Check for errors
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unable to get error response".into());
+            let error_text =
+                response.text().await.unwrap_or_else(|_| "Unable to get error response".into());
             error!("Zoom API error: {} - {}", status, error_text);
             return Err(anyhow!("Zoom API error ({}): {}", status, error_text));
         }
@@ -292,17 +268,13 @@ impl ZoomClient {
             request = request.body(body_str.to_string());
         }
 
-        let response = request
-            .send()
-            .await
-            .map_err(|e| anyhow!("Failed to send request: {}", e))?;
+        let response =
+            request.send().await.map_err(|e| anyhow!("Failed to send request: {}", e))?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unable to get error response".into());
+            let error_text =
+                response.text().await.unwrap_or_else(|_| "Unable to get error response".into());
             return Err(anyhow!("API error ({}): {}", status, error_text));
         }
 
@@ -355,9 +327,7 @@ pub fn calculate_meeting_duration(start_time: &str, end_time: &str) -> Result<u3
     } else {
         // If end time is earlier than start time, assume it's the next day
         (end.signed_duration_since(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
-            + chrono::NaiveTime::from_hms_opt(24, 0, 0)
-                .unwrap()
-                .signed_duration_since(start))
+            + chrono::NaiveTime::from_hms_opt(24, 0, 0).unwrap().signed_duration_since(start))
         .num_minutes() as u32
     };
 

@@ -29,18 +29,11 @@ fn handle_config_command(args: CommandArgs) -> Result<()> {
         "show" => {
             let config = Config::load()?;
             println!("\nCurrent Configuration:");
-            println!(
-                "  Language Model Provider: {:?}",
-                config.language_model.provider
-            );
+            println!("  Language Model Provider: {:?}", config.language_model.provider);
             println!("\nCalendar Settings:");
             println!(
                 "  Default Calendar: {}",
-                config
-                    .calendar
-                    .default_calendar
-                    .as_deref()
-                    .unwrap_or("None")
+                config.calendar.default_calendar.as_deref().unwrap_or("None")
             );
             println!(
                 "  Default Reminder: {} minutes",
@@ -51,17 +44,10 @@ fn handle_config_command(args: CommandArgs) -> Result<()> {
                 config.calendar.default_duration_minutes.unwrap_or(60)
             );
             println!("\nTodo Settings:");
-            println!(
-                "  Default List: {}",
-                config.todo.default_list.as_deref().unwrap_or("None")
-            );
+            println!("  Default List: {}", config.todo.default_list.as_deref().unwrap_or("None"));
             println!(
                 "  Default Reminder: {}",
-                if config.todo.default_reminder {
-                    "Enabled"
-                } else {
-                    "Disabled"
-                }
+                if config.todo.default_reminder { "Enabled" } else { "Disabled" }
             );
             println!("\nNotes Settings:");
             println!(
@@ -97,10 +83,7 @@ fn handle_config_command(args: CommandArgs) -> Result<()> {
             return Ok(());
         }
         _ => {
-            println!(
-                "Unknown config setting '{}'. Available settings:",
-                args.args[0]
-            );
+            println!("Unknown config setting '{}'. Available settings:", args.args[0]);
             println!("  llm - Set the language model provider");
             println!("  show - Display current configuration");
             println!("\nExample: ducktape config llm grok");
