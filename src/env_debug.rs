@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Prints the status of environment variables and .env file for debugging
 pub fn print_env_status() {
     info!("📊 Environment Variables Status:");
 
@@ -57,14 +58,19 @@ pub fn print_env_status() {
     }
 }
 
+/// Sets a placeholder API key for development/testing only
+/// 
+/// # Warning
+/// This function should only be used during development and testing,
+/// never in production environments. Proper API keys should be set
+/// through environment variables or the .env file.
 pub fn force_set_api_key() -> bool {
-    // If environment variable is not set, try to set it from hardcoded value
+    // If environment variable is not set, set a placeholder for development
     if env::var("XAI_API_KEY").is_err() {
-        let api_key =
-            "xai-vLxMy9tYMTkU4z1XwRc0LE74eUEg7acbvb9NL95oNqz3KlKJxAOtrPaCOtbA1estp0Z4foPGycmV0X8P";
+        let api_key = "xai-placeholder-development-key-not-for-production-use";
         env::set_var("XAI_API_KEY", api_key);
         info!(
-            "🔑 Forced XAI_API_KEY to be set (length: {})",
+            "🔑 Set placeholder XAI_API_KEY for development (length: {})",
             api_key.len()
         );
         return true;
