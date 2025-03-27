@@ -1,5 +1,8 @@
 # DuckTape 🦆
 
+> **Note**: DuckTape currently only works on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac)
+> We have windows on our roadmap
+
 A terminal-based calendar management tool with natural language processing and AI integration.
 
 ## Installation
