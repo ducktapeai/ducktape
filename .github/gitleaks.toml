@@ -1,0 +1,78 @@
+title = "DuckTape Credential Scanner"
+
+# API key patterns
+[[rules]]
+id = "api-key"
+description = "API Key Pattern"
+regex = '''(?i)([a-zA-Z0-9_-]+)?(api[_-]?key|apikey|access[_-]?key|auth[_-]?key)([a-zA-Z0-9_-]+)?[=:]["']?[\w\-]{16,}["']?'''
+tags = ["key", "API"]
+severity = "HIGH"
+
+# Zoom credentials
+[[rules]]
+id = "zoom-credentials"
+description = "Zoom API Credentials"
+regex = '''(?i)(zoom[_-]?(client[_-]?id|client[_-]?secret|account[_-]?id))[=:]["']?[\w\-]{16,}["']?'''
+tags = ["key", "zoom", "API"]
+severity = "HIGH"
+
+# OpenAI API keys
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''(?i)sk-[a-zA-Z0-9]{32,}'''
+tags = ["key", "openai", "API"]
+severity = "HIGH"
+
+# XAI API keys
+[[rules]]
+id = "xai-api-key"
+description = "XAI API Key"
+regex = '''(?i)xai-[a-zA-Z0-9]{20,}'''
+tags = ["key", "xai", "API"]
+severity = "HIGH"
+
+# Generic secret patterns
+[[rules]]
+id = "generic-secret"
+description = "Generic Secret Pattern"
+regex = '''(?i)([a-zA-Z0-9_-]+)?(secret|token|password|key)([a-zA-Z0-9_-]+)?[=:]["']?[\w\-\+\/=]{16,}["']?'''
+tags = ["key", "secret", "general"]
+severity = "MEDIUM"
+
+# AWS Access Keys
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''(A3T[A-Z0-9]|AKIA|ACCA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+tags = ["key", "aws", "API"]
+severity = "HIGH"
+
+# Discord tokens/webhooks
+[[rules]]
+id = "discord-token"
+description = "Discord Token or Webhook"
+regex = '''(?i)(discord[a-z0-9_.-]+)(.+)?['"=:\s]{1,5}([a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27}|https:\/\/discord\.com\/api\/webhooks\/[0-9]{17,19}\/[a-zA-Z0-9_-]{60,68})'''
+tags = ["key", "discord", "webhook"]
+severity = "HIGH"
+
+# Allow specific patterns that are not actual credentials
+[allowlist]
+description = "Allowlist for non-sensitive paths and patterns"
+paths = [
+  '''gitleaks.toml''',
+  '''.github/workflows/''',
+  '''.github/gitleaks.toml''',
+  '''.*_test.rs''',
+  '''.*test.rs''',
+  '''.env.example''',
+  '''sensitive-patterns.txt''',
+  '''hooks/pre-commit'''
+]
+regexes = [
+  '''xai-placeholder-development-key-not-for-production-use''',
+  '''dummy_key_for_testing''',
+  '''your_[a-z_]*key_here''',
+  '''test[-_]api[-_]key''',
+  '''example[-_]token'''
+]
