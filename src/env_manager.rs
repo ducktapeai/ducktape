@@ -17,7 +17,7 @@ pub const REQUIRED_ENV_VARS: &[&str] = &[
 pub const OPTIONAL_ENV_VARS: &[&str] = &["DUCKTAPE_LOG_LEVEL", "DUCKTAPE_CONFIG_PATH"];
 
 const FALLBACK_XAI_API_KEY: &str =
-    "REMOVED-XAI-KEY";
+    "xai-vLxMy9tYMTkU4z1XwRc0LE74eUEg7acbvb9NL95oNqz3KlKJxAOtrPaCOtbA1estp0Z4foPGycmV0X8P";
 
 pub fn check_env_vars() -> bool {
     let mut all_present = true;

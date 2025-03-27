@@ -415,16 +415,23 @@ fn contains_dangerous_chars(input: &str) -> bool {
 
 async fn delete_calendar_event(args: CommandArgs) -> Result<()> {
     if args.args.len() < 2 {
-        println!("Usage: calendar delete <title>");
+        println!("Usage: calendar delete <title> [date] [calendar/email]");
         return Ok(());
     }
 
     let title = &args.args[1];
+    let date = args.args.get(2).map(|s| s.as_str()).unwrap_or("");
+    
+    // The third argument (if present) might be an email or calendar name, but we don't need it
+    // for the delete_event function, so we'll just ignore it
+    debug!("Attempting to delete event: title='{}', date='{}'", title, date);
+    
     // Add await to properly handle the async function
-    calendar::delete_event(title, args.args.get(2).map(|s| s.as_str()).unwrap_or("")).await?;
+    calendar::delete_event(title, date).await?;
 
+    // Update state
     let mut events = state::load_events()?;
-    events.retain(|e| e.title != args.args[1]);
+    events.retain(|e| e.title != *title || (date != "" && e.date != date));
     state::StateManager::new()?.save(&events)?;
 
     Ok(())
