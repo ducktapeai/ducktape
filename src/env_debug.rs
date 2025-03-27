@@ -61,7 +61,7 @@ pub fn force_set_api_key() -> bool {
     // If environment variable is not set, try to set it from hardcoded value
     if env::var("XAI_API_KEY").is_err() {
         let api_key =
-            "REMOVED-XAI-KEY";
+            "xai-vLxMy9tYMTkU4z1XwRc0LE74eUEg7acbvb9NL95oNqz3KlKJxAOtrPaCOtbA1estp0Z4foPGycmV0X8P";
         env::set_var("XAI_API_KEY", api_key);
         info!(
             "🔑 Forced XAI_API_KEY to be set (length: {})",

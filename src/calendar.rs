@@ -409,7 +409,7 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
 
     // Load configuration and get default calendar if none specified
     let app_config = Config::load()?;
-    let requested_calendars = if config.calendars.is_empty() {
+    let requested_calendars = if (config.calendars.is_empty()) {
         vec![app_config
             .calendar
             .default_calendar
@@ -926,14 +926,29 @@ pub async fn list_event_properties() -> Result<()> {
     }
 }
 
-pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
+pub async fn delete_event(title: &str, date: &str) -> Result<()> {
+    debug!("Attempting to delete event: title='{}', date='{}'", title, date);
+    
+    // Validate date format if provided
+    if !date.is_empty() && !validate_date_format(date) {
+        return Err(anyhow!("Invalid date format. Please use YYYY-MM-DD format."));
+    }
+    
+    let date_filter = if date.is_empty() {
+        // If no date provided, find all events with the title
+        String::from("")
+    } else {
+        // Convert date to format for AppleScript comparison
+        format!(r#" and start date of it > date "{0} 00:00:00" and start date of it < date "{0} 23:59:59""#, date)
+    };
+
     let script = format!(
         r#"tell application "Calendar"
             try
                 set foundEvents to {{}}
                 repeat with c in calendars
                     tell c
-                        set matchingEvents to (every event whose summary contains "{0}")
+                        set matchingEvents to (every event whose summary is "{0}" or summary contains "{0}"{1})
                         repeat with evt in matchingEvents
                             copy evt to end of foundEvents
                         end repeat
@@ -941,21 +956,26 @@ pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
                 end repeat
                 
                 if (count of foundEvents) is 0 then
-                    error "No matching events found for title: {0}"
+                    error "No matching events found for title: {0}{2}"
                 end if
                 
+                set deletedCount to 0
                 repeat with evt in foundEvents
                     set evtTitle to summary of evt
-                    log "Deleting event: " & evtTitle
+                    set evtDate to start date of evt
+                    log "Deleting event: " & evtTitle & " on " & (evtDate as string)
                     delete evt
+                    set deletedCount to deletedCount + 1
                 end repeat
                 
-                return "Success: Events deleted"
+                return "Success: " & deletedCount & " event(s) deleted"
             on error errMsg
                 return "Error: " & errMsg
             end try
         end tell"#,
-        title
+        title,
+        date_filter,
+        if date.is_empty() { String::from("") } else { format!(" on date {}", date) }
     );
 
     let output = tokio::process::Command::new("osascript")
@@ -966,9 +986,11 @@ pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
 
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Success") {
-        println!("Calendar event(s) deleted containing title: {}", title);
+        debug!("Calendar event deletion result: {}", result);
+        println!("{}", result);
         Ok(())
     } else {
+        error!("Calendar event deletion failed: {}", result);
         Err(anyhow!("Failed to delete events: {}", result))
     }
 }
