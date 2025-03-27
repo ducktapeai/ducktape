@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::process::Command;
 
 #[derive(Debug)]
@@ -10,11 +10,7 @@ pub struct ReminderConfig<'a> {
 
 impl<'a> ReminderConfig<'a> {
     pub fn new(title: &'a str) -> Self {
-        Self {
-            title,
-            remind_date: None,
-            notes: None,
-        }
+        Self { title, remind_date: None, notes: None }
     }
 }
 

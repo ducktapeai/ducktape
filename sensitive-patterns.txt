@@ -1,0 +1,4 @@
+xai-vLxMy9tYMTkU4z1XwRc0LE74eUEg7acbvb9NL95oNqz3KlKJxAOtrPaCOtbA1estp0Z4foPGycmV0X8P==>REMOVED-XAI-KEY
+OtfQQjEcGp2zBuLcOfJEymynuuXNzWDY==>REMOVED-ZOOM-SECRET
+sk-[a-zA-Z0-9]{32,}==>REMOVED-OPENAI-KEY
+regex:(?i)(api_key|secret|token|password|key)[\s]*[=:][\s]*["][^\s"]{8,}["](?!.*example)==>REMOVED-CREDENTIAL

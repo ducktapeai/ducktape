@@ -167,23 +167,19 @@ fn test_recurrence_rule_generation() -> Result<()> {
 
 #[tokio::test]
 async fn test_create_calendar_event() -> Result<()> {
-    use ducktape::calendar::{create_event, EventConfig};
+    use ducktape::calendar::{EventConfig, create_event};
 
     let mut config = EventConfig::new("Test Event", "2024-02-01", "14:30");
     config.end_time = Some("15:30".to_string());
 
     let result = create_event(config).await;
-    assert!(
-        result.is_ok(),
-        "Failed to create calendar event: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "Failed to create calendar event: {:?}", result);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_create_event_with_contacts() -> Result<()> {
-    use ducktape::calendar::{create_event, EventConfig};
+    use ducktape::calendar::{EventConfig, create_event};
 
     let mut config = EventConfig::new("Meeting with Team", "2024-02-01", "14:00");
     config.end_time = Some("15:00".to_string());
@@ -191,26 +187,18 @@ async fn test_create_event_with_contacts() -> Result<()> {
     config.emails = vec!["john.doe@example.com".to_string()];
 
     let result = create_event(config).await;
-    assert!(
-        result.is_ok(),
-        "Failed to create calendar event with contacts: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "Failed to create calendar event with contacts: {:?}", result);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_create_short_event() -> Result<()> {
-    use ducktape::calendar::{create_event, EventConfig};
+    use ducktape::calendar::{EventConfig, create_event};
 
     let mut config = EventConfig::new("Quick Sync", "2024-02-01", "10:00");
     config.end_time = Some("10:30".to_string());
 
     let result = create_event(config).await;
-    assert!(
-        result.is_ok(),
-        "Failed to create short calendar event: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "Failed to create short calendar event: {:?}", result);
     Ok(())
 }

@@ -1,10 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::future::Future;
 use std::pin::Pin;
 
 use crate::calendar::EventConfig;
 use crate::commands::{CommandArgs, CommandExecutor};
-use crate::contact_groups::{create_event_with_group, ContactGroup, ContactGroups};
+use crate::contact_groups::{ContactGroup, ContactGroups, create_event_with_group};
 
 /// Handle contact group commands
 pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
@@ -30,19 +30,11 @@ pub async fn handle_contacts_command(args: &[&str]) -> Result<()> {
             let group_id = args[1].to_string();
             let name = args[2].to_string();
             let contacts: Vec<String> = args[3].split(',').map(|s| s.trim().to_string()).collect();
-            let description = if args.len() > 4 {
-                Some(args[4].to_string())
-            } else {
-                None
-            };
+            let description = if args.len() > 4 { Some(args[4].to_string()) } else { None };
 
             // Create and add the new group
             let mut groups = ContactGroups::load()?;
-            let group = ContactGroup {
-                name,
-                contacts,
-                description,
-            };
+            let group = ContactGroup { name, contacts, description };
             groups.add_group(group_id, group);
             groups.save()?;
             println!("Contact group '{}' created successfully", args[1]);
