@@ -34,6 +34,7 @@ ducktape config llm grok    # For Grok-2-latest model
 | OpenAI           | ✅          | Complete integration with API                      |
 | Grok (XAI)       | ✅          | Complete integration with API                      |
 | DeepSeek         | 🚧          | Integration in progress                            |
+| Apple Contacts   | ✅          | Full contact lookup for event invitations          |
 | Zoom             | ✅          | Meeting creation via Server-to-Server OAuth        |
 | Native Calendar  | ✅          | Full read/write with Apple Calendar                |
 | CSV Import       | ✅          | Full support for event importing                   |
@@ -295,6 +296,33 @@ ducktape calendar create "Meeting Title" 2023-06-15 14:00 15:00 --zoom
 # Or using natural language
 "schedule a zoom meeting with the team tomorrow at 3pm for one hour"
 ```
+
+## Apple Contacts Integration
+
+DuckTape seamlessly integrates with the Apple Contacts app to simplify adding attendees to your calendar events.
+
+### How Contact Lookup Works
+
+- **Name Matching**: When you specify contact names using the `--contacts` flag or natural language commands, DuckTape looks up these names in your Apple Contacts app.
+- **Exact Matching**: Contact names must match exactly as they appear in Apple Contacts for successful lookup.
+- **Multiple Email Handling**: If a contact has multiple email addresses, DuckTape will use the primary email address.
+
+### Using Contacts in Commands
+
+```bash
+# Add contacts by name (names must match Apple Contacts entries)
+ducktape calendar create "Team Meeting" 2024-04-01 10:00 11:00 --contacts "Jane Smith,John Doe"
+
+# Using natural language
+ducktape "schedule a meeting with Jane Smith and John Doe tomorrow at 2pm"
+```
+
+### Tips for Contact Usage
+
+- Ensure contact names are spelled exactly as they appear in the Apple Contacts app
+- If a contact isn't being found, check your Contacts app to verify the name format
+- For contacts with the same name, consider using their email address directly with the `--email` flag
+- Contact groups from the Apple Contacts app are not currently supported
 
 ## Calendar Import
 DuckTape supports importing calendar events from CSV and ICS files. 
