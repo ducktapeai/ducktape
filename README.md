@@ -7,6 +7,23 @@ Plans underway to integrate as an Application.
 
 > **Note**: DuckTape currently only works on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac)
 
+### AI Models Currently in Use
+
+DuckTape leverages the following language models for natural language understanding:
+
+| Provider | Model | Status | Use Case | 
+|----------|-------|:------:|----------|
+| OpenAI   | GPT-4 Turbo | ✅ | Primary model for complex natural language processing |
+| OpenAI   | GPT-3.5 Turbo | ✅ | Fallback model for faster processing of simple requests |  
+| Grok (XAI) | Grok-2-latest | ✅ | Alternative model with specialized calendar understanding |
+| DeepSeek | DeepSeek-Coder | 🚧 | In development for code-related tasks and reminders |
+
+The default model is determined by your configuration settings. You can switch between models using:
+```bash
+ducktape config llm openai  # For OpenAI models
+ducktape config llm grok    # For Grok-2-latest model
+```
+
 ### Integration Status
 
 | Integration      | Status      | Description                                        |
