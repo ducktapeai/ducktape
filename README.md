@@ -305,7 +305,7 @@ DuckTape seamlessly integrates with the Apple Contacts app to simplify adding at
 
 - **Name Matching**: When you specify contact names using the `--contacts` flag or natural language commands, DuckTape looks up these names in your Apple Contacts app.
 - **Exact Matching**: Contact names must match exactly as they appear in Apple Contacts for successful lookup.
-- **Multiple Email Handling**: If a contact has multiple email addresses, DuckTape will use the primary email address.
+- **Multiple Email Handling**: If a contact has multiple email addresses, DuckTape will use the all the email address.
 
 ### Using Contacts in Commands
 
