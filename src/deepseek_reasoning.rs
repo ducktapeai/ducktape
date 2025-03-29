@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde_json::json;
 use std::env;
 
+#[allow(dead_code)]
 pub async fn get_superbowl_info() -> Result<String> {
     // Adjust endpoint and parameters as needed.
     let endpoint = "https://api.deepseek.example/v1/reason";
