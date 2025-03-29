@@ -3,6 +3,10 @@ use anyhow::Result;
 use std::future::Future;
 use std::pin::Pin;
 
+/// Command handler for the "version" command.
+/// 
+/// This command displays the current version of the DuckTape application
+/// as defined in Cargo.toml.
 pub struct VersionCommand;
 
 impl CommandExecutor for VersionCommand {
@@ -15,6 +19,11 @@ impl CommandExecutor for VersionCommand {
     }
 }
 
+/// Prints the current version of the DuckTape application.
+///
+/// # Returns
+/// 
+/// A `Result<()>` indicating success or failure.
 fn print_version() -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     println!("DuckTape version {}", version);
