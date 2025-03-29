@@ -44,6 +44,22 @@ ducktape config llm grok    # For Grok-2-latest model
 
 ## Installation
 
+### Using Homebrew (macOS and Linux)
+
+You can now install Ducktape using Homebrew:
+
+```bash
+brew install ducktapeai/ducktape/ducktape
+```
+
+To update to the latest version:
+
+```bash
+brew upgrade ducktape
+```
+
+### Manual Installation
+
 From crates.io:
 ```bash
 cargo install ducktape
