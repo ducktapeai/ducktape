@@ -5,6 +5,17 @@ All notable changes to DuckTape will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-03-29
+
+### Changed
+- Updated dependencies to latest compatible versions
+- Improved error handling in WebSocket connections
+- Enhanced security in API key management
+
+### Fixed
+- Resolved dependency conflicts in Cargo.lock
+- Fixed error handling in calendar event creation
+
 ## [0.1.1] - 2025-03-29
 
 ### Fixed
