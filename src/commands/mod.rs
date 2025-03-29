@@ -134,7 +134,7 @@ impl CommandArgs {
         if !first_part.eq_ignore_ascii_case("ducktape") {
             // If the first word is a valid command on its own (like "calendars", "calendar", etc.)
             // then assume we're missing the ducktape prefix and proceed
-            if first_part.eq_ignore_ascii_case("calendars") 
+            if first_part.eq_ignore_ascii_case("calendars")
                 || first_part.eq_ignore_ascii_case("calendar")
                 || first_part.eq_ignore_ascii_case("todo")
                 || first_part.eq_ignore_ascii_case("note")
@@ -145,13 +145,11 @@ impl CommandArgs {
             {
                 // Don't remove first part, just proceed
                 log::debug!("First part '{}' is a valid command, keeping it", first_part);
-            }
-            else {
+            } else {
                 log::debug!("First part '{}' does not match 'ducktape'", first_part);
                 return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
             }
-        }
-        else {
+        } else {
             // Remove "ducktape" prefix
             parts.remove(0);
         }
