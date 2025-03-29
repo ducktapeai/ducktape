@@ -93,7 +93,10 @@ fn print_version() {
 
 /// Prints help information for the application
 fn print_help() {
-    println!("{} - AI-powered terminal tool for Apple Calendar, Reminders and Notes", APP_NAME);
+    println!(
+        "{} - AI-powered terminal tool for Apple Calendar, Reminders and Notes",
+        APP_NAME
+    );
     println!("\nUSAGE:");
     println!("  ducktape [COMMAND] [FLAGS]");
     println!("\nCOMMANDS:");
