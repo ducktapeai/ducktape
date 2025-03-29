@@ -24,6 +24,11 @@ use app::Application;
 use config::Config;
 use std::env;
 
+/// Name of the application used in help and version output
+const APP_NAME: &str = "DuckTape";
+/// Current version of the application
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
@@ -55,11 +60,22 @@ async fn main() -> Result<()> {
                 app.run().await?;
                 return Ok(());
             }
+            "version" | "--version" | "-v" => {
+                // Display version information
+                print_version();
+                return Ok(());
+            }
+            "help" | "--help" | "-h" => {
+                // Display help information
+                print_help();
+                return Ok(());
+            }
             _ => {
-                println!("Usage: ducktape [--api-server|--full]");
-                println!("  --api-server  Start in API server mode only");
-                println!("  --full        Start both terminal and API server");
-                println!("  (no flags)    Start in terminal mode only");
+                // For other commands, we could either:
+                // 1. Print help and return error
+                // 2. Try to process as a domain command
+                // For now, display help for unknown commands
+                print_help();
                 return Ok(());
             }
         }
@@ -68,4 +84,27 @@ async fn main() -> Result<()> {
     // Default: Run in terminal-only mode
     let app = Application::new();
     app.run_terminal_only().await
+}
+
+/// Prints version information for the application
+fn print_version() {
+    println!("{} version {}", APP_NAME, VERSION);
+}
+
+/// Prints help information for the application
+fn print_help() {
+    println!("{} - AI-powered terminal tool for Apple Calendar, Reminders and Notes", APP_NAME);
+    println!("\nUSAGE:");
+    println!("  ducktape [COMMAND] [FLAGS]");
+    println!("\nCOMMANDS:");
+    println!("  help        Display this help information");
+    println!("  version     Display the current version");
+    println!("\nFLAGS:");
+    println!("  --api-server  Start in API server mode only");
+    println!("  --full        Start both terminal and API server");
+    println!("  (no flags)    Start in terminal mode only");
+    println!("\nEXAMPLES:");
+    println!("  ducktape                 Start interactive terminal mode");
+    println!("  ducktape --api-server    Start API server only");
+    println!("  ducktape version         Display version information");
 }
