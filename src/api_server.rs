@@ -36,6 +36,7 @@ use std::path::Path;
 
 // API state that will be shared across handlers
 pub struct ApiState {
+    #[allow(dead_code)] // This field is kept for future use
     pub config: Config,
 }
 
@@ -972,4 +973,4 @@ pub async fn start_api_server(config: Config) -> Result<()> {
         .map_err(|e| anyhow!("Failed to start API server: {}", e))?;
 
     Ok(())
-} // Fixed: removed extra closing brace
+}

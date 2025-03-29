@@ -123,6 +123,7 @@ impl Application {
         }
     }
 
+    #[allow(dead_code)] // May be used in future versions
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
 
@@ -217,6 +218,7 @@ impl Application {
     }
 }
 
+#[allow(dead_code)] // Kept for future use when logging is expanded
 pub fn init_logger() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format(|buf, record| {

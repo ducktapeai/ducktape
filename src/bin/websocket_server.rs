@@ -1,5 +1,4 @@
 use ducktape::api_server; // Change from websocket to api_server since that appears to be the correct module
-use std::error::Error;
 
 fn main() {
     // Initialize logging using proper env_logger approach

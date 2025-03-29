@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::process::Command;
 
+#[allow(dead_code)]
 pub fn list_calendars() -> Result<()> {
     // First ensure Calendar.app is running
     let launch_script = r#"
@@ -46,6 +47,7 @@ pub fn list_calendars() -> Result<()> {
     }
 }
 
+#[allow(dead_code)]
 pub fn list_event_properties() -> Result<()> {
     let script = r#"tell application "Calendar"
         try
@@ -91,6 +93,7 @@ pub fn list_event_properties() -> Result<()> {
     }
 }
 
+#[allow(dead_code)]
 pub fn create_event(
     _title: &str,
     _date: &str,
