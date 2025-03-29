@@ -153,6 +153,7 @@ pub mod help;
 pub mod notes;
 pub mod todo;
 pub mod utilities;
+pub mod version;
 
 #[allow(dead_code)]
 // Public function to print help

@@ -5,6 +5,7 @@ use crate::commands::help;
 use crate::commands::notes;
 use crate::commands::todo;
 use crate::commands::utilities;
+use crate::commands::version;
 use crate::commands::{CommandArgs, CommandExecutor};
 use crate::config::{Config, LLMProvider};
 use anyhow::{Result, anyhow};
@@ -24,6 +25,7 @@ impl Application {
             Box::new(config::ConfigCommand),
             Box::new(utilities::UtilitiesCommand),
             Box::new(contacts::ContactGroupsCommand),
+            Box::new(version::VersionCommand),
         ];
 
         Self { command_executors: executors }
