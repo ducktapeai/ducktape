@@ -2,7 +2,6 @@ use anyhow::Result;
 use ducktape::calendar;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 use tempfile::tempdir;
 
 #[test]
