@@ -45,6 +45,9 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
 
+    // Create application instance early so we can use it for commands
+    let app = Application::new();
+
     // Check command line flags
     if args.len() > 1 {
         match args[1].as_str() {
@@ -56,7 +59,6 @@ async fn main() -> Result<()> {
             }
             "--full" => {
                 // Start both terminal and API server (original behavior)
-                let app = Application::new();
                 app.run().await?;
                 return Ok(());
             }
@@ -70,11 +72,192 @@ async fn main() -> Result<()> {
                 print_help();
                 return Ok(());
             }
+            "calendars" => {
+                // Handle calendars command directly
+                calendar::list_calendars().await?;
+                return Ok(());
+            }
+            "calendar" => {
+                // Handle calendar subcommands
+                if args.len() > 2 {
+                    let subcommand = args[2].as_str();
+                    match subcommand {
+                        "list" => {
+                            calendar::list_calendars().await?;
+                            return Ok(());
+                        }
+                        "props" | "properties" => {
+                            calendar::list_event_properties().await?;
+                            return Ok(());
+                        }
+                        "create" | "add" => {
+                            // For calendar create/add, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "delete" | "remove" => {
+                            // For calendar delete/remove, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "import" => {
+                            // For calendar import, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "set-default" => {
+                            // For calendar set-default, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        _ => {
+                            // For other calendar subcommands, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                    }
+                } else {
+                    // If just "calendar" with no subcommand, show help
+                    println!("Usage: ducktape calendar <subcommand>");
+                    println!("Subcommands:");
+                    println!("  list      - List available calendars");
+                    println!("  props     - List available event properties");
+                    println!("  create    - Create a new calendar event");
+                    println!("  delete    - Delete a calendar event");
+                    println!("  import    - Import events from a file");
+                    println!("  set-default - Set the default calendar");
+                    return Ok(());
+                }
+            }
+            "todo" | "todos" => {
+                // Handle todo subcommands
+                if args.len() > 2 {
+                    let subcommand = args[2].as_str();
+                    match subcommand {
+                        "list" => {
+                            // List todos directly
+                            let full_command = format!("ducktape todo list");
+                            return app.process_command(&full_command).await;
+                        }
+                        "lists" => {
+                            // List todo lists directly
+                            let full_command = format!("ducktape todo lists");
+                            return app.process_command(&full_command).await;
+                        }
+                        "create" | "add" => {
+                            // For todo create/add, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "complete" | "done" => {
+                            // For todo complete, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "delete" | "remove" => {
+                            // For todo delete, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "set-list" | "set-default" => {
+                            // For todo set-list, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        _ => {
+                            // For other todo subcommands, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                    }
+                } else {
+                    // If just "todo" with no subcommand, show todos
+                    let full_command = format!("ducktape todo list");
+                    return app.process_command(&full_command).await;
+                }
+            }
+            "note" | "notes" => {
+                // Handle note subcommands
+                if args.len() > 2 {
+                    let subcommand = args[2].as_str();
+                    match subcommand {
+                        "list" => {
+                            // List notes directly
+                            let full_command = format!("ducktape note list");
+                            return app.process_command(&full_command).await;
+                        }
+                        "create" | "add" | "new" => {
+                            // For note create, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "search" | "find" => {
+                            // For note search, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "delete" | "remove" => {
+                            // For note delete, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        _ => {
+                            // For other note subcommands, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                    }
+                } else {
+                    // If just "note" with no subcommand, show notes
+                    let full_command = format!("ducktape note list");
+                    return app.process_command(&full_command).await;
+                }
+            }
+            "config" => {
+                // Handle config subcommands
+                if args.len() > 2 {
+                    let subcommand = args[2].as_str();
+                    match subcommand {
+                        "show" | "list" | "get" => {
+                            // For config show, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        "set" => {
+                            // For config set, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                        _ => {
+                            // For other config subcommands, process the full command
+                            let full_command = args.join(" ");
+                            return app.process_command(&full_command).await;
+                        }
+                    }
+                } else {
+                    // If just "config" with no subcommand, show config
+                    let full_command = format!("ducktape config show");
+                    return app.process_command(&full_command).await;
+                }
+            }
             _ => {
-                // For other commands, we could either:
-                // 1. Print help and return error
-                // 2. Try to process as a domain command
-                // For now, display help for unknown commands
+                // Check if this might be a command with arguments
+                if args.len() >= 2 {
+                    // Reconstruct full command including "ducktape"
+                    let full_command = args.join(" ");
+                    
+                    // Try to process as a command
+                    match app.process_command(&full_command).await {
+                        Ok(_) => return Ok(()),
+                        Err(_) => {
+                            // If command processing fails, just show help
+                            print_help();
+                            return Ok(());
+                        }
+                    }
+                }
+                
+                // Default: show help for unknown commands
                 print_help();
                 return Ok(());
             }
@@ -82,7 +265,6 @@ async fn main() -> Result<()> {
     }
 
     // Default: Run in terminal-only mode
-    let app = Application::new();
     app.run_terminal_only().await
 }
 
@@ -102,12 +284,18 @@ fn print_help() {
     println!("\nCOMMANDS:");
     println!("  help        Display this help information");
     println!("  version     Display the current version");
+    println!("  calendar    Manage calendar events");
+    println!("  todo        Manage reminders/todos");
+    println!("  note        Manage notes");
+    println!("  config      View or modify configuration");
     println!("\nFLAGS:");
     println!("  --api-server  Start in API server mode only");
     println!("  --full        Start both terminal and API server");
     println!("  (no flags)    Start in terminal mode only");
     println!("\nEXAMPLES:");
-    println!("  ducktape                 Start interactive terminal mode");
-    println!("  ducktape --api-server    Start API server only");
-    println!("  ducktape version         Display version information");
+    println!("  ducktape                      Start interactive terminal mode");
+    println!("  ducktape calendar list        List available calendars");
+    println!("  ducktape todo lists           List available reminder lists");
+    println!("  ducktape note list            List recent notes");
+    println!("  ducktape --api-server         Start API server only");
 }

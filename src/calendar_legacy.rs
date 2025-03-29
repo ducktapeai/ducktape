@@ -47,6 +47,50 @@ pub fn list_calendars() -> Result<()> {
     }
 }
 
+/// Fetch available calendars and return as a vector of strings
+pub fn fetch_calendars() -> Result<Vec<String>> {
+    // First ensure Calendar.app is running
+    let launch_script = r#"
+        tell application "Calendar"
+            launch
+            delay 1
+        end tell
+    "#;
+
+    Command::new("osascript").arg("-e").arg(launch_script).output()?;
+
+    let script = r#"tell application "Calendar"
+        try
+            set output to {}
+            repeat with aCal in calendars
+                set calInfo to name of aCal
+                copy calInfo to end of output
+            end repeat
+            return output
+        on error errMsg
+            error "Failed to list calendars: " & errMsg
+        end try
+    end tell"#;
+
+    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+
+    if output.status.success() {
+        let calendars = String::from_utf8_lossy(&output.stdout);
+        Ok(calendars
+            .trim_matches('{')
+            .trim_matches('}')
+            .split(", ")
+            .map(|s| s.trim_matches('"').to_string())
+            .filter(|s| !s.is_empty())
+            .collect())
+    } else {
+        Err(anyhow!(
+            "Failed to get available calendars: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ))
+    }
+}
+
 #[allow(dead_code)]
 pub fn list_event_properties() -> Result<()> {
     let script = r#"tell application "Calendar"
