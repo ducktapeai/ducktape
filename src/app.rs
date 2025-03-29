@@ -172,7 +172,7 @@ impl Application {
         // Parse the processed command into arguments
         match CommandArgs::parse(&processed_input) {
             Ok(args) => self.execute_command(args).await,
-            Err(e) => Err(anyhow!("Failed to parse command: {}", e))
+            Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
         }
     }
 

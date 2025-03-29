@@ -350,10 +350,10 @@ fn contains_dangerous_chars_for_script(input: &str) -> bool {
 
 pub async fn list_calendars() -> anyhow::Result<()> {
     use crate::calendar_legacy::fetch_calendars;
-    
+
     log::info!("Fetching available calendars");
     let calendars = fetch_calendars()?;
-    
+
     if calendars.is_empty() {
         println!("No calendars found");
     } else {
@@ -362,7 +362,7 @@ pub async fn list_calendars() -> anyhow::Result<()> {
             println!("- {}", calendar);
         }
     }
-    
+
     Ok(())
 }
 
@@ -379,7 +379,7 @@ pub async fn list_event_properties() -> anyhow::Result<()> {
     println!("- location: Event location");
     println!("- url: Event URL");
     println!("- all_day: Whether the event is all-day (true/false)");
-    
+
     Ok(())
 }
 
@@ -816,16 +816,16 @@ async fn ensure_calendar_running() -> Result<()> {
 /// Delete a calendar event based on title and date
 pub async fn delete_event(title: &str, date: &str) -> Result<()> {
     info!("Attempting to delete event: {} on {}", title, date);
-    
+
     // Validate inputs
     if !validate_date_format(date) {
         return Err(anyhow!("Invalid date format: {}", date));
     }
-    
+
     // Sanitize inputs to prevent AppleScript injection
     let sanitized_title = title.replace('\"', "\\\"");
     let sanitized_date = date.replace('\"', "\\\"");
-    
+
     // Script to delete the event
     let script = format!(
         r#"tell application "Calendar"
@@ -852,17 +852,13 @@ pub async fn delete_event(title: &str, date: &str) -> Result<()> {
         title = sanitized_title,
         date = sanitized_date
     );
-    
+
     // Execute the AppleScript
-    let output = tokio::process::Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .await?;
-    
+    let output = tokio::process::Command::new("osascript").arg("-e").arg(script).output().await?;
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    
+
     if output.status.success() {
         info!("Successfully deleted event: {} on {}", title, date);
         println!("{}", stdout);
@@ -876,21 +872,18 @@ pub async fn delete_event(title: &str, date: &str) -> Result<()> {
 /// Import events from a CSV file
 pub async fn import_csv_events(file_path: &Path, calendar_name: Option<String>) -> Result<()> {
     info!("Importing events from CSV file: {:?}", file_path);
-    
+
     let file = File::open(file_path)?;
-    let mut reader = ReaderBuilder::new()
-        .has_headers(true)
-        .flexible(true)
-        .from_reader(file);
-    
+    let mut reader = ReaderBuilder::new().has_headers(true).flexible(true).from_reader(file);
+
     let mut success_count = 0;
     let mut error_count = 0;
-    
+
     let app_config = Config::load()?;
-    let target_calendar = calendar_name.unwrap_or_else(|| 
+    let target_calendar = calendar_name.unwrap_or_else(|| {
         app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
-    );
-    
+    });
+
     for result in reader.records() {
         let record = match result {
             Ok(rec) => rec,
@@ -900,7 +893,7 @@ pub async fn import_csv_events(file_path: &Path, calendar_name: Option<String>) 
                 continue;
             }
         };
-        
+
         // Extract fields from CSV - handle potential missing fields gracefully
         let title = record.get(0).unwrap_or("Untitled Event").trim().to_string();
         let date = record.get(1).unwrap_or("").trim();
@@ -914,31 +907,32 @@ pub async fn import_csv_events(file_path: &Path, calendar_name: Option<String>) 
             let s = s.trim();
             if s.is_empty() { None } else { Some(s.to_string()) }
         });
-        let all_day = record.get(6)
+        let all_day = record
+            .get(6)
             .map(|s| s.trim().to_lowercase() == "true" || s.trim() == "1")
             .unwrap_or(false);
-        
+
         // Validate required fields
         if !validate_date_format(date) || (!all_day && !validate_time_format(start_time)) {
             error!("Invalid date/time format in CSV record: date={}, time={}", date, start_time);
             error_count += 1;
             continue;
         }
-        
+
         // Create event config
         let mut config = EventConfig::new(&title, date, if all_day { "00:00" } else { start_time });
         config.calendars = vec![target_calendar.clone()];
         config.all_day = all_day;
         config.description = description;
         config.location = location;
-        
+
         // Set end time if provided
         if let Some(end_time) = end_time {
             if !all_day && validate_time_format(end_time) {
                 config.end_time = Some(end_time.to_string());
             }
         }
-        
+
         // Create the event
         match create_event(config).await {
             Ok(_) => {
@@ -951,9 +945,9 @@ pub async fn import_csv_events(file_path: &Path, calendar_name: Option<String>) 
             }
         }
     }
-    
+
     info!("CSV import complete: {} events imported, {} errors", success_count, error_count);
-    
+
     if success_count > 0 {
         println!("Successfully imported {} events from CSV", success_count);
         if error_count > 0 {
@@ -968,19 +962,19 @@ pub async fn import_csv_events(file_path: &Path, calendar_name: Option<String>) 
 /// Import events from an ICS (iCalendar) file
 pub async fn import_ics_events(file_path: &Path, calendar_name: Option<String>) -> Result<()> {
     info!("Importing events from ICS file: {:?}", file_path);
-    
+
     let file = File::open(file_path)?;
     let buf_reader = BufReader::new(file);
     let parser = IcalParser::new(buf_reader);
-    
+
     let mut success_count = 0;
     let mut error_count = 0;
-    
+
     let app_config = Config::load()?;
-    let target_calendar = calendar_name.unwrap_or_else(|| 
+    let target_calendar = calendar_name.unwrap_or_else(|| {
         app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
-    );
-    
+    });
+
     for calendar in parser {
         match calendar {
             Ok(cal) => {
@@ -1002,9 +996,9 @@ pub async fn import_ics_events(file_path: &Path, calendar_name: Option<String>) 
             }
         }
     }
-    
+
     info!("ICS import complete: {} events imported, {} errors", success_count, error_count);
-    
+
     if success_count > 0 {
         println!("Successfully imported {} events from ICS", success_count);
         if error_count > 0 {
@@ -1019,43 +1013,53 @@ pub async fn import_ics_events(file_path: &Path, calendar_name: Option<String>) 
 /// Import a single event from an iCal component
 async fn import_ical_event(event: &IcalEvent, calendar_name: &str) -> Result<()> {
     // Extract summary (title)
-    let title = event.properties.iter()
+    let title = event
+        .properties
+        .iter()
         .find(|p| p.name == "SUMMARY")
         .and_then(|p| p.value.clone())
         .unwrap_or_else(|| "Untitled Event".to_string());
-    
+
     // Extract start date/time
-    let dtstart = event.properties.iter()
+    let dtstart = event
+        .properties
+        .iter()
         .find(|p| p.name == "DTSTART")
         .and_then(|p| p.value.clone())
         .ok_or_else(|| anyhow!("Event missing DTSTART property"))?;
-    
+
     // Check if it's an all-day event (no time component)
     // Simplest approach: just check if the DTSTART is 8 characters (YYYYMMDD) or longer
     let all_day = dtstart.len() <= 8;
-    
+
     // Parse date and time
     let (date, time) = if all_day {
         // Just use the date portion if available, or try to parse the basic format
         if dtstart.len() >= 8 {
-            (format!("{}-{}-{}", &dtstart[0..4], &dtstart[4..6], &dtstart[6..8]), "00:00".to_string())
+            (
+                format!("{}-{}-{}", &dtstart[0..4], &dtstart[4..6], &dtstart[6..8]),
+                "00:00".to_string(),
+            )
         } else {
             return Err(anyhow!("Invalid DTSTART format for all-day event"));
         }
     } else {
         // Extract and format date and time
-        if dtstart.len() >= 15 { // Basic format: YYYYMMDDTHHMMSS
+        if dtstart.len() >= 15 {
+            // Basic format: YYYYMMDDTHHMMSS
             (
                 format!("{}-{}-{}", &dtstart[0..4], &dtstart[4..6], &dtstart[6..8]),
-                format!("{}:{}", &dtstart[9..11], &dtstart[11..13])
+                format!("{}:{}", &dtstart[9..11], &dtstart[11..13]),
             )
         } else {
             return Err(anyhow!("Invalid DTSTART format: {}", dtstart));
         }
     };
-    
+
     // Extract end date/time
-    let end_time = event.properties.iter()
+    let end_time = event
+        .properties
+        .iter()
         .find(|p| p.name == "DTEND")
         .and_then(|p| p.value.clone())
         .and_then(|dtend| {
@@ -1065,18 +1069,22 @@ async fn import_ical_event(event: &IcalEvent, calendar_name: &str) -> Result<()>
                 Some(format!("{}:{}", &dtend[9..11], &dtend[11..13]))
             }
         });
-    
+
     // Extract description
-    let description = event.properties.iter()
+    let description = event
+        .properties
+        .iter()
         .find(|p| p.name == "DESCRIPTION")
         .and_then(|p| p.value.clone());
-    
+
     // Extract location
-    let location = event.properties.iter()
+    let location = event
+        .properties
+        .iter()
         .find(|p| p.name == "LOCATION")
         .and_then(|p| p.value.clone())
         .filter(|s| !s.is_empty());
-    
+
     // Create event config
     let mut config = EventConfig::new(&title, &date, &time);
     config.calendars = vec![calendar_name.to_string()];
@@ -1084,7 +1092,7 @@ async fn import_ical_event(event: &IcalEvent, calendar_name: &str) -> Result<()>
     config.description = description;
     config.location = location;
     config.end_time = end_time;
-    
+
     // Create the event
     create_event(config).await
 }
@@ -1092,7 +1100,7 @@ async fn import_ical_event(event: &IcalEvent, calendar_name: &str) -> Result<()>
 /// Function to create an event with contacts
 pub async fn create_event_with_contacts(config: EventConfig, contact_names: &[&str]) -> Result<()> {
     info!("Creating event with contacts: {:?}", contact_names);
-    
+
     // Look up emails for each contact name
     let mut found_emails = Vec::new();
     for name in contact_names {
@@ -1116,17 +1124,17 @@ pub async fn create_event_with_contacts(config: EventConfig, contact_names: &[&s
         emails: Vec::with_capacity(config.emails.len() + found_emails.len()),
         ..config.clone()
     };
-    
+
     // Add existing emails from original config
     updated_config.emails.extend(config.emails.iter().cloned());
-    
+
     // Add newly found emails
     updated_config.emails.extend(found_emails);
 
     // Deduplicate and clean emails
     updated_config.emails.sort_unstable();
     updated_config.emails.dedup();
-    
+
     info!("Final email list for invitation: {:?}", updated_config.emails);
 
     // Create the event with the updated config
@@ -1137,7 +1145,7 @@ pub async fn create_event_with_contacts(config: EventConfig, contact_names: &[&s
 async fn lookup_contact(contact_name: &str) -> Result<Vec<String>> {
     // Sanitize the contact name for AppleScript
     let sanitized_name = contact_name.replace('\"', "\\\"");
-    
+
     // AppleScript to fetch email addresses for the given contact
     let script = format!(
         r#"tell application "Contacts"
@@ -1159,19 +1167,15 @@ async fn lookup_contact(contact_name: &str) -> Result<Vec<String>> {
         end tell"#,
         sanitized_name
     );
-    
+
     debug!("Looking up contact: {}", contact_name);
-    
+
     // Execute the AppleScript
-    let output = tokio::process::Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .await?;
-    
+    let output = tokio::process::Command::new("osascript").arg("-e").arg(script).output().await?;
+
     if output.status.success() {
         let emails_output = String::from_utf8_lossy(&output.stdout);
-        
+
         // Parse the comma-separated list of emails
         let emails: Vec<String> = emails_output
             .trim_matches('{')
@@ -1180,7 +1184,7 @@ async fn lookup_contact(contact_name: &str) -> Result<Vec<String>> {
             .filter(|s| !s.is_empty())
             .map(|s| s.trim_matches('"').to_string())
             .collect();
-        
+
         debug!("Found {} email(s) for contact: {}", emails.len(), contact_name);
         Ok(emails)
     } else {

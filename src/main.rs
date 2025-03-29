@@ -245,7 +245,7 @@ async fn main() -> Result<()> {
                 if args.len() >= 2 {
                     // Reconstruct full command including "ducktape"
                     let full_command = args.join(" ");
-                    
+
                     // Try to process as a command
                     match app.process_command(&full_command).await {
                         Ok(_) => return Ok(()),
@@ -256,7 +256,7 @@ async fn main() -> Result<()> {
                         }
                     }
                 }
-                
+
                 // Default: show help for unknown commands
                 print_help();
                 return Ok(());
