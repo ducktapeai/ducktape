@@ -125,34 +125,41 @@ impl Application {
         }
     }
 
-    #[allow(dead_code)] // May be used in future versions
+    /// Process a direct command string - now public for CLI use
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
 
+        // Add "ducktape" prefix if missing for consistency
+        let normalized_input = if !input.trim().starts_with("ducktape") {
+            format!("ducktape {}", input)
+        } else {
+            input.to_string()
+        };
+
         // Determine if this is a natural language command that needs AI processing
         // or a direct command with parameters
-        let processed_input = if input.starts_with("calendar")
-            || input.starts_with("todo")
-            || input.starts_with("note")
+        let processed_input = if normalized_input.starts_with("ducktape calendar")
+            || normalized_input.starts_with("ducktape todo")
+            || normalized_input.starts_with("ducktape note")
         {
-            input.to_string()
+            normalized_input
         } else {
             // For natural language, we need to process via one of the AI models
             match Config::load()?.language_model.provider {
                 LLMProvider::OpenAI => {
-                    match crate::openai_parser::parse_natural_language(input).await {
+                    match crate::openai_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("OpenAI parser error: {}", e)),
                     }
                 }
                 LLMProvider::Grok => {
-                    match crate::grok_parser::parse_natural_language(input).await {
+                    match crate::grok_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("Grok parser error: {}", e)),
                     }
                 }
                 LLMProvider::DeepSeek => {
-                    match crate::deepseek_parser::parse_natural_language(input).await {
+                    match crate::deepseek_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("DeepSeek parser error: {}", e)),
                     }
@@ -162,24 +169,11 @@ impl Application {
 
         log::info!("Processed command: {}", processed_input);
 
-        // Split the processed command into tokens
-        let tokens: Vec<&str> = processed_input.split_whitespace().collect();
-        if tokens.is_empty() {
-            return Err(anyhow!("Empty command"));
+        // Parse the processed command into arguments
+        match CommandArgs::parse(&processed_input) {
+            Ok(args) => self.execute_command(args).await,
+            Err(e) => Err(anyhow!("Failed to parse command: {}", e))
         }
-
-        let command = tokens[0];
-
-        // Find a command executor that can handle this command
-        for executor in &self.command_executors {
-            if executor.can_handle(command) {
-                // Extract the arguments
-                let args = CommandArgs::parse(&processed_input)?;
-                return executor.execute(args).await;
-            }
-        }
-
-        Err(anyhow!("Unknown command: {}", command))
     }
 
     async fn execute_command(&self, args: CommandArgs) -> Result<()> {

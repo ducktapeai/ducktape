@@ -37,10 +37,38 @@ impl CommandArgs {
             || normalized_input.eq_ignore_ascii_case("ducktape help")
             || normalized_input.eq_ignore_ascii_case("ducktape --help")
             || normalized_input.eq_ignore_ascii_case("ducktape -h")
+            || normalized_input.eq_ignore_ascii_case("--h")
+            || normalized_input.eq_ignore_ascii_case("-h")
             || normalized_input.eq_ignore_ascii_case("ducktape --h")
         {
             return Ok(CommandArgs {
                 command: "help".to_string(),
+                args: vec![],
+                flags: HashMap::new(),
+            });
+        }
+
+        // Special case for version commands
+        if normalized_input.eq_ignore_ascii_case("version")
+            || normalized_input.eq_ignore_ascii_case("ducktape version")
+            || normalized_input.eq_ignore_ascii_case("ducktape --version")
+            || normalized_input.eq_ignore_ascii_case("ducktape -v")
+            || normalized_input.eq_ignore_ascii_case("--version")
+            || normalized_input.eq_ignore_ascii_case("-v")
+        {
+            return Ok(CommandArgs {
+                command: "version".to_string(),
+                args: vec![],
+                flags: HashMap::new(),
+            });
+        }
+
+        // Special case for calendars command
+        if normalized_input.eq_ignore_ascii_case("calendars")
+            || normalized_input.eq_ignore_ascii_case("ducktape calendars")
+        {
+            return Ok(CommandArgs {
+                command: "calendars".to_string(),
                 args: vec![],
                 flags: HashMap::new(),
             });
@@ -104,10 +132,29 @@ impl CommandArgs {
         // Check for and remove "ducktape" prefix, being more lenient with case and whitespace
         let first_part = parts[0].trim();
         if !first_part.eq_ignore_ascii_case("ducktape") {
-            log::debug!("First part '{}' does not match 'ducktape'", first_part);
-            return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
+            // If the first word is a valid command on its own (like "calendars", "calendar", etc.)
+            // then assume we're missing the ducktape prefix and proceed
+            if first_part.eq_ignore_ascii_case("calendars") 
+                || first_part.eq_ignore_ascii_case("calendar")
+                || first_part.eq_ignore_ascii_case("todo")
+                || first_part.eq_ignore_ascii_case("note")
+                || first_part.eq_ignore_ascii_case("notes")
+                || first_part.eq_ignore_ascii_case("config")
+                || first_part.eq_ignore_ascii_case("version")
+                || first_part.eq_ignore_ascii_case("help")
+            {
+                // Don't remove first part, just proceed
+                log::debug!("First part '{}' is a valid command, keeping it", first_part);
+            }
+            else {
+                log::debug!("First part '{}' does not match 'ducktape'", first_part);
+                return Err(anyhow::anyhow!("Commands must start with 'ducktape'"));
+            }
         }
-        parts.remove(0); // Remove "ducktape"
+        else {
+            // Remove "ducktape" prefix
+            parts.remove(0);
+        }
 
         if parts.is_empty() {
             return Err(anyhow::anyhow!("No command provided after 'ducktape'"));
