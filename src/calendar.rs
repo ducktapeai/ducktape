@@ -24,10 +24,14 @@ use std::str::FromStr;
 pub enum CalendarError {
     #[error("Calendar application is not running")]
     NotRunning,
+
     #[error("Calendar '{0}' not found")]
+    #[allow(dead_code)] // Kept for future use
     CalendarNotFound(String),
+
     #[error("Invalid date/time format: {0}")]
     InvalidDateTime(String),
+
     #[error("AppleScript execution failed: {0}")]
     ScriptError(String),
 }
@@ -395,7 +399,7 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
 
     // Load configuration and get default calendar if none specified
     let app_config = Config::load()?;
-    let requested_calendars = if (config.calendars.is_empty()) {
+    let requested_calendars = if config.calendars.is_empty() {
         vec![app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())]
     } else {
         // Validate that specified calendars exist

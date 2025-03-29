@@ -1,27 +1,26 @@
-use anyhow::{Result, anyhow};
-use std::process::Command;
+use anyhow::Result;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ReminderConfig<'a> {
     pub title: &'a str,
-    pub remind_date: Option<&'a str>, // e.g. "2025-02-21 14:30"
-    pub notes: Option<String>,
+    pub days: i32,
+    pub time: Option<&'a str>,
 }
 
 impl<'a> ReminderConfig<'a> {
+    #[allow(dead_code)]
     pub fn new(title: &'a str) -> Self {
-        Self { title, remind_date: None, notes: None }
+        Self { title, days: 0, time: None }
     }
 }
 
+#[allow(dead_code)]
 pub fn create_reminder(config: ReminderConfig) -> Result<()> {
     // Build properties for AppleScript; note that AppleScript requires a proper date format.
     let mut properties = format!("name:\"{}\"", config.title);
-    if let Some(date_str) = config.remind_date {
+    if let Some(date_str) = config.time {
         properties.push_str(&format!(", remind me date:date \"{}\"", date_str));
-    }
-    if let Some(notes) = config.notes {
-        properties.push_str(&format!(", body:\"{}\"", notes));
     }
 
     let script = format!(
@@ -36,16 +35,17 @@ pub fn create_reminder(config: ReminderConfig) -> Result<()> {
         properties
     );
 
-    let output = Command::new("osascript").arg("-e").arg(&script).output()?;
+    let output = std::process::Command::new("osascript").arg("-e").arg(&script).output()?;
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Success") {
         println!("Reminder created: {}", config.title);
         Ok(())
     } else {
-        Err(anyhow!("Failed to create reminder: {}", result))
+        Err(anyhow::anyhow!("Failed to create reminder: {}", result))
     }
 }
 
+#[allow(dead_code)]
 pub fn list_reminders() -> Result<()> {
     let script = r#"tell application "Reminders"
         try
@@ -59,11 +59,11 @@ pub fn list_reminders() -> Result<()> {
         end try
     end tell"#;
 
-    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+    let output = std::process::Command::new("osascript").arg("-e").arg(script).output()?;
 
     let result = String::from_utf8_lossy(&output.stdout);
     if result.contains("Error") {
-        Err(anyhow!("Failed to list reminders: {}", result))
+        Err(anyhow::anyhow!("Failed to list reminders: {}", result))
     } else {
         println!("Reminders:");
         for reminder in result.trim_matches(&['{', '}'][..]).split(", ") {
