@@ -1,10 +1,7 @@
-use log::{error, info};
-use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
+use log::info;
+use std::io::BufRead;
 
-/// Prints the status of environment variables and .env file for debugging
+#[allow(dead_code)]
 pub fn print_env_status() {
     info!("📊 Environment Variables Status:");
 
@@ -19,7 +16,7 @@ pub fn print_env_status() {
     ];
 
     for var in important_vars {
-        match env::var(var) {
+        match std::env::var(var) {
             Ok(val) => info!("  ✅ {} is SET (length: {})", var, val.len()),
             Err(_) => info!("  ❌ {} is NOT SET", var),
         }
@@ -30,11 +27,11 @@ pub fn print_env_status() {
     let env_paths = [".env", "/Users/shaunstuart/RustroverProjects/ducktape/.env"];
 
     for path in env_paths {
-        if Path::new(path).exists() {
+        if std::path::Path::new(path).exists() {
             info!("  ✅ Found .env file at: {}", path);
 
-            if let Ok(file) = File::open(path) {
-                let reader = BufReader::new(file);
+            if let Ok(file) = std::fs::File::open(path) {
+                let reader = std::io::BufReader::new(file);
                 let mut found_vars = Vec::new();
 
                 for line in reader.lines() {
@@ -66,9 +63,9 @@ pub fn print_env_status() {
 /// through environment variables or the .env file.
 pub fn force_set_api_key() -> bool {
     // If environment variable is not set, set a placeholder for development
-    if env::var("XAI_API_KEY").is_err() {
+    if std::env::var("XAI_API_KEY").is_err() {
         let api_key = "xai-placeholder-development-key-not-for-production-use";
-        env::set_var("XAI_API_KEY", api_key);
+        std::env::set_var("XAI_API_KEY", api_key);
         info!("🔑 Set placeholder XAI_API_KEY for development (length: {})", api_key.len());
         return true;
     }
