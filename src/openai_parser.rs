@@ -13,14 +13,17 @@ use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
-// Add a struct for the parser
+/// Add a struct for the parser
+#[allow(dead_code)]
 pub struct OpenAIParser;
 
 impl OpenAIParser {
+    #[allow(dead_code)]
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
+    #[allow(dead_code)]
     pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
         match parse_natural_language(input).await {
             Ok(command) => Ok(Some(command)),
@@ -29,9 +32,11 @@ impl OpenAIParser {
     }
 }
 
+#[allow(dead_code)]
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
+#[allow(dead_code)]
 // Helper function to escape strings for AppleScript to prevent command injection
 fn escape_applescript_string(input: &str) -> String {
     // First replace double quotes with escaped quotes for AppleScript
@@ -44,6 +49,7 @@ fn escape_applescript_string(input: &str) -> String {
         .collect::<String>()
 }
 
+#[allow(dead_code)]
 // Function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
     // Execute AppleScript to get calendars
@@ -69,6 +75,7 @@ async fn get_available_calendars() -> Result<Vec<String>> {
         .collect())
 }
 
+#[allow(dead_code)]
 /// Sanitize user input to prevent injection or other security issues
 fn sanitize_user_input(input: &str) -> String {
     input
@@ -77,6 +84,7 @@ fn sanitize_user_input(input: &str) -> String {
         .collect::<String>()
 }
 
+#[allow(dead_code)]
 /// Validate returned calendar command for security
 fn validate_calendar_command(command: &str) -> Result<()> {
     // Check for suspicious patterns
@@ -123,6 +131,7 @@ fn validate_calendar_command(command: &str) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 /// Add Zoom meeting flag when zoom-related keywords are detected
 fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     if !command.contains("calendar create") {
@@ -142,6 +151,7 @@ fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     command.to_string()
 }
 
+#[allow(dead_code)]
 /// Enhance command with recurrence flags based on natural language
 fn enhance_recurrence_command(command: &str) -> String {
     if !command.contains("calendar create") {
@@ -195,6 +205,7 @@ fn enhance_recurrence_command(command: &str) -> String {
     enhanced
 }
 
+#[allow(dead_code)]
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Input validation
     if input.is_empty() {
@@ -445,6 +456,7 @@ Rules:
     Ok(final_results.join("\n"))
 }
 
+#[allow(dead_code)]
 // Enhanced email extraction with improved validation
 fn extract_emails(input: &str) -> Result<Vec<String>> {
     // Use a more strict email regex pattern

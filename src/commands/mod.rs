@@ -154,6 +154,7 @@ pub mod notes;
 pub mod todo;
 pub mod utilities;
 
+#[allow(dead_code)]
 // Public function to print help
 pub fn print_help() -> Result<()> {
     help::print_help()

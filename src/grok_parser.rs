@@ -443,13 +443,16 @@ mod tests {
     }
 }
 
+#[allow(dead_code)]
 pub struct GrokParser;
 
 impl GrokParser {
+    #[allow(dead_code)]
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
+    #[allow(dead_code)]
     pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
         match parse_natural_language(input).await {
             Ok(command) => Ok(Some(command)),

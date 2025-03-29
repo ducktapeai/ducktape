@@ -5,6 +5,21 @@ All notable changes to DuckTape will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-03-29
+
+### Fixed
+- Resolved all compiler warnings across the codebase
+- Fixed missing BufRead trait import in env_debug.rs
+- Added Serialize derive for ScheduleCommand in command_parser.rs
+- Added #[allow(dead_code)] attributes to properly document future-use code
+- Fixed unused imports across multiple modules
+- Improved code organization according to Rust coding standards
+
+### Changed
+- Enhanced code quality by fixing all compiler warnings
+- Made appropriate uses of #[allow(dead_code)] for code stability
+- Improved code readability and maintainability
+
 ## [0.1.0] - 2025-03-24
 
 ### Added
