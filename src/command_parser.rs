@@ -1,5 +1,5 @@
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct ParsedCommand {
@@ -7,11 +7,15 @@ pub struct ParsedCommand {
     pub details: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct UserMessage {
+    #[allow(dead_code)]
     pub content: String,
+    #[allow(dead_code)]
     pub timestamp: String,
+    #[allow(dead_code)]
     pub id: String,
+    #[allow(dead_code)]
     pub sender: String,
 }
 
@@ -22,6 +26,7 @@ pub struct CommandResponse {
     pub command_id: String,
 }
 
+#[allow(dead_code)]
 pub fn parse_command(message: &str) -> Option<ParsedCommand> {
     // Match schedule command: "schedule a <type> <what> with <who> <when> at <time>"
     if let Some(schedule) = parse_schedule(message) {
@@ -35,6 +40,7 @@ pub fn parse_command(message: &str) -> Option<ParsedCommand> {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct ScheduleCommand {
     event_type: String,
     event_name: String,
@@ -43,6 +49,7 @@ struct ScheduleCommand {
     time: String,
 }
 
+#[allow(dead_code)]
 fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
     // Use regex to parse the schedule command
     let re =
@@ -61,6 +68,7 @@ fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
     None
 }
 
+#[allow(dead_code)]
 pub fn process_command(message: UserMessage) -> CommandResponse {
     let parsed = parse_command(&message.content);
 

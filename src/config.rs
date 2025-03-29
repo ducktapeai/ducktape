@@ -113,7 +113,7 @@ fn get_config_path() -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
+
     use tempfile::tempdir;
 
     #[test]

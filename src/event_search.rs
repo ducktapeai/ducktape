@@ -8,6 +8,7 @@ use std::io::Read;
 use std::path::Path;
 use std::{fs::File, io::Write};
 
+#[allow(dead_code)]
 // Maximum size for response data to prevent DoS attacks (5MB)
 const MAX_RESPONSE_SIZE: usize = 5 * 1024 * 1024;
 
@@ -22,6 +23,7 @@ pub struct EventSearchResult {
     pub url: Option<String>,
 }
 
+#[allow(dead_code)]
 /// Search for events on the internet using a search query
 /// Returns a list of potential events found
 pub async fn search_events(query: &str) -> Result<Vec<EventSearchResult>> {
@@ -104,6 +106,7 @@ pub async fn search_events(query: &str) -> Result<Vec<EventSearchResult>> {
     Ok(events)
 }
 
+#[allow(dead_code)]
 /// Use Grok's capabilities to search the internet for events
 async fn search_events_with_grok(query: &str) -> Result<Vec<EventSearchResult>> {
     let api_key = std::env::var("XAI_API_KEY")
@@ -233,6 +236,7 @@ Respond ONLY with the JSON array. Do not include any explanatory text."#,
     Ok(events)
 }
 
+#[allow(dead_code)]
 /// Helper function to extract JSON from text that might contain markdown and other content
 fn extract_json_from_text(text: &str) -> Result<String> {
     // Look for JSON array between ```json and ``` markers
@@ -253,6 +257,7 @@ fn extract_json_from_text(text: &str) -> Result<String> {
     Ok("[]".to_string())
 }
 
+#[allow(dead_code)]
 // Keep the existing rugby_events search as fallback
 async fn search_rugby_events(query: &str) -> Result<Option<Vec<EventSearchResult>>> {
     // Define common rugby teams and tournaments for matching
@@ -418,6 +423,7 @@ async fn search_rugby_events(query: &str) -> Result<Option<Vec<EventSearchResult
     Ok(Some(events))
 }
 
+#[allow(dead_code)]
 /// Convert a search result into a calendar event command
 pub fn event_to_calendar_command(event: &EventSearchResult, calendar: Option<&str>) -> String {
     // Get config and use default calendar if no calendar is specified
@@ -437,6 +443,7 @@ pub fn event_to_calendar_command(event: &EventSearchResult, calendar: Option<&st
     format_command(event, calendar_name)
 }
 
+#[allow(dead_code)]
 /// Helper function to format the calendar command
 fn format_command(event: &EventSearchResult, calendar_name: &str) -> String {
     let mut command = format!(
@@ -476,12 +483,14 @@ fn format_command(event: &EventSearchResult, calendar_name: &str) -> String {
     command
 }
 
+#[allow(dead_code)]
 /// Helper function to sanitize JSON strings to prevent injection attacks
 fn sanitize_json_string(input: &str) -> String {
     // Remove control characters that might interfere with JSON parsing
     input.chars().filter(|&c| !c.is_control() || c == '\n' || c == '\t').collect()
 }
 
+#[allow(dead_code)]
 pub fn save_search_results(results: &[EventSearchResult], file_path: &str) -> Result<()> {
     // Limit the number of results to save
     let max_items = 1000;
@@ -510,6 +519,7 @@ pub fn save_search_results(results: &[EventSearchResult], file_path: &str) -> Re
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn load_search_results(file_path: &str) -> Result<Vec<EventSearchResult>> {
     // Validate the file path
     let path = Path::new(file_path);
@@ -545,6 +555,7 @@ pub fn load_search_results(file_path: &str) -> Result<Vec<EventSearchResult>> {
     Ok(events)
 }
 
+#[allow(dead_code)]
 // Function to format search results for display
 pub fn format_search_results(results: &[EventSearchResult]) -> String {
     if results.is_empty() {
