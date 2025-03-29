@@ -1,5 +1,14 @@
 # Rust Coding Standards for Ducktape Project
 
+## Version Control and Branching
+
+1. **Branch Management**
+   - Always create a new branch before making changes (never work directly on main)
+   - Use descriptive branch names with prefixes: `feature/`, `bugfix/`, `docs/`, `refactor/`
+   - Keep branches focused on a single issue or feature
+   - Rebase feature branches on main before submitting PR
+   - Delete branches after merging
+
 ## Code Style and Formatting
 
 1. **Code Formatting**
