@@ -1,88 +1,29 @@
 # Changelog
 
-All notable changes to DuckTape will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - 2025-03-29
-
-### Changed
-- Updated dependencies to latest compatible versions
-- Improved error handling in WebSocket connections
-- Enhanced security in API key management
-
-### Fixed
-- Resolved dependency conflicts in Cargo.lock
-- Fixed error handling in calendar event creation
-
-## [0.1.1] - 2025-03-29
-
-### Fixed
-- Resolved all compiler warnings across the codebase
-- Fixed missing BufRead trait import in env_debug.rs
-- Added Serialize derive for ScheduleCommand in command_parser.rs
-- Added #[allow(dead_code)] attributes to properly document future-use code
-- Fixed unused imports across multiple modules
-- Improved code organization according to Rust coding standards
-
-### Changed
-- Enhanced code quality by fixing all compiler warnings
-- Made appropriate uses of #[allow(dead_code)] for code stability
-- Improved code readability and maintainability
-
-## [0.1.0] - 2025-03-24
+## [0.1.3] - 2025-03-29
 
 ### Added
-- Initial open source release
-- Natural language command processing using OpenAI, Grok, or DeepSeek
-- Apple Calendar integration
-  - Event creation and management
-  - Recurring events support
-  - Calendar selection
-  - Event search
-- WebSocket API server
-  - Real-time command processing
-  - Client authentication
-  - Rate limiting
-  - Secure communication
-- Zoom meeting integration
-  - Automatic meeting creation
-  - Meeting link insertion
-- Contact group management
-- Environment variable management
-- Security features
-  - Input validation
-  - Safe API key handling
-  - WebSocket security
-- Comprehensive documentation
-  - API documentation
-  - Development guide
-  - Security policy
-
-### Security
-- Added security audit script
-- Implemented input validation
-- Added rate limiting
-- Added TLS support for WebSocket server
-- Added secure API key handling
-
-### Changed
-- Updated to use dotenvy instead of dotenv
-- Improved error handling throughout
-- Enhanced WebSocket protocol
-- Optimized calendar operations
+- Proper CLI version command (`ducktape --version`)
+- Improved help command with detailed descriptions (`ducktape --help`)
+- Better command-line argument handling
 
 ### Fixed
-- Calendar event creation edge cases
-- WebSocket connection handling
-- Environment variable loading
-- Input validation issues
+- Resolved dependency conflicts and updated all packages to latest versions
+- Fixed issue with cargo dependency resolution
 
-## [0.0.1] - 2025-03-15
+## [0.1.2] - Previous Release
 
 ### Added
-- Initial development version
-- Basic calendar integration
-- Simple command parsing
-- Environment configuration
+- Initial public release
+- Basic calendar management functionality
+- Natural language processing for calendar events
+- Terminal UI for interactive usage
+- WebSocket API server for desktop client integration
+
+[0.1.3]: https://github.com/DuckTapeAI/ducktape/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/DuckTapeAI/ducktape/releases/tag/v0.1.2
