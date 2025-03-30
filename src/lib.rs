@@ -21,6 +21,7 @@ pub mod openai_parser;
 pub mod env_manager;
 pub mod reminders;
 pub mod state;
+pub mod storage; // Add storage module
 pub mod todo;
 pub mod utils;
 pub mod validation;

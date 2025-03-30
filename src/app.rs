@@ -177,12 +177,27 @@ impl Application {
     }
 
     async fn execute_command(&self, args: CommandArgs) -> Result<()> {
+        log::debug!("Attempting to execute command: {}", args.command);
+        let command_name = args.command.clone(); // Clone the command name for logging
+        let args_debug = format!("{:?}", args.args); // Format args for debug logging
+
         for executor in &self.command_executors {
-            if executor.can_handle(&args.command) {
-                return executor.execute(args).await;
+            if executor.can_handle(&command_name) {
+                log::info!("Executing command '{}' with arguments: {}", command_name, args_debug);
+                match executor.execute(args).await {
+                    Ok(()) => {
+                        log::debug!("Command '{}' executed successfully", command_name);
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::error!("Failed to execute command '{}': {:?}", command_name, e);
+                        return Err(e);
+                    }
+                }
             }
         }
 
+        log::warn!("Unrecognized command: {}", command_name);
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
     }
