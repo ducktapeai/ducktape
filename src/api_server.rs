@@ -22,12 +22,12 @@ use crate::calendar::{
     EventConfig, create_event, get_available_calendars, import_csv_events, import_ics_events,
     validate_email,
 };
+use crate::commands;
 use crate::config::Config;
 use crate::grok_parser;
 use crate::notes::{NoteConfig, create_note};
 use crate::todo::{TodoConfig, create_todo};
 use std::path::Path;
-use crate::commands;
 
 // API state that will be shared across handlers
 pub struct ApiState {
