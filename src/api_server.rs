@@ -17,10 +17,6 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
-// Remove these unused imports:
-// use std::sync::Mutex;
-// use tokio::sync::mpsc;
-// use crate::app::Application;
 
 use crate::calendar::{
     EventConfig, create_event, get_available_calendars, import_csv_events, import_ics_events,
@@ -31,8 +27,7 @@ use crate::grok_parser;
 use crate::notes::{NoteConfig, create_note};
 use crate::todo::{TodoConfig, create_todo};
 use std::path::Path;
-// Remove this unused import:
-// use crate::commands;
+use crate::commands;
 
 // API state that will be shared across handlers
 pub struct ApiState {
