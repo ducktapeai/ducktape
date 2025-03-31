@@ -544,13 +544,15 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     if date_parts.len() != 3 {
         return Err(anyhow!("Invalid date format: {}", config.start_date));
     }
-    
+
     // Extract year, month, day from the original string
     let year_str = date_parts[0];
-    let month_num = date_parts[1].trim_start_matches('0').parse::<u32>()
+    let month_num = date_parts[1]
+        .trim_start_matches('0')
+        .parse::<u32>()
         .map_err(|_| anyhow!("Invalid month value: {}", date_parts[1]))?;
-    let day_str = date_parts[2].trim_start_matches('0');   // Remove leading zeros
-    
+    let day_str = date_parts[2].trim_start_matches('0'); // Remove leading zeros
+
     // Convert month number to month name for unambiguous AppleScript date
     let month_name = match month_num {
         1 => "January",
@@ -562,22 +564,17 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         7 => "July",
         8 => "August",
         9 => "September",
-        10 => "October", 
+        10 => "October",
         11 => "November",
         12 => "December",
-        _ => return Err(anyhow!("Invalid month number: {}", month_num))
+        _ => return Err(anyhow!("Invalid month number: {}", month_num)),
     };
-    
+
     info!(
         "Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
-        config.title,
-        year_str,
-        month_name,
-        month_num,
-        day_str,
-        config.start_date
+        config.title, year_str, month_name, month_num, day_str, config.start_date
     );
-    
+
     // Extract time components
     let hour_str = local_start.format("%-H").to_string();
     let minute_str = local_start.format("%-M").to_string();
@@ -612,7 +609,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     } else {
         local_start + chrono::Duration::hours(1)
     };
-    
+
     // Extract end date components directly
     let end_hour_str = end_dt.format("%-H").to_string();
     let end_minute_str = end_dt.format("%-M").to_string();
@@ -820,12 +817,8 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
 
     if result.contains("Success") {
         info!(
-            "Calendar event created: {} at {} (year={}, month={}, day={})", 
-            config.title, 
-            start_datetime,
-            year_str,
-            month_name,
-            day_str
+            "Calendar event created: {} at {} (year={}, month={}, day={})",
+            config.title, start_datetime, year_str, month_name, day_str
         );
         Ok(())
     } else {
