@@ -539,6 +539,49 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
 
+    // Parse the date components from the original string format to avoid any month indexing issues
+    let date_parts: Vec<&str> = config.start_date.split("-").collect();
+    if date_parts.len() != 3 {
+        return Err(anyhow!("Invalid date format: {}", config.start_date));
+    }
+    
+    // Extract year, month, day from the original string
+    let year_str = date_parts[0];
+    let month_num = date_parts[1].trim_start_matches('0').parse::<u32>()
+        .map_err(|_| anyhow!("Invalid month value: {}", date_parts[1]))?;
+    let day_str = date_parts[2].trim_start_matches('0');   // Remove leading zeros
+    
+    // Convert month number to month name for unambiguous AppleScript date
+    let month_name = match month_num {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October", 
+        11 => "November",
+        12 => "December",
+        _ => return Err(anyhow!("Invalid month number: {}", month_num))
+    };
+    
+    info!(
+        "Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
+        config.title,
+        year_str,
+        month_name,
+        month_num,
+        day_str,
+        config.start_date
+    );
+    
+    // Extract time components
+    let hour_str = local_start.format("%-H").to_string();
+    let minute_str = local_start.format("%-M").to_string();
+
     // Parse end datetime with similar timezone handling
     let end_dt = if let Some(ref end_time) = config.end_time {
         let end_datetime = format!("{} {}", config.start_date, end_time);
@@ -569,10 +612,10 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     } else {
         local_start + chrono::Duration::hours(1)
     };
-
-    if end_dt <= local_start {
-        return Err(anyhow!("End time must be after start time"));
-    }
+    
+    // Extract end date components directly
+    let end_hour_str = end_dt.format("%-H").to_string();
+    let end_minute_str = end_dt.format("%-M").to_string();
 
     // Create Zoom meeting if requested
     let mut zoom_meeting_info = String::new();
@@ -714,7 +757,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         String::new()
     };
 
-    // Generate AppleScript
+    // Generate AppleScript using explicit month name format for dates
     let script = format!(
         r#"tell application "Calendar"
             try
@@ -722,20 +765,13 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                     error "Calendar '{calendar_name}' not found"
                 end if
                 tell calendar "{calendar_name}"
-                    set startDate to current date
-                    set year of startDate to {start_year}
-                    set month of startDate to {start_month}
-                    set day of startDate to {start_day}
-                    set hours of startDate to {start_hours}
-                    set minutes of startDate to {start_minutes}
-                    set seconds of startDate to 0
-                    set endDate to current date
-                    set year of endDate to {end_year}
-                    set month of endDate to {end_month}
-                    set day of endDate to {end_day}
-                    set hours of endDate to {end_hours}
-                    set minutes of endDate to {end_minutes}
-                    set seconds of endDate to 0
+                    -- Set date using explicit month name which avoids any numeric month confusion
+                    set startDate to date "{day_str} {month_name} {year_str} {hour_str}:{minute_str}:00"
+                    set endDate to date "{day_str} {month_name} {year_str} {end_hour_str}:{end_minute_str}:00"
+                    
+                    -- Debug our date parsing
+                    log "Event: {title} - Created with date: " & (year of startDate as string) & "-" & (month of startDate as string) & "-" & (day of startDate as string)
+                    
                     set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
                     {all_day_code}
                     {reminder_code}
@@ -753,16 +789,13 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         calendar_name = config.calendars[0],
         title = config.title,
         description = full_description,
-        start_year = local_start.format("%Y"),
-        start_month = local_start.format("%-m"),
-        start_day = local_start.format("%-d"),
-        start_hours = local_start.format("%-H"),
-        start_minutes = local_start.format("%-M"),
-        end_year = end_dt.format("%Y"),
-        end_month = end_dt.format("%-m"),
-        end_day = end_dt.format("%-d"),
-        end_hours = end_dt.format("%-H"),
-        end_minutes = end_dt.format("%-M"),
+        year_str = year_str,
+        month_name = month_name,
+        day_str = day_str,
+        hour_str = hour_str,
+        minute_str = minute_str,
+        end_hour_str = end_hour_str,
+        end_minute_str = end_minute_str,
         extra = extra,
         all_day_code = if config.all_day { "set allday event of newEvent to true" } else { "" },
         reminder_code = if let Some(minutes) = config.reminder {
@@ -778,7 +811,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         attendees_block = attendees_block,
     );
 
-    debug!("Generated AppleScript:\n{}", script);
+    debug!("Generated AppleScript using explicit month name approach:\n{}", script);
 
     // Execute AppleScript
     let output = Command::new("osascript").arg("-e").arg(&script).output()?;
@@ -786,7 +819,14 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     let error_output = String::from_utf8_lossy(&output.stderr);
 
     if result.contains("Success") {
-        info!("Calendar event created: {} at {}", config.title, start_datetime);
+        info!(
+            "Calendar event created: {} at {} (year={}, month={}, day={})", 
+            config.title, 
+            start_datetime,
+            year_str,
+            month_name,
+            day_str
+        );
         Ok(())
     } else {
         error!("AppleScript error: STDOUT: {} | STDERR: {}", result, error_output);
