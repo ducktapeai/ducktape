@@ -585,11 +585,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     // Build attendees block
     let mut attendees_block = String::new();
     if !config.emails.is_empty() {
-        info!(
-            "Adding {} attendee(s): {}",
-            config.emails.len(),
-            config.emails.join(", ")
-        );
+        info!("Adding {} attendee(s): {}", config.emails.len(), config.emails.join(", "));
         for email in &config.emails {
             // Skip adding the calendar owner as attendee if it's the same as the calendar name
             // This avoids the issue where calendar owners don't appear as attendees
@@ -648,7 +644,10 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         end tell"#,
         calendar_name = config.calendars[0],
         title = config.title.replace("\"", "\\\\\""),
-        description = config.description.unwrap_or_else(|| "Created by Ducktape 🦆".to_string()).replace("\"", "\\\\\""),
+        description = config
+            .description
+            .unwrap_or_else(|| "Created by Ducktape 🦆".to_string())
+            .replace("\"", "\\\\\""),
         start_year = local_start.format("%Y"),
         start_month = local_start.format("%-m"),
         start_day = local_start.format("%-d"),
@@ -857,7 +856,8 @@ pub async fn import_csv_events(file_path: &Path, target_calendar: Option<String>
 
     // Get default calendar for fallback
     let app_config = Config::load()?;
-    let default_calendar = app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
+    let default_calendar =
+        app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
 
     // Process each record
     for (row_num, result) in rdr.records().enumerate() {
@@ -1235,9 +1235,6 @@ async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .filter(|s| !s.is_empty())
             .collect())
     } else {
-        Err(anyhow!(
-            "Failed to lookup contact: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ))
+        Err(anyhow!("Failed to lookup contact: {}", String::from_utf8_lossy(&output.stderr)))
     }
 }
