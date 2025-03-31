@@ -13,7 +13,7 @@ readme = "README.md"
 default-run = "ducktape"
 
 [dependencies]
-rustyline = "11.0.0"
+rustyline = "15.0.0"
 walkdir = "2.3.3"
 ical = "0.8.0"
 csv = "1.3.0"
