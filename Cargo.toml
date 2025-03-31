@@ -31,7 +31,7 @@ tokio = { version = "1.35.0", features = ["full"] }
 lru = "0.10"
 once_cell = "1.8"
 regex = "1.9"
-directories = "5.0"
+directories = "6.0"
 toml = "0.8"
 chrono-tz = "0.8.6"
 scopeguard = "1.2.0"
