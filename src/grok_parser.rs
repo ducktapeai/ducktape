@@ -2,6 +2,7 @@ use crate::config::Config;
 use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike};
 use lru::LruCache;
+use log::{debug, info, warn, error};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde_json::{Value, json};
@@ -12,7 +13,7 @@ use std::sync::Mutex;
 static RESPONSE_CACHE: Lazy<Mutex<LruCache<String, String>>> =
     Lazy::new(|| Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())));
 
-// Same calendar helper function as in openai_parser
+// Helper function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
     let output = std::process::Command::new("osascript")
         .arg("-e")
@@ -48,6 +49,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 
     // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
+    debug!("Parsing natural language input: {}", sanitized_input);
 
     // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")
@@ -64,12 +66,27 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     };
 
     if let Some(cached_response) = cached {
+        debug!("Using cached response for input");
         return Ok(cached_response);
     }
 
     // Get available calendars and configuration
-    let available_calendars = get_available_calendars().await?;
-    let config = Config::load()?;
+    let available_calendars = match get_available_calendars().await {
+        Ok(cals) => cals,
+        Err(e) => {
+            warn!("Failed to get available calendars: {}", e);
+            vec!["Calendar".to_string(), "Work".to_string(), "Home".to_string(), "KIDS".to_string()]
+        }
+    };
+
+    let config = match Config::load() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            warn!("Failed to load config: {}, using defaults", e);
+            Config::default()
+        }
+    };
+
     let default_calendar =
         config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
 
@@ -102,10 +119,14 @@ Rules:
 6. If a calendar is specified in input, use that exact calendar name.
 7. If input mentions "kids" or "children", use the "KIDS" calendar.
 8. If input mentions "work", use the "Work" calendar.
-9. If no calendar is specified, use the default calendar.
-10. Available calendars are: {calendars}.
+9. If input mentions "shaun.stuart@hashicorp.com", use that as the calendar.
+10. If no calendar is specified, use the default calendar.
 11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names.
-12. If the input mentions recurring events or repetition:
+12. If input mentions scheduling "with" someone, add their name to --contacts.
+13. If input mentions inviting, sending to, or emailing someone@domain.com, add it with --email.
+14. Multiple email addresses should be comma-separated.
+15. Multiple contact names should be comma-separated.
+16. If the input mentions recurring events or repetition:
     - For "daily" recurrence: use --repeat daily
     - For "weekly" recurrence: use --repeat weekly
     - For "monthly" recurrence: use --repeat monthly
@@ -113,7 +134,7 @@ Rules:
     - If specific interval is mentioned (e.g., "every 2 weeks"), add --interval 2
     - If specific end date is mentioned (e.g., "until March 15"), add --until YYYY-MM-DD
     - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10
-13. If the input mentions "zoom", "video call", "video meeting", or "virtual meeting", add the --zoom flag to create a Zoom meeting automatically."#,
+17. If the input mentions "zoom", "video call", "video meeting", or "virtual meeting", add the --zoom flag to create a Zoom meeting automatically."#,
         current_time = current_date.format("%Y-%m-%d %H:%M"),
         calendars = available_calendars.join(", "),
         default_cal = default_calendar,
@@ -124,13 +145,21 @@ Rules:
     let context = format!("Current date and time: {}", Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, sanitized_input);
 
+    debug!("Sending request to Grok API with prompt: {}", prompt);
+
     // API request with proper error handling and timeouts
-    let client = Client::builder()
+    let client = match Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
-        .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
+    {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Failed to create HTTP client: {}", e);
+            return Err(anyhow!("Failed to create HTTP client: {}", e));
+        }
+    };
 
-    let response = client
+    let response = match client
         .post(format!("{}/chat/completions", api_base))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
@@ -147,11 +176,17 @@ Rules:
                 }
             ],
             "temperature": 0.3,
-            "max_tokens": 150
+            "max_tokens": 200
         }))
         .send()
         .await
-        .map_err(|e| anyhow!("API request failed: {}", e))?;
+    {
+        Ok(r) => r,
+        Err(e) => {
+            error!("API request to Grok failed: {}", e);
+            return Err(anyhow!("API request failed: {}", e));
+        }
+    };
 
     if !response.status().is_success() {
         let status = response.status();
@@ -160,20 +195,28 @@ Rules:
             .await
             .unwrap_or_else(|_| "Unable to read error response".to_string());
 
+        error!("X.AI API error ({}): {}", status, error_text);
         return Err(anyhow!("X.AI API error ({}): {}", status, error_text));
     }
 
-    let response_json: Value = response
-        .json()
-        .await
-        .map_err(|e| anyhow!("Failed to parse API response: {}", e))?;
+    let response_json: Value = match response.json().await {
+        Ok(json) => json,
+        Err(e) => {
+            error!("Failed to parse Grok API response: {}", e);
+            return Err(anyhow!("Failed to parse API response: {}", e));
+        }
+    };
 
     // Safely extract the response content
-    let commands = response_json["choices"][0]["message"]["content"]
-        .as_str()
-        .ok_or_else(|| anyhow!("Invalid or missing response content"))?
-        .trim()
-        .to_string();
+    let commands = match response_json["choices"][0]["message"]["content"].as_str() {
+        Some(content) => content.trim().to_string(),
+        None => {
+            error!("Invalid or missing response content from Grok API");
+            return Err(anyhow!("Invalid or missing response content"));
+        }
+    };
+
+    debug!("Received command from Grok API: {}", commands);
 
     // Cache the response - use a safe mutex pattern
     if let Ok(mut cache) = RESPONSE_CACHE.lock() {
@@ -185,12 +228,19 @@ Rules:
     let enhanced_command = enhance_command_with_zoom(&enhanced_command, &sanitized_input);
 
     // Final validation of the returned commands
-    validate_calendar_command(&enhanced_command)?;
-
-    Ok(enhanced_command)
+    match validate_calendar_command(&enhanced_command) {
+        Ok(_) => {
+            debug!("Successfully parsed natural language input to command: {}", enhanced_command);
+            Ok(enhanced_command)
+        }
+        Err(e) => {
+            error!("Command validation failed: {}", e);
+            Err(e)
+        }
+    }
 }
 
-// Add a helper function to enhance Zoom recognition
+// Helper function to enhance Zoom recognition
 fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     if !command.contains("calendar create") {
         return command.to_string();
@@ -203,6 +253,7 @@ fn enhance_command_with_zoom(command: &str, input: &str) -> String {
     let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
 
     if has_zoom_keyword && !command.contains("--zoom") {
+        debug!("Adding --zoom flag to command based on input keywords");
         return format!("{} --zoom", command);
     }
 
@@ -231,15 +282,19 @@ fn enhance_recurrence_command(command: &str) -> String {
     // If recurring keywords found but no --repeat flag, add it
     if has_recurring_keyword && !command.contains("--repeat") && !command.contains("--recurring") {
         if command.contains("every day") || command.contains("daily") {
+            debug!("Adding daily recurrence to command");
             enhanced = format!("{} --repeat daily", enhanced);
         } else if command.contains("every week") || command.contains("weekly") {
+            debug!("Adding weekly recurrence to command");
             enhanced = format!("{} --repeat weekly", enhanced);
         } else if command.contains("every month") || command.contains("monthly") {
+            debug!("Adding monthly recurrence to command");
             enhanced = format!("{} --repeat monthly", enhanced);
         } else if command.contains("every year")
             || command.contains("yearly")
             || command.contains("annually")
         {
+            debug!("Adding yearly recurrence to command");
             enhanced = format!("{} --repeat yearly", enhanced);
         }
     }
@@ -253,6 +308,7 @@ fn enhance_recurrence_command(command: &str) -> String {
                 if interval > 0 && interval < 100 && // Reasonable limit
                    !command.contains("--interval")
                 {
+                    debug!("Adding interval {} to command", interval);
                     enhanced = format!("{} --interval {}", enhanced, interval);
                 }
             }
@@ -443,20 +499,20 @@ mod tests {
     }
 }
 
-#[allow(dead_code)]
 pub struct GrokParser;
 
 impl GrokParser {
-    #[allow(dead_code)]
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
-    #[allow(dead_code)]
     pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
         match parse_natural_language(input).await {
             Ok(command) => Ok(Some(command)),
-            Err(e) => Err(e),
+            Err(e) => {
+                error!("Grok parser error: {}", e);
+                Err(e)
+            }
         }
     }
 }
