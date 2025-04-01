@@ -222,7 +222,7 @@ Rules:
 
     // Enhanced command processing with proper pipeline
     let mut enhanced_command = commands.clone();
-    
+
     // Apply all enhancements in sequence
     enhanced_command = enhance_recurrence_command(&enhanced_command);
     enhanced_command = enhance_command_with_contacts(&enhanced_command, &sanitized_input);
@@ -532,7 +532,8 @@ mod tests {
         assert!(enhanced.contains("--contacts \"John Smith\""));
 
         // Test handling invitations
-        let cmd = "ducktape calendar create \"Project Deadlines\" 2025-04-01 10:00 11:00 \"Work\" --zoom";
+        let cmd =
+            "ducktape calendar create \"Project Deadlines\" 2025-04-01 10:00 11:00 \"Work\" --zoom";
         let input = "create an zoom event at 10am on April 1 called Project Deadlines and invite Shaun Stuart";
         let enhanced = enhance_command_with_contacts(cmd, input);
         assert!(enhanced.contains("--contacts \"Shaun Stuart\""));
@@ -599,7 +600,7 @@ fn extract_contact_names(input: &str) -> Vec<String> {
             if let Some(name_match) = capture.get(*capture_group) {
                 let name = name_match.as_str().trim();
                 debug!("Matched name: {}", name);
-                
+
                 // Skip if it looks like an email
                 if !name.contains('@') && !name.is_empty() {
                     contact_names.push(name.to_string());
