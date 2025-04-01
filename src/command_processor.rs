@@ -215,11 +215,23 @@ impl CommandHandler for CalendarHandler {
                     let end_time = &args.args[4];
                     let calendar = args.args.get(5).cloned();
 
-                    // Extract location and description from flags if present
+                    // Build flags
                     let location = args.flags.get("--location").cloned().flatten();
                     let description = args.flags.get("--notes").cloned().flatten();
                     let emails = args.flags.get("--attendees").cloned().flatten();
                     let contacts = args.flags.get("--contacts").cloned().flatten();
+
+                    // Handle recurrence options
+                    let recurrence_frequency = args
+                        .flags
+                        .get("--repeat")
+                        .or(args.flags.get("--recurring"))
+                        .cloned()
+                        .flatten();
+                    let interval = args.flags.get("--interval").cloned().flatten();
+                    let until_date = args.flags.get("--until").cloned().flatten();
+                    let count = args.flags.get("--count").cloned().flatten();
+                    let days = args.flags.get("--days").cloned().flatten();
 
                     // Create event config and pass to calendar module
                     let mut config = crate::calendar::EventConfig::new(title, date, start_time);
@@ -236,6 +248,57 @@ impl CommandHandler for CalendarHandler {
                     if args.flags.contains_key("--zoom") {
                         info!("Zoom flag detected, creating event with Zoom meeting");
                         config.create_zoom_meeting = true;
+                    }
+
+                    // Process recurrence information if provided
+                    if let Some(freq_str) = recurrence_frequency {
+                        match crate::calendar::RecurrenceFrequency::from_str(&freq_str) {
+                            Ok(frequency) => {
+                                info!("Creating recurring event with frequency: {}", freq_str);
+                                let mut recurrence =
+                                    crate::calendar::RecurrencePattern::new(frequency);
+
+                                // Add interval if specified
+                                if let Some(interval_str) = interval {
+                                    if let Ok(interval_val) = interval_str.parse::<u32>() {
+                                        recurrence = recurrence.with_interval(interval_val);
+                                        debug!("Setting recurrence interval: {}", interval_val);
+                                    }
+                                }
+
+                                // Add end date if specified
+                                if let Some(until) = until_date {
+                                    recurrence = recurrence.with_end_date(&until);
+                                    debug!("Setting recurrence end date: {}", until);
+                                }
+
+                                // Add count if specified
+                                if let Some(count_str) = count {
+                                    if let Ok(count_val) = count_str.parse::<u32>() {
+                                        recurrence = recurrence.with_count(count_val);
+                                        debug!("Setting recurrence count: {}", count_val);
+                                    }
+                                }
+
+                                // Add days if specified
+                                if let Some(days_str) = days {
+                                    let day_values: Vec<u8> = days_str
+                                        .split(',')
+                                        .filter_map(|s| s.trim().parse::<u8>().ok())
+                                        .collect();
+
+                                    if !day_values.is_empty() {
+                                        recurrence = recurrence.with_days_of_week(&day_values);
+                                        debug!("Setting recurrence days: {:?}", day_values);
+                                    }
+                                }
+
+                                config.recurrence = Some(recurrence);
+                            }
+                            Err(e) => {
+                                warn!("Invalid recurrence frequency '{}': {}", freq_str, e);
+                            }
+                        }
                     }
 
                     if let Some(attendees_str) = emails {
