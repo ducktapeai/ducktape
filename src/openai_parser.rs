@@ -1,13 +1,13 @@
 #[allow(unused_imports)]
 use crate::calendar;
 use crate::config::Config;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike}; // Add Timelike trait
 use lru::LruCache; // Fix: use correct import for LruCache
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
@@ -52,10 +52,8 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Get available calendars and configuration early
     let available_calendars = get_available_calendars().await?;
     let config = Config::load()?;
-    let default_calendar = config
-        .calendar
-        .default_calendar
-        .unwrap_or_else(|| "Calendar".to_string());
+    let default_calendar =
+        config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string());
 
     let current_date = Local::now();
     let system_prompt = format!(
@@ -87,10 +85,7 @@ Rules:
     );
 
     // Add current date context
-    let context = format!(
-        "Current date and time: {}",
-        Local::now().format("%Y-%m-%d %H:%M")
-    );
+    let context = format!("Current date and time: {}", Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, input);
 
     let client = Client::new();
@@ -127,10 +122,7 @@ Rules:
         .to_string();
 
     // Cache the response before returning
-    RESPONSE_CACHE
-        .lock()
-        .unwrap()
-        .put(input.to_string(), commands.clone());
+    RESPONSE_CACHE.lock().unwrap().put(input.to_string(), commands.clone());
 
     // Process each command separately
     let mut results = Vec::new();
@@ -246,10 +238,7 @@ mod tests {
             let mock_response = format!(
                 "ducktape calendar create \"Test Event\" 2024-02-07 14:00 15:00 \"Calendar\""
             );
-            RESPONSE_CACHE
-                .lock()
-                .unwrap()
-                .put(input.to_string(), mock_response.clone());
+            RESPONSE_CACHE.lock().unwrap().put(input.to_string(), mock_response.clone());
 
             let command = mock_response;
             assert!(command.starts_with("ducktape"));
