@@ -231,7 +231,7 @@ impl CommandHandler for CalendarHandler {
 
                     config.location = location;
                     config.description = description;
-                    
+
                     // Check for --zoom flag and set create_zoom_meeting property
                     if args.flags.contains_key("--zoom") {
                         info!("Zoom flag detected, creating event with Zoom meeting");
