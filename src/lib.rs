@@ -3,8 +3,9 @@ pub mod app;
 pub mod calendar;
 pub mod calendar_legacy;
 // pub mod cli;  // Commented out if it doesn't exist
+pub mod command_processor; // New command processor module
 pub mod command_parser;
-pub mod commands;
+// pub mod commands; // Removed commands module
 pub mod config;
 pub mod contact_groups;
 // pub mod contacts;  // Commented out if it doesn't exist

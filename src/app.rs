@@ -1,34 +1,15 @@
-use crate::commands::calendar;
-use crate::commands::config;
-use crate::commands::contacts;
-use crate::commands::help;
-use crate::commands::notes;
-use crate::commands::todo;
-use crate::commands::utilities;
-use crate::commands::version;
-use crate::commands::{CommandArgs, CommandExecutor};
+use crate::command_processor::{CommandArgs, CommandHandler, CommandProcessor};
 use crate::config::{Config, LLMProvider};
 use anyhow::{Result, anyhow};
 use rustyline::DefaultEditor;
 
 pub struct Application {
-    command_executors: Vec<Box<dyn CommandExecutor>>,
+    command_processor: CommandProcessor,
 }
 
 impl Application {
     pub fn new() -> Self {
-        let executors: Vec<Box<dyn CommandExecutor>> = vec![
-            Box::new(help::HelpCommand),
-            Box::new(calendar::CalendarCommand),
-            Box::new(todo::TodoCommand),
-            Box::new(notes::NotesCommand),
-            Box::new(config::ConfigCommand),
-            Box::new(utilities::UtilitiesCommand),
-            Box::new(contacts::ContactGroupsCommand),
-            Box::new(version::VersionCommand),
-        ];
-
-        Self { command_executors: executors }
+        Self { command_processor: CommandProcessor::new() }
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -118,7 +99,7 @@ impl Application {
             if args.command == "exit" || args.command == "quit" {
                 std::process::exit(0);
             }
-            self.execute_command(args).await
+            self.command_processor.execute(args).await
         } else {
             // If input doesn't start with "ducktape", treat as natural language
             self.process_natural_language(input).await
@@ -171,35 +152,9 @@ impl Application {
 
         // Parse the processed command into arguments
         match CommandArgs::parse(&processed_input) {
-            Ok(args) => self.execute_command(args).await,
+            Ok(args) => self.command_processor.execute(args).await,
             Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
         }
-    }
-
-    async fn execute_command(&self, args: CommandArgs) -> Result<()> {
-        log::debug!("Attempting to execute command: {}", args.command);
-        let command_name = args.command.clone(); // Clone the command name for logging
-        let args_debug = format!("{:?}", args.args); // Format args for debug logging
-
-        for executor in &self.command_executors {
-            if executor.can_handle(&command_name) {
-                log::info!("Executing command '{}' with arguments: {}", command_name, args_debug);
-                match executor.execute(args).await {
-                    Ok(()) => {
-                        log::debug!("Command '{}' executed successfully", command_name);
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        log::error!("Failed to execute command '{}': {:?}", command_name, e);
-                        return Err(e);
-                    }
-                }
-            }
-        }
-
-        log::warn!("Unrecognized command: {}", command_name);
-        println!("Unrecognized command. Type 'help' for a list of available commands.");
-        Ok(())
     }
 
     async fn process_natural_language(&self, input: &str) -> Result<()> {
@@ -214,7 +169,7 @@ impl Application {
                 // Check if the generated command starts with ducktape
                 if command.starts_with("ducktape") {
                     let args = CommandArgs::parse(&command)?;
-                    self.execute_command(args).await
+                    self.command_processor.execute(args).await
                 } else {
                     println!("Generated command doesn't start with 'ducktape': {}", command);
                     Ok(())
