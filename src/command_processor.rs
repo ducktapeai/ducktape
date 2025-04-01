@@ -239,8 +239,11 @@ impl CommandHandler for CalendarHandler {
                     }
 
                     if let Some(attendees_str) = emails {
-                        config.emails =
-                            attendees_str.split(',').map(|s| s.trim().to_string()).collect();
+                        config.emails = attendees_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|email| crate::calendar::validate_email(email))
+                            .collect();
                     }
 
                     // If contacts are specified, use create_event_with_contacts
