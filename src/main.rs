@@ -3,7 +3,7 @@ mod app;
 mod calendar;
 mod calendar_legacy;
 mod command_parser;
-mod commands;
+mod command_processor;
 mod config;
 mod contact_groups;
 mod deepseek_parser;

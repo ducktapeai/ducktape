@@ -96,7 +96,7 @@ impl ContactGroups {
         if self.groups.is_empty() {
             println!("  No contact groups defined");
             println!(
-                "\nTo create a group: ducktape contacts add <group_id> <name> <contact1,contact2,...>"
+                "\nTo create a group: ducktape contacts add <group_id> <n> <contact1,contact2,...>"
             );
             return;
         }
@@ -128,4 +128,45 @@ pub async fn create_event_with_group(config: EventConfig, group_id: &str) -> Res
 
     // Create the event with the contacts
     create_event_with_contacts(config, &contacts).await
+}
+
+/// Create a new contact group
+pub fn create_group(group_name: &str, emails: &[String]) -> Result<()> {
+    // Load existing groups
+    let mut groups = ContactGroups::load()?;
+    
+    // Create a new group
+    let group = ContactGroup {
+        name: group_name.to_string(),
+        contacts: emails.to_vec(),
+        description: None,
+    };
+    
+    // Add the group
+    groups.add_group(group_name.to_string(), group);
+    
+    // Save the updated groups
+    groups.save()?;
+    
+    info!("Created contact group '{}' with {} members", group_name, emails.len());
+    Ok(())
+}
+
+/// List all available contact groups
+pub fn list_groups() -> Result<Vec<String>> {
+    let groups = ContactGroups::load()?;
+    
+    let group_names: Vec<String> = groups.groups.keys().cloned().collect();
+    Ok(group_names)
+}
+
+/// Get a specific contact group by name
+pub fn get_group(group_name: &str) -> Result<Option<Vec<String>>> {
+    let groups = ContactGroups::load()?;
+    
+    if let Some(group) = groups.get_group(group_name) {
+        Ok(Some(group.contacts.clone()))
+    } else {
+        Ok(None)
+    }
 }
