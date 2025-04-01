@@ -22,7 +22,7 @@ use crate::calendar::{
     EventConfig, create_event, get_available_calendars, import_csv_events, import_ics_events,
     validate_email,
 };
-use crate::commands;
+use crate::command_processor::CommandArgs;
 use crate::config::Config;
 use crate::grok_parser;
 use crate::notes::{NoteConfig, create_note};
@@ -289,7 +289,6 @@ struct SwiftChatMessage {
 
 #[derive(Debug, Serialize)]
 struct SwiftEventResponse {
-    #[serde(rename = "type")]
     message_type: String,
     status: String,
     message: String,
@@ -423,7 +422,7 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
 
                             // Parse the command into arguments
-                            match crate::commands::CommandArgs::parse(&command) {
+                            match CommandArgs::parse(&command) {
                                 Ok(args) => {
                                     // Log the parsed args to help debug
                                     info!(

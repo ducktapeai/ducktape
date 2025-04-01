@@ -27,15 +27,18 @@ pub fn create_event(&self, event: &CalendarEvent) -> Result<(), CalendarError> {
             for attendee in attendees.split(";") {
                 let trimmed = attendee.trim();
                 if !trimmed.is_empty() {
-                    script_parts.push(format!("make new attendee at end of attendees with properties {{email:\"{}\"}}",
-                        trimmed));
+                    // Include display name and participation status for proper invites
+                    script_parts.push(format!(
+                        r#"make new attendee at end of attendees with properties {{email:"{0}", display name:"{0}", participation status:needs-action}}"#,
+                        trimmed
+                    ));
                 }
             }
             
             if script_parts.is_empty() {
                 "".to_string()
             } else {
-                script_parts.join("\n                ")
+                script_parts.join("\n                    ")
             }
         }
     } else {
@@ -59,7 +62,10 @@ pub fn create_event(&self, event: &CalendarEvent) -> Result<(), CalendarError> {
                 tell newEvent
                     {}
                 end tell
+                
+                save
             end tell
+            reload calendars
         end tell
         "#,
         calendar_name,
@@ -74,5 +80,3 @@ pub fn create_event(&self, event: &CalendarEvent) -> Result<(), CalendarError> {
 
     // ...existing code...
 }
-
-// ...existing code...

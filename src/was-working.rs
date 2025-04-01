@@ -1,12 +1,12 @@
 use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
-use crate::zoom::{ZoomClient, ZoomMeetingOptions, calculate_meeting_duration, format_zoom_time};
-use anyhow::{Result, anyhow};
+use crate::zoom::{calculate_meeting_duration, format_zoom_time, ZoomClient, ZoomMeetingOptions};
+use anyhow::{anyhow, Result};
 use chrono::{Datelike, Local, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
 use csv::ReaderBuilder;
-use ical::parser::ical::IcalParser;
 use ical::parser::ical::component::IcalEvent;
+use ical::parser::ical::IcalParser;
 use log::{debug, error, info};
 use regex::Regex;
 use std::fs::File;
@@ -24,14 +24,10 @@ use std::str::FromStr;
 pub enum CalendarError {
     #[error("Calendar application is not running")]
     NotRunning,
-
     #[error("Calendar '{0}' not found")]
-    #[allow(dead_code)] // Kept for future use
     CalendarNotFound(String),
-
     #[error("Invalid date/time format: {0}")]
     InvalidDateTime(String),
-
     #[error("AppleScript execution failed: {0}")]
     ScriptError(String),
 }
