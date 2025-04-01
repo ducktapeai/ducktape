@@ -1,9 +1,9 @@
 use anyhow::{Result, anyhow};
+use log::{debug, info, warn};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
-use log::{debug, info, warn};
 
 /// Command line arguments structure
 #[derive(Debug, Clone)]
@@ -203,7 +203,9 @@ impl CommandHandler for CalendarHandler {
                 Some("create") => {
                     if args.args.len() < 5 {
                         println!("Not enough arguments for calendar create command");
-                        println!("Usage: ducktape calendar create <title> <date> <start_time> <end_time> [calendar]");
+                        println!(
+                            "Usage: ducktape calendar create <title> <date> <start_time> <end_time> [calendar]"
+                        );
                         return Ok(());
                     }
 
@@ -222,39 +224,41 @@ impl CommandHandler for CalendarHandler {
                     // Create event config and pass to calendar module
                     let mut config = crate::calendar::EventConfig::new(title, date, start_time);
                     config.end_time = Some(end_time.clone());
-                    
+
                     if let Some(cal) = calendar {
                         config.calendars = vec![cal];
                     }
-                    
+
                     config.location = location;
                     config.description = description;
-                    
+
                     if let Some(attendees_str) = emails {
-                        config.emails = attendees_str.split(',')
-                            .map(|s| s.trim().to_string())
-                            .collect();
+                        config.emails =
+                            attendees_str.split(',').map(|s| s.trim().to_string()).collect();
                     }
 
                     // If contacts are specified, use create_event_with_contacts
                     if let Some(contacts_str) = contacts {
                         // Split contacts string by commas and convert to string slices
-                        let contact_names: Vec<&str> = contacts_str.split(',')
+                        let contact_names: Vec<&str> = contacts_str
+                            .split(',')
                             .map(|s| s.trim())
                             .filter(|s| !s.is_empty())
                             .collect();
-                        
+
                         if !contact_names.is_empty() {
                             info!("Creating event with contacts: {:?}", contact_names);
-                            return crate::calendar::create_event_with_contacts(config, &contact_names).await;
+                            return crate::calendar::create_event_with_contacts(
+                                config,
+                                &contact_names,
+                            )
+                            .await;
                         }
                     }
 
                     crate::calendar::create_event(config).await
                 }
-                Some("list") => {
-                    crate::calendar::list_calendars().await
-                }
+                Some("list") => crate::calendar::list_calendars().await,
                 Some("show") => {
                     // TODO: Implement show calendar functionality
                     println!("Show calendar functionality is not implemented yet.");
@@ -289,36 +293,37 @@ impl CommandHandler for TodoHandler {
                     }
 
                     let title = &args.args[1];
-                    
+
                     // Create a new TodoConfig with the title
                     let mut config = crate::todo::TodoConfig::new(title);
-                    
+
                     // Set lists if provided in arguments (args[2] and beyond are list names)
                     if args.args.len() > 2 {
-                        let list_names: Vec<&str> = args.args[2..].iter().map(|s| s.as_str()).collect();
+                        let list_names: Vec<&str> =
+                            args.args[2..].iter().map(|s| s.as_str()).collect();
                         config.lists = list_names;
                     }
-                    
+
                     // Set reminder time if provided via --remind flag
                     if let Some(Some(reminder_time)) = args.flags.get("--remind") {
                         config.reminder_time = Some(reminder_time);
                     }
-                    
+
                     // Set notes if provided via --notes flag
                     if let Some(Some(notes)) = args.flags.get("--notes") {
                         config.notes = Some(notes.clone());
                     }
-                    
+
                     // Note: create_todo is synchronous, so don't await it
                     match crate::todo::create_todo(config) {
                         Ok(_) => {
                             println!("Todo '{}' created successfully", title);
                             Ok(())
-                        },
+                        }
                         Err(e) => {
                             println!("Failed to create todo: {}", e);
                             Err(anyhow!("Failed to create todo: {}", e))
-                        },
+                        }
                     }
                 }
                 Some("list") => {
@@ -438,24 +443,23 @@ impl CommandHandler for ConfigHandler {
                         "notes.default_folder" => {
                             config.notes.default_folder = Some(value.clone());
                         }
-                        "language_model.provider" => {
-                            match value.to_lowercase().as_str() {
-                                "openai" => {
-                                    config.language_model.provider = crate::config::LLMProvider::OpenAI;
-                                }
-                                "grok" => {
-                                    config.language_model.provider = crate::config::LLMProvider::Grok;
-                                }
-                                "deepseek" => {
-                                    config.language_model.provider = crate::config::LLMProvider::DeepSeek;
-                                }
-                                _ => {
-                                    println!("Invalid language model provider: {}", value);
-                                    println!("Valid options are: openai, grok, deepseek");
-                                    return Ok(());
-                                }
+                        "language_model.provider" => match value.to_lowercase().as_str() {
+                            "openai" => {
+                                config.language_model.provider = crate::config::LLMProvider::OpenAI;
                             }
-                        }
+                            "grok" => {
+                                config.language_model.provider = crate::config::LLMProvider::Grok;
+                            }
+                            "deepseek" => {
+                                config.language_model.provider =
+                                    crate::config::LLMProvider::DeepSeek;
+                            }
+                            _ => {
+                                println!("Invalid language model provider: {}", value);
+                                println!("Valid options are: openai, grok, deepseek");
+                                return Ok(());
+                            }
+                        },
                         _ => {
                             println!("Unknown config key: {}", key);
                             return Ok(());
@@ -482,25 +486,28 @@ impl CommandHandler for ConfigHandler {
                         "calendar.default" => {
                             println!(
                                 "calendar.default = {}",
-                                config.calendar.default_calendar.unwrap_or_else(|| "Not set".to_string())
+                                config
+                                    .calendar
+                                    .default_calendar
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                         }
                         "calendar.reminder" => {
                             println!(
                                 "calendar.reminder = {}",
-                                config.calendar.default_reminder_minutes.map_or_else(
-                                    || "Not set".to_string(),
-                                    |m| m.to_string()
-                                )
+                                config
+                                    .calendar
+                                    .default_reminder_minutes
+                                    .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                         }
                         "calendar.duration" => {
                             println!(
                                 "calendar.duration = {}",
-                                config.calendar.default_duration_minutes.map_or_else(
-                                    || "Not set".to_string(),
-                                    |m| m.to_string()
-                                )
+                                config
+                                    .calendar
+                                    .default_duration_minutes
+                                    .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                         }
                         "todo.default_list" => {
@@ -512,7 +519,10 @@ impl CommandHandler for ConfigHandler {
                         "notes.default_folder" => {
                             println!(
                                 "notes.default_folder = {}",
-                                config.notes.default_folder.unwrap_or_else(|| "Not set".to_string())
+                                config
+                                    .notes
+                                    .default_folder
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                         }
                         "language_model.provider" => {
@@ -528,21 +538,24 @@ impl CommandHandler for ConfigHandler {
                             println!("======================");
                             println!(
                                 "calendar.default = {}",
-                                config.calendar.default_calendar.unwrap_or_else(|| "Not set".to_string())
+                                config
+                                    .calendar
+                                    .default_calendar
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                             println!(
                                 "calendar.reminder = {}",
-                                config.calendar.default_reminder_minutes.map_or_else(
-                                    || "Not set".to_string(),
-                                    |m| m.to_string()
-                                )
+                                config
+                                    .calendar
+                                    .default_reminder_minutes
+                                    .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                             println!(
                                 "calendar.duration = {}",
-                                config.calendar.default_duration_minutes.map_or_else(
-                                    || "Not set".to_string(),
-                                    |m| m.to_string()
-                                )
+                                config
+                                    .calendar
+                                    .default_duration_minutes
+                                    .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                             println!(
                                 "todo.default_list = {}",
@@ -550,7 +563,10 @@ impl CommandHandler for ConfigHandler {
                             );
                             println!(
                                 "notes.default_folder = {}",
-                                config.notes.default_folder.unwrap_or_else(|| "Not set".to_string())
+                                config
+                                    .notes
+                                    .default_folder
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                             let provider = match config.language_model.provider {
                                 crate::config::LLMProvider::OpenAI => "openai",
@@ -649,7 +665,11 @@ impl CommandHandler for ContactGroupsHandler {
                     let result = crate::contact_groups::create_group(group_name, &emails);
                     match result {
                         Ok(_) => {
-                            println!("Created contact group '{}' with {} members", group_name, emails.len());
+                            println!(
+                                "Created contact group '{}' with {} members",
+                                group_name,
+                                emails.len()
+                            );
                         }
                         Err(e) => {
                             println!("Failed to create contact group: {}", e);
@@ -721,7 +741,9 @@ impl CommandHandler for VersionHandler {
         Box::pin(async move {
             const VERSION: &str = env!("CARGO_PKG_VERSION");
             println!("DuckTape v{}", VERSION);
-            println!("A tool for interacting with Apple Calendar, Notes, and Reminders via the command line.");
+            println!(
+                "A tool for interacting with Apple Calendar, Notes, and Reminders via the command line."
+            );
             println!("© 2024-2025 DuckTape Team");
             Ok(())
         })
@@ -833,7 +855,9 @@ mod tests {
     #[test]
     fn test_command_args_parse() {
         // Test basic command
-        let args = CommandArgs::parse("ducktape calendar create \"Test Event\" 2023-01-01 09:00 10:00").unwrap();
+        let args =
+            CommandArgs::parse("ducktape calendar create \"Test Event\" 2023-01-01 09:00 10:00")
+                .unwrap();
         assert_eq!(args.command, "calendar");
         assert_eq!(args.args, vec!["create", "Test Event", "2023-01-01", "09:00", "10:00"]);
         assert!(args.flags.is_empty());
