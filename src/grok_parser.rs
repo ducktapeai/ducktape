@@ -1,8 +1,8 @@
 use crate::config::Config;
 use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike};
+use log::{debug, error, info, warn};
 use lru::LruCache;
-use log::{debug, info, warn, error};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde_json::{Value, json};
@@ -148,10 +148,7 @@ Rules:
     debug!("Sending request to Grok API with prompt: {}", prompt);
 
     // API request with proper error handling and timeouts
-    let client = match Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-    {
+    let client = match Client::builder().timeout(std::time::Duration::from_secs(30)).build() {
         Ok(c) => c,
         Err(e) => {
             error!("Failed to create HTTP client: {}", e);
