@@ -587,34 +587,50 @@ fn extract_contact_names(input: &str) -> Vec<String> {
     if let Some(after_word) = text_to_parse {
         debug!("Text to parse for contacts: '{}'", after_word);
 
-        // Extract until we hit certain stop words or punctuation
-        let name_part = after_word
-            .split(|c: char| c == ',' || c == ';' || c == '.')
-            .next()
-            .unwrap_or("")
-            .trim();
-
-        debug!("Initial name part: '{}'", name_part);
-
-        // Further refine by removing trailing stop words or time references
-        let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
-
-        let mut final_name = name_part.to_string();
-        for word in &stop_words {
-            if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
-                final_name = final_name[0..pos].trim().to_string();
+        // Split by known separators that indicate multiple people
+        for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
+            let name_part = name_part.trim();
+            
+            // Skip empty parts
+            if name_part.is_empty() {
+                continue;
             }
-        }
-
-        debug!("Final extracted name: '{}'", final_name);
-
-        if !final_name.is_empty() && !final_name.contains('@') {
-            contact_names.push(final_name);
+            
+            // Further process parts with "and" to extract multiple names
+            if name_part.contains(" and ") {
+                let and_parts: Vec<&str> = name_part.split(" and ").collect();
+                for and_part in and_parts {
+                    let final_name = refine_name(and_part);
+                    if !final_name.is_empty() && !final_name.contains('@') {
+                        contact_names.push(final_name);
+                    }
+                }
+            } else {
+                // Process single name
+                let final_name = refine_name(name_part);
+                if !final_name.is_empty() && !final_name.contains('@') {
+                    contact_names.push(final_name);
+                }
+            }
         }
     }
 
     debug!("Extracted contact names: {:?}", contact_names);
     contact_names
+}
+
+// Helper function to refine a name by removing trailing stop words
+fn refine_name(name_part: &str) -> String {
+    let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
+    
+    let mut final_name = name_part.trim().to_string();
+    for word in &stop_words {
+        if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
+            final_name = final_name[0..pos].trim().to_string();
+        }
+    }
+    
+    final_name
 }
 
 // Helper function to enhance commands with proper contact and email handling

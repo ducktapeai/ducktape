@@ -180,38 +180,65 @@ ducktape config show
 ```bash
 # Create a calendar event
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar]
+# Example: Create a meeting tomorrow at 3 PM for an hour
+ducktape calendar create "Weekly Team Standup" 2025-04-03 15:00 16:00 "Work"
 
 # Create event with attendee
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --email "attendee@example.com"
+# Example: Create a project review meeting with a client
+ducktape calendar create "Q2 Project Review" 2025-04-10 13:00 14:30 "Work" --email "client@company.com,manager@ourcompany.com"
 
 # Create recurring event
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat daily
+# Example: Create a daily check-in meeting at 9 AM
+ducktape calendar create "Morning Check-in" 2025-04-03 09:00 09:15 "Work" --repeat daily
 
 # Create recurring event with contacts
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat weekly --contacts "Jane Doe"
+# Example: Create a weekly 1:1 meeting with your team member
+ducktape calendar create "1:1 with Marketing Team" 2025-04-07 11:00 12:00 "Work" --repeat weekly --contacts "Jane Smith,Michael Johnson"
 
 # Create event with Zoom meeting
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --zoom
+# Example: Create a remote team meeting with Zoom link automatically generated
+ducktape calendar create "Remote Team Sync" 2025-04-04 14:00 15:00 "Work" --zoom --email "team@company.com"
+
+# Create event with location and reminder
+ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --location "<location>" --reminder <minutes>
+# Example: Create a doctor's appointment with a reminder 1 hour before
+ducktape calendar create "Dr. Smith Appointment" 2025-04-15 10:30 11:30 "Personal" --location "123 Medical Plaza, Suite 45" --reminder 60
 
 # Delete events
 ducktape calendar delete "<title>"
+# Example: Delete all events with "Interview" in the title
+ducktape calendar delete "Interview"
 
 # Set the default calendar (if no calendar is specified in event creation, this calendar will be used)
 ducktape calendar set-default "<calendar_name>"
+# Example: Set your work calendar as default
+ducktape calendar set-default "Work"
 
 # List available calendars
+ducktape calendars
+# Example: See all the calendars available on your system
 ducktape calendars
 
 # List calendar properties
 ducktape calendar-props
+# Example: View available properties that can be set on calendar events
+ducktape calendar-props
 
 # List all events
+ducktape list-events
+# Example: View all upcoming events
 ducktape list-events
 
 # Import calendar events (new!)
 ducktape calendar import "<file_path>" [--format csv|ics] [--calendar "<calendar_name>"]
-ducktape calendar import "events.csv" --format csv --calendar "Work"
-ducktape calendar import "events.ics" --format ics
+# Example: Import events from a CSV file to your Work calendar
+ducktape calendar import "~/Downloads/events.csv" --format csv --calendar "Work"
+# Example: Import events from an ICS file (iCalendar)
+ducktape calendar import "~/Downloads/conference_schedule.ics" --format ics
 ```
 
 ### Calendar Options
