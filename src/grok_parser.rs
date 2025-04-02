@@ -590,12 +590,12 @@ fn extract_contact_names(input: &str) -> Vec<String> {
         // Split by known separators that indicate multiple people
         for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
             let name_part = name_part.trim();
-            
+
             // Skip empty parts
             if name_part.is_empty() {
                 continue;
             }
-            
+
             // Further process parts with "and" to extract multiple names
             if name_part.contains(" and ") {
                 let and_parts: Vec<&str> = name_part.split(" and ").collect();
@@ -622,14 +622,14 @@ fn extract_contact_names(input: &str) -> Vec<String> {
 // Helper function to refine a name by removing trailing stop words
 fn refine_name(name_part: &str) -> String {
     let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
-    
+
     let mut final_name = name_part.trim().to_string();
     for word in &stop_words {
         if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
             final_name = final_name[0..pos].trim().to_string();
         }
     }
-    
+
     final_name
 }
 
