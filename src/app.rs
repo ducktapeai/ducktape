@@ -151,7 +151,9 @@ impl Application {
         log::info!("Processed command: {}", processed_input);
 
         // Ensure calendar event commands have proper end times
-        let final_command = if processed_input.contains("calendar create") || processed_input.contains("calendar add") {
+        let final_command = if processed_input.contains("calendar create")
+            || processed_input.contains("calendar add")
+        {
             // Check if it has a start time but no end time
             let parts: Vec<&str> = processed_input.split_whitespace().collect();
             let mut has_start_time = false;
@@ -160,7 +162,8 @@ impl Application {
 
             // Find start time position and check if end time exists
             for (i, part) in parts.iter().enumerate() {
-                if part.contains(':') && i > 2 {  // Potential time format (avoid matching in command prefix)
+                if part.contains(':') && i > 2 {
+                    // Potential time format (avoid matching in command prefix)
                     if !has_start_time {
                         has_start_time = true;
                         start_time_index = i;
@@ -172,10 +175,16 @@ impl Application {
             }
 
             // If there's a start time but no end time, add an end time 1 hour later
-            if has_start_time && !has_end_time && start_time_index > 0 && start_time_index < parts.len() {
+            if has_start_time
+                && !has_end_time
+                && start_time_index > 0
+                && start_time_index < parts.len()
+            {
                 let start_time = parts[start_time_index];
                 if let Some((hours_str, minutes_str)) = start_time.split_once(':') {
-                    if let (Ok(hours), Ok(minutes)) = (hours_str.parse::<u32>(), minutes_str.parse::<u32>()) {
+                    if let (Ok(hours), Ok(minutes)) =
+                        (hours_str.parse::<u32>(), minutes_str.parse::<u32>())
+                    {
                         // Calculate end time one hour later
                         let end_hours = (hours + 1) % 24;
                         let end_time = format!("{}:{}", end_hours, minutes_str);
