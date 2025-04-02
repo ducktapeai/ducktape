@@ -567,7 +567,7 @@ impl GrokParser {
 fn extract_contact_names(input: &str) -> Vec<String> {
     let mut contact_names = Vec::new();
     let input_lower = input.to_lowercase();
-    
+
     // Check for different contact-related keywords
     let text_to_parse = if input_lower.contains(" with ") {
         debug!("Found 'with' keyword for contact extraction");
@@ -579,37 +579,33 @@ fn extract_contact_names(input: &str) -> Vec<String> {
         debug!("Found 'invite' keyword for contact extraction");
         // Special handling for invite keyword which might not have a space before it
         let parts: Vec<&str> = input.splitn(2, "invite ").collect();
-        if parts.len() > 1 {
-            Some(parts[1])
-        } else {
-            None
-        }
+        if parts.len() > 1 { Some(parts[1]) } else { None }
     } else {
         None
     };
 
     if let Some(after_word) = text_to_parse {
         debug!("Text to parse for contacts: '{}'", after_word);
-        
+
         // Extract until we hit certain stop words or punctuation
         let name_part = after_word
             .split(|c: char| c == ',' || c == ';' || c == '.')
             .next()
             .unwrap_or("")
             .trim();
-            
+
         debug!("Initial name part: '{}'", name_part);
-            
+
         // Further refine by removing trailing stop words or time references
         let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
-        
+
         let mut final_name = name_part.to_string();
         for word in &stop_words {
             if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
                 final_name = final_name[0..pos].trim().to_string();
             }
         }
-            
+
         debug!("Final extracted name: '{}'", final_name);
 
         if !final_name.is_empty() && !final_name.contains('@') {
@@ -631,10 +627,10 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
 
     // Step 1: Extract email addresses from the input
     let email_addresses = extract_email_addresses(input);
-    
+
     // Step 2: Extract contact names
     let contact_names = extract_contact_names(input);
-    
+
     debug!("Email addresses extracted: {:?}", email_addresses);
     debug!("Contact names extracted: {:?}", contact_names);
 
@@ -644,7 +640,7 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
         debug!("Adding emails to command: {}", escaped_emails);
         enhanced = format!(r#"{} --email "{}""#, enhanced, escaped_emails);
     }
-    
+
     // Step 4: Clean up any incorrectly placed contact names in email flags
     if enhanced.contains("--email") {
         // Pattern: --email "Name Without @ Symbol"
@@ -684,9 +680,9 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
 fn extract_email_addresses(input: &str) -> Vec<String> {
     // Email regex pattern - basic pattern for demonstration
     let email_regex = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
-    
+
     let mut emails = Vec::new();
-    
+
     for cap in email_regex.captures_iter(input) {
         let email = cap.get(0).unwrap().as_str().to_string();
         if crate::calendar::validate_email(&email) {
@@ -696,6 +692,6 @@ fn extract_email_addresses(input: &str) -> Vec<String> {
             debug!("Found invalid email: {}", email);
         }
     }
-    
+
     emails
 }
