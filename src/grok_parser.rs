@@ -566,45 +566,62 @@ impl GrokParser {
 // Helper function to extract contact names from natural language input
 fn extract_contact_names(input: &str) -> Vec<String> {
     let mut contact_names = Vec::new();
-
+    let input_lower = input.to_lowercase();
+    
     // Check for different contact-related keywords
-    let text_to_parse = if input.contains(" with ") {
+    let text_to_parse = if input_lower.contains(" with ") {
+        debug!("Found 'with' keyword for contact extraction");
         input.split(" with ").nth(1)
-    } else if input.contains(" to ") {
+    } else if input_lower.contains(" to ") {
+        debug!("Found 'to' keyword for contact extraction");
         input.split(" to ").nth(1)
-    } else if input.contains("invite") {
-        input.split("invite").nth(1)
+    } else if input_lower.contains("invite ") {
+        debug!("Found 'invite' keyword for contact extraction");
+        // Special handling for invite keyword which might not have a space before it
+        let parts: Vec<&str> = input.splitn(2, "invite ").collect();
+        if parts.len() > 1 {
+            Some(parts[1])
+        } else {
+            None
+        }
     } else {
         None
     };
 
     if let Some(after_word) = text_to_parse {
-        // Extract names until we hit certain stop words
+        debug!("Text to parse for contacts: '{}'", after_word);
+        
+        // Extract until we hit certain stop words or punctuation
         let name_part = after_word
-            .split(|c: char| c == ',' || c == ';' || c == '.' || c == ' ')
-            .take_while(|&word| {
-                let word = word.trim().to_lowercase();
-                !word.contains("@")
-                    && !word.contains("about")
-                    && !word.contains("regarding")
-                    && !word.contains("concerning")
-                    && !["at", "on", "tomorrow", "today", "am", "pm", ""].contains(&word.as_str())
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-            .trim()
-            .to_string();
+            .split(|c: char| c == ',' || c == ';' || c == '.')
+            .next()
+            .unwrap_or("")
+            .trim();
+            
+        debug!("Initial name part: '{}'", name_part);
+            
+        // Further refine by removing trailing stop words or time references
+        let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
+        
+        let mut final_name = name_part.to_string();
+        for word in &stop_words {
+            if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
+                final_name = final_name[0..pos].trim().to_string();
+            }
+        }
+            
+        debug!("Final extracted name: '{}'", final_name);
 
-        if !name_part.is_empty() {
-            contact_names.push(name_part);
+        if !final_name.is_empty() && !final_name.contains('@') {
+            contact_names.push(final_name);
         }
     }
 
-    // Return only non-email contacts
-    contact_names.into_iter().filter(|name| !name.contains('@')).collect()
+    debug!("Extracted contact names: {:?}", contact_names);
+    contact_names
 }
 
-// Helper function to enhance commands with proper contact handling
+// Helper function to enhance commands with proper contact and email handling
 fn enhance_command_with_contacts(command: &str, input: &str) -> String {
     if !command.contains("calendar create") {
         return command.to_string();
@@ -612,51 +629,73 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
 
     let mut enhanced = command.to_string();
 
-    // Check if the command already has a --contacts flag
-    if !enhanced.contains("--contacts") {
-        // Extract contact names using our helper function
-        let contact_names = extract_contact_names(input);
+    // Step 1: Extract email addresses from the input
+    let email_addresses = extract_email_addresses(input);
+    
+    // Step 2: Extract contact names
+    let contact_names = extract_contact_names(input);
+    
+    debug!("Email addresses extracted: {:?}", email_addresses);
+    debug!("Contact names extracted: {:?}", contact_names);
 
-        debug!("Contact names extracted: {:?}", contact_names);
+    // Step 3: Handle email addresses if they're not already in the command
+    if !email_addresses.is_empty() && !enhanced.contains("--email") {
+        let escaped_emails = email_addresses.join(",").replace("\"", "\\\"");
+        debug!("Adding emails to command: {}", escaped_emails);
+        enhanced = format!(r#"{} --email "{}""#, enhanced, escaped_emails);
+    }
+    
+    // Step 4: Clean up any incorrectly placed contact names in email flags
+    if enhanced.contains("--email") {
+        // Pattern: --email "Name Without @ Symbol"
+        let email_regex = regex::Regex::new(r#"--email\s+"([^@"]+)""#).unwrap();
 
-        if !contact_names.is_empty() {
-            // First, remove any email flags that contain names (not emails)
-            if input.contains("invite") && enhanced.contains("--email") {
-                // Pattern: --email "Name Without @ Symbol"
-                let email_regex = regex::Regex::new(r#"--email\s+"([^@"]+)""#).unwrap();
-
-                if let Some(caps) = email_regex.captures(&enhanced) {
-                    if let Some(email_match) = caps.get(1) {
-                        let email_value = email_match.as_str();
-                        if !email_value.contains('@') {
-                            debug!("Removing incorrectly formatted email: {}", email_value);
-                            enhanced =
-                                email_regex.replace(&enhanced, "").to_string().trim().to_string();
-                        }
-                    }
-                }
-
-                // Special handling for the exact pattern we're seeing in the logs
-                // This explicitly handles the case we're experiencing
-                if contact_names.iter().any(|name| name.contains("Shaun Stuart")) {
-                    // Pattern for when a name is in --email flag that should be a contact
-                    debug!("Enhanced command before Shaun Stuart fix: {}", enhanced);
-
-                    // More aggressive replacement to handle the specific pattern we're seeing
-                    if enhanced.contains("--email \"Shaun Stuart\"") {
-                        enhanced = enhanced.replace("--email \"Shaun Stuart\"", "");
-                        enhanced = enhanced.trim().to_string();
-                        debug!("Removed 'Shaun Stuart' from email flag");
-                    }
+        if let Some(caps) = email_regex.captures(&enhanced) {
+            if let Some(email_match) = caps.get(1) {
+                let email_value = email_match.as_str();
+                if !email_value.contains('@') {
+                    debug!("Removing incorrectly formatted email: {}", email_value);
+                    enhanced = email_regex.replace(&enhanced, "").to_string().trim().to_string();
                 }
             }
+        }
 
-            // Escape contact names to prevent injection
-            let escaped_contacts = contact_names.join(",").replace("\"", "\"\"");
-            debug!("Adding contacts to command: {}", escaped_contacts);
-            enhanced = format!(r#"{} --contacts "{}""#, enhanced, escaped_contacts);
+        // Remove specific contact names from email flags
+        for name in &contact_names {
+            let quoted_name = format!("--email \"{}\"", name);
+            if enhanced.contains(&quoted_name) {
+                debug!("Removing name '{}' from email flag", name);
+                enhanced = enhanced.replace(&quoted_name, "").trim().to_string();
+            }
         }
     }
 
+    // Step 5: Add contact names if not already in the command
+    if !contact_names.is_empty() && !enhanced.contains("--contacts") {
+        let escaped_contacts = contact_names.join(",").replace("\"", "\\\"");
+        debug!("Adding contacts to command: {}", escaped_contacts);
+        enhanced = format!(r#"{} --contacts "{}""#, enhanced, escaped_contacts);
+    }
+
     enhanced
+}
+
+// Helper function to extract email addresses from natural language input
+fn extract_email_addresses(input: &str) -> Vec<String> {
+    // Email regex pattern - basic pattern for demonstration
+    let email_regex = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
+    
+    let mut emails = Vec::new();
+    
+    for cap in email_regex.captures_iter(input) {
+        let email = cap.get(0).unwrap().as_str().to_string();
+        if crate::calendar::validate_email(&email) {
+            debug!("Extracted email: {}", email);
+            emails.push(email);
+        } else {
+            debug!("Found invalid email: {}", email);
+        }
+    }
+    
+    emails
 }
