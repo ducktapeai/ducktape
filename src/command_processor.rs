@@ -337,7 +337,9 @@ impl CommandHandler for CalendarHandler {
                     crate::calendar::create_event(config).await
                 }
                 Some("list") => crate::calendar::list_calendars().await,
-                Some("props") | Some("properties") => crate::calendar::list_event_properties().await,
+                Some("props") | Some("properties") => {
+                    crate::calendar::list_event_properties().await
+                }
                 Some("delete") | Some("remove") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for calendar delete command");
@@ -347,16 +349,23 @@ impl CommandHandler for CalendarHandler {
 
                     let title = &args.args[1];
                     crate::calendar::delete_event(title, "").await
-                },
+                }
                 Some("import") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for calendar import command");
-                        println!("Usage: ducktape calendar import <file_path> [--format csv|ics] [--calendar <name>]");
+                        println!(
+                            "Usage: ducktape calendar import <file_path> [--format csv|ics] [--calendar <name>]"
+                        );
                         return Ok(());
                     }
 
                     let file_path = std::path::Path::new(&args.args[1]);
-                    let format = args.flags.get("--format").cloned().flatten().unwrap_or_else(|| "csv".to_string());
+                    let format = args
+                        .flags
+                        .get("--format")
+                        .cloned()
+                        .flatten()
+                        .unwrap_or_else(|| "csv".to_string());
                     let calendar = args.flags.get("--calendar").cloned().flatten();
 
                     match format.to_lowercase().as_str() {
@@ -367,9 +376,12 @@ impl CommandHandler for CalendarHandler {
                             Ok(())
                         }
                     }
-                },
+                }
                 Some(cmd) => {
-                    println!("Unknown calendar command: {}. Run 'ducktape calendar --help' for available commands.", cmd);
+                    println!(
+                        "Unknown calendar command: {}. Run 'ducktape calendar --help' for available commands.",
+                        cmd
+                    );
                     Ok(())
                 }
                 None => {
@@ -407,7 +419,9 @@ fn print_calendar_help() {
     println!("  --interval <num>     Set recurrence interval (e.g., every 2 weeks)");
     println!("  --until <date>       Set end date for recurrence (YYYY-MM-DD)");
     println!("  --count <num>        Set number of occurrences");
-    println!("  --days \"<days>\"      Set days of week for weekly recurrence (Mo,Tu,We,Th,Fr,Sa,Su)");
+    println!(
+        "  --days \"<days>\"      Set days of week for weekly recurrence (Mo,Tu,We,Th,Fr,Sa,Su)"
+    );
     println!("\nEXAMPLES:");
     println!("  ducktape calendar create \"Team Meeting\" 2024-04-15 14:00 15:00 \"Work\" --zoom");
     println!("  ducktape calendar create \"Weekly Review\" 2024-04-15 10:00 11:00 --repeat weekly");
