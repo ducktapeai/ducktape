@@ -503,9 +503,10 @@ pub async fn get_available_calendars() -> Result<Vec<String>> {
 
 async fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
-    
+
     // Add explicit logging to help diagnose time issues
-    info!("Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
+    info!(
+        "Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
         config.title,
         Local::now().year(),
         Local::now().month(),
@@ -522,7 +523,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             10 => "October",
             11 => "November",
             12 => "December",
-            _ => "Unknown"
+            _ => "Unknown",
         },
         Local::now().day(),
         config.start_date
@@ -536,7 +537,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     );
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
-        
+
     // Convert to local timezone with consistent type
     let local_start = if let Some(tz_str) = config.timezone.as_deref() {
         match Tz::from_str(tz_str) {
@@ -567,25 +568,26 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     let end_dt = if let Some(ref end_time) = config.end_time {
         let end_datetime = format!("{} {}", config.start_date, end_time);
         debug!("End datetime string: {}", end_datetime);
-        
+
         let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
             .map_err(|e| anyhow!("Invalid end datetime: {}", e))?;
-            
+
         // Check that end time is after start time
         if naive_end <= start_dt {
-            debug!("End time {} is not after start time {}, adding 1 day", 
-                naive_end.format("%H:%M"), 
-                start_dt.format("%H:%M"));
-                
-            // If end time is earlier than start time, assume it's the next day
-            let next_day = start_dt.date().succ_opt().ok_or_else(|| 
-                anyhow!("Failed to calculate next day for end time"))?;
-                
-            let adjusted_end = NaiveDateTime::new(
-                next_day, 
-                naive_end.time()
+            debug!(
+                "End time {} is not after start time {}, adding 1 day",
+                naive_end.format("%H:%M"),
+                start_dt.format("%H:%M")
             );
-            
+
+            // If end time is earlier than start time, assume it's the next day
+            let next_day = start_dt
+                .date()
+                .succ_opt()
+                .ok_or_else(|| anyhow!("Failed to calculate next day for end time"))?;
+
+            let adjusted_end = NaiveDateTime::new(next_day, naive_end.time());
+
             Local::now()
                 .timezone()
                 .from_local_datetime(&adjusted_end)
@@ -595,9 +597,10 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             if let Some(tz_str) = config.timezone.as_deref() {
                 match Tz::from_str(tz_str) {
                     Ok(tz) => {
-                        let tz_dt = tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
-                            anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
-                        })?;
+                        let tz_dt =
+                            tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
+                                anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
+                            })?;
                         tz_dt.with_timezone(&Local)
                     }
                     Err(_) => Local::now()
@@ -832,7 +835,11 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     let error_output = String::from_utf8_lossy(&output.stderr);
 
     if result.contains("Success") {
-        info!("Calendar event created: {} at {}", config.title, local_start.format("%Y-%m-%d %H:%M"));
+        info!(
+            "Calendar event created: {} at {}",
+            config.title,
+            local_start.format("%Y-%m-%d %H:%M")
+        );
         Ok(())
     } else {
         error!("AppleScript error: STDOUT: {} | STDERR: {}", result, error_output);
