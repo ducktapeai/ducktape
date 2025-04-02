@@ -150,8 +150,56 @@ impl Application {
 
         log::info!("Processed command: {}", processed_input);
 
+        // Ensure calendar event commands have proper end times
+        let final_command = if processed_input.contains("calendar create") || processed_input.contains("calendar add") {
+            // Check if it has a start time but no end time
+            let parts: Vec<&str> = processed_input.split_whitespace().collect();
+            let mut has_start_time = false;
+            let mut has_end_time = false;
+            let mut start_time_index = 0;
+
+            // Find start time position and check if end time exists
+            for (i, part) in parts.iter().enumerate() {
+                if part.contains(':') && i > 2 {  // Potential time format (avoid matching in command prefix)
+                    if !has_start_time {
+                        has_start_time = true;
+                        start_time_index = i;
+                    } else if i == start_time_index + 1 {
+                        has_end_time = true;
+                        break;
+                    }
+                }
+            }
+
+            // If there's a start time but no end time, add an end time 1 hour later
+            if has_start_time && !has_end_time && start_time_index > 0 && start_time_index < parts.len() {
+                let start_time = parts[start_time_index];
+                if let Some((hours_str, minutes_str)) = start_time.split_once(':') {
+                    if let (Ok(hours), Ok(minutes)) = (hours_str.parse::<u32>(), minutes_str.parse::<u32>()) {
+                        // Calculate end time one hour later
+                        let end_hours = (hours + 1) % 24;
+                        let end_time = format!("{}:{}", end_hours, minutes_str);
+
+                        let mut new_parts = parts.clone();
+                        new_parts.insert(start_time_index + 1, &end_time);
+                        let fixed_command = new_parts.join(" ");
+                        log::info!("Added missing end time. Fixed command: {}", fixed_command);
+                        fixed_command
+                    } else {
+                        processed_input.clone()
+                    }
+                } else {
+                    processed_input.clone()
+                }
+            } else {
+                processed_input.clone()
+            }
+        } else {
+            processed_input.clone()
+        };
+
         // Parse the processed command into arguments
-        match CommandArgs::parse(&processed_input) {
+        match CommandArgs::parse(&final_command) {
             Ok(args) => self.command_processor.execute(args).await,
             Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
         }

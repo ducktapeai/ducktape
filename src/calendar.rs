@@ -503,6 +503,30 @@ pub async fn get_available_calendars() -> Result<Vec<String>> {
 
 async fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
+    
+    // Add explicit logging to help diagnose time issues
+    info!("Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
+        config.title,
+        Local::now().year(),
+        Local::now().month(),
+        match Local::now().month() {
+            1 => "January",
+            2 => "February",
+            3 => "March",
+            4 => "April",
+            5 => "May",
+            6 => "June",
+            7 => "July",
+            8 => "August",
+            9 => "September",
+            10 => "October",
+            11 => "November",
+            12 => "December",
+            _ => "Unknown"
+        },
+        Local::now().day(),
+        config.start_date
+    );
 
     // Parse start datetime with timezone handling
     let start_datetime = format!(
@@ -510,10 +534,9 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         config.start_date,
         if config.all_day { "00:00" } else { &config.start_time }
     );
-
     let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
         .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
-
+        
     // Convert to local timezone with consistent type
     let local_start = if let Some(tz_str) = config.timezone.as_deref() {
         match Tz::from_str(tz_str) {
@@ -540,40 +563,69 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
     };
 
-    // Parse end datetime with similar timezone handling
+    // Parse end datetime with improved handling and validation
     let end_dt = if let Some(ref end_time) = config.end_time {
         let end_datetime = format!("{} {}", config.start_date, end_time);
+        debug!("End datetime string: {}", end_datetime);
+        
         let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
             .map_err(|e| anyhow!("Invalid end datetime: {}", e))?;
-
-        if let Some(tz_str) = config.timezone.as_deref() {
-            match Tz::from_str(tz_str) {
-                Ok(tz) => {
-                    let tz_dt = tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
-                        anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
-                    })?;
-                    tz_dt.with_timezone(&Local)
+            
+        // Check that end time is after start time
+        if naive_end <= start_dt {
+            debug!("End time {} is not after start time {}, adding 1 day", 
+                naive_end.format("%H:%M"), 
+                start_dt.format("%H:%M"));
+                
+            // If end time is earlier than start time, assume it's the next day
+            let next_day = start_dt.date().succ_opt().ok_or_else(|| 
+                anyhow!("Failed to calculate next day for end time"))?;
+                
+            let adjusted_end = NaiveDateTime::new(
+                next_day, 
+                naive_end.time()
+            );
+            
+            Local::now()
+                .timezone()
+                .from_local_datetime(&adjusted_end)
+                .single()
+                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+        } else {
+            if let Some(tz_str) = config.timezone.as_deref() {
+                match Tz::from_str(tz_str) {
+                    Ok(tz) => {
+                        let tz_dt = tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
+                            anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
+                        })?;
+                        tz_dt.with_timezone(&Local)
+                    }
+                    Err(_) => Local::now()
+                        .timezone()
+                        .from_local_datetime(&naive_end)
+                        .single()
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
                 }
-                Err(_) => Local::now()
+            } else {
+                Local::now()
                     .timezone()
                     .from_local_datetime(&naive_end)
                     .single()
-                    .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
             }
-        } else {
-            Local::now()
-                .timezone()
-                .from_local_datetime(&naive_end)
-                .single()
-                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
         }
     } else {
+        // If no end time is specified, default to one hour after start time
         local_start + chrono::Duration::hours(1)
     };
 
     if end_dt <= local_start {
         return Err(anyhow!("End time must be after start time"));
     }
+
+    // Log the final start and end times for debugging
+    debug!("Final start time: {}", local_start.format("%Y-%m-%d %H:%M"));
+    debug!("Final end time: {}", end_dt.format("%Y-%m-%d %H:%M"));
 
     // Create Zoom meeting if requested
     let mut zoom_meeting_info = String::new();
@@ -586,7 +638,6 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
         } else {
             60 // Default 1 hour
         };
-
         let meeting_options = ZoomMeetingOptions {
             topic: config.title.to_string(),
             start_time: zoom_start_time,
@@ -594,7 +645,6 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             password: None,
             agenda: config.description.clone(),
         };
-
         match client.create_meeting(meeting_options).await {
             Ok(meeting) => {
                 info!("Created Zoom meeting: ID={}, URL={}", meeting.id, meeting.join_url);
@@ -650,7 +700,6 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                 debug!("Skipping calendar owner {} as explicit attendee", email);
                 continue;
             }
-
             attendees_block.push_str(&format!(
                 r#"
                     try
@@ -671,18 +720,15 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             format!("FREQ={}", recurrence.frequency.to_rfc5545()),
             format!("INTERVAL={}", recurrence.interval),
         ];
-
         if let Some(count) = recurrence.count {
             parts.push(format!("COUNT={}", count));
         }
-
         if let Some(end_date) = &recurrence.end_date {
             let end_naive =
                 NaiveDateTime::parse_from_str(&format!("{} 23:59", end_date), "%Y-%m-%d %H:%M")
                     .map_err(|e| anyhow!("Invalid recurrence end date: {}", e))?;
             parts.push(format!("UNTIL={}", end_naive.format("%Y%m%dT%H%M%SZ")));
         }
-
         if recurrence.frequency == RecurrenceFrequency::Weekly
             && !recurrence.days_of_week.is_empty()
         {
@@ -702,7 +748,6 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                 .collect();
             parts.push(format!("BYDAY={}", days.join(",")));
         }
-
         let rule_string = parts.join(";");
         format!(
             r#"
@@ -787,7 +832,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     let error_output = String::from_utf8_lossy(&output.stderr);
 
     if result.contains("Success") {
-        info!("Calendar event created: {} at {}", config.title, start_datetime);
+        info!("Calendar event created: {} at {}", config.title, local_start.format("%Y-%m-%d %H:%M"));
         Ok(())
     } else {
         error!("AppleScript error: STDOUT: {} | STDERR: {}", result, error_output);
