@@ -199,6 +199,12 @@ pub struct CalendarHandler;
 impl CommandHandler for CalendarHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
+            // Check for --help or -h flag
+            if args.flags.contains_key("--help") || args.flags.contains_key("-h") {
+                print_calendar_help();
+                return Ok(());
+            }
+
             match args.args.get(0).map(|s| s.as_str()) {
                 Some("create") => {
                     if args.args.len() < 5 {
@@ -331,13 +337,44 @@ impl CommandHandler for CalendarHandler {
                     crate::calendar::create_event(config).await
                 }
                 Some("list") => crate::calendar::list_calendars().await,
-                Some("show") => {
-                    // TODO: Implement show calendar functionality
-                    println!("Show calendar functionality is not implemented yet.");
+                Some("props") | Some("properties") => crate::calendar::list_event_properties().await,
+                Some("delete") | Some("remove") => {
+                    if args.args.len() < 2 {
+                        println!("Not enough arguments for calendar delete command");
+                        println!("Usage: ducktape calendar delete <title>");
+                        return Ok(());
+                    }
+
+                    let title = &args.args[1];
+                    crate::calendar::delete_event(title, "").await
+                },
+                Some("import") => {
+                    if args.args.len() < 2 {
+                        println!("Not enough arguments for calendar import command");
+                        println!("Usage: ducktape calendar import <file_path> [--format csv|ics] [--calendar <name>]");
+                        return Ok(());
+                    }
+
+                    let file_path = std::path::Path::new(&args.args[1]);
+                    let format = args.flags.get("--format").cloned().flatten().unwrap_or_else(|| "csv".to_string());
+                    let calendar = args.flags.get("--calendar").cloned().flatten();
+
+                    match format.to_lowercase().as_str() {
+                        "csv" => crate::calendar::import_csv_events(file_path, calendar).await,
+                        "ics" => crate::calendar::import_ics_events(file_path, calendar).await,
+                        _ => {
+                            println!("Unknown format: {}. Supported formats: csv, ics", format);
+                            Ok(())
+                        }
+                    }
+                },
+                Some(cmd) => {
+                    println!("Unknown calendar command: {}. Run 'ducktape calendar --help' for available commands.", cmd);
                     Ok(())
                 }
-                _ => {
-                    println!("Unknown calendar command. Available commands: create, list, show");
+                None => {
+                    // If no subcommand is provided, print calendar help
+                    print_calendar_help();
                     Ok(())
                 }
             }
@@ -349,6 +386,34 @@ impl CommandHandler for CalendarHandler {
     }
 }
 
+// Print calendar-specific help information
+fn print_calendar_help() {
+    println!("CALENDAR COMMANDS:");
+    println!("  ducktape calendar list                   List available calendars");
+    println!("  ducktape calendar props                  List available calendar properties");
+    println!("  ducktape calendar create <title> <date> <start_time> <end_time> [calendar]");
+    println!("  ducktape calendar delete <title>         Delete events with matching title");
+    println!("  ducktape calendar import <file> [--format csv|ics] [--calendar <name>]");
+    println!("\nCALENDAR OPTIONS:");
+    println!("  --all-day            Create an all-day event");
+    println!("  --location \"<loc>\"   Set event location");
+    println!("  --notes \"<desc>\"     Set event description");
+    println!("  --email \"<email>\"    Add attendee by email");
+    println!("  --reminder <mins>    Set reminder (minutes before event)");
+    println!("  --contacts \"<names>\" Add contacts by name (auto-lookup emails)");
+    println!("  --zoom               Create a Zoom meeting for the event");
+    println!("\nRECURRENCE OPTIONS:");
+    println!("  --repeat <freq>      Set recurrence (daily, weekly, monthly, yearly)");
+    println!("  --interval <num>     Set recurrence interval (e.g., every 2 weeks)");
+    println!("  --until <date>       Set end date for recurrence (YYYY-MM-DD)");
+    println!("  --count <num>        Set number of occurrences");
+    println!("  --days \"<days>\"      Set days of week for weekly recurrence (Mo,Tu,We,Th,Fr,Sa,Su)");
+    println!("\nEXAMPLES:");
+    println!("  ducktape calendar create \"Team Meeting\" 2024-04-15 14:00 15:00 \"Work\" --zoom");
+    println!("  ducktape calendar create \"Weekly Review\" 2024-04-15 10:00 11:00 --repeat weekly");
+    println!("  ducktape calendar import \"events.csv\" --format csv --calendar \"Work\"");
+}
+
 // Todo handler
 #[derive(Debug)]
 pub struct TodoHandler;
@@ -356,6 +421,12 @@ pub struct TodoHandler;
 impl CommandHandler for TodoHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
+            // Check for --help or -h flag
+            if args.flags.contains_key("--help") || args.flags.contains_key("-h") {
+                print_todo_help();
+                return Ok(());
+            }
+
             match args.args.get(0).map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
@@ -421,6 +492,26 @@ impl CommandHandler for TodoHandler {
     }
 }
 
+// Print todo-specific help information
+fn print_todo_help() {
+    println!("TODO COMMANDS:");
+    println!("  ducktape todo list                       List all todos");
+    println!("  ducktape todo lists                      List available reminder lists");
+    println!("  ducktape todo create <title> [list]      Create a new todo");
+    println!("  ducktape todo add <title> [list]         Alias for create");
+    println!("  ducktape todo delete <title>             Delete a todo");
+    println!("\nTODO OPTIONS:");
+    println!("  --list \"<list>\"      Specify reminder list");
+    println!("  --due \"<date>\"       Set due date/time");
+    println!("  --notes \"<text>\"     Add notes to the todo");
+    println!("  --priority <level>   Set priority (high, medium, low)");
+    println!("  --remind \"<time>\"    Set reminder time");
+    println!("\nEXAMPLES:");
+    println!("  ducktape todo create \"Buy groceries\" \"Shopping\"");
+    println!("  ducktape todo add \"Call John\" --due \"tomorrow at 5pm\"");
+    println!("  ducktape todo add \"Doctor appointment\" --remind \"2024-04-15 14:00\"");
+}
+
 // Notes handler
 #[derive(Debug)]
 pub struct NotesHandler;
@@ -428,6 +519,12 @@ pub struct NotesHandler;
 impl CommandHandler for NotesHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
+            // Check for --help or -h flag
+            if args.flags.contains_key("--help") || args.flags.contains_key("-h") {
+                print_notes_help();
+                return Ok(());
+            }
+
             match args.args.get(0).map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
@@ -465,6 +562,19 @@ impl CommandHandler for NotesHandler {
     fn can_handle(&self, command: &str) -> bool {
         command == "note" || command == "notes"
     }
+}
+
+// Print notes-specific help information
+fn print_notes_help() {
+    println!("NOTES COMMANDS:");
+    println!("  ducktape note list                       List recent notes");
+    println!("  ducktape note create <title> [content] [folder]");
+    println!("  ducktape note add <title> [content] [folder]");
+    println!("\nNOTES OPTIONS:");
+    println!("  --folder \"<folder>\"  Specify the folder for the note");
+    println!("\nEXAMPLES:");
+    println!("  ducktape note create \"Meeting Notes\" \"Content here\"");
+    println!("  ducktape note add \"Shopping List\" \"Milk, Eggs, Bread\" \"Personal\"");
 }
 
 // Config handler
@@ -845,14 +955,17 @@ impl CommandHandler for HelpHandler {
 
 // Print help information
 pub fn print_help() -> Result<()> {
-    println!("DuckTape - A tool for interacting with Apple Calendar, Notes, and Reminders");
+    println!(
+        "{} - A tool for interacting with Apple Calendar, Notes, and Reminders",
+        env!("CARGO_PKG_NAME")
+    );
     println!();
     println!("USAGE:");
     println!("  ducktape [COMMAND] [SUBCOMMAND] [OPTIONS]");
     println!();
     println!("COMMANDS:");
     println!("  calendar  Manage calendar events");
-    println!("  todo      Manage todo items");
+    println!("  todo      Manage todo items/reminders");
     println!("  notes     Manage notes");
     println!("  config    Manage configuration");
     println!("  contacts  Manage contact groups");
@@ -864,10 +977,13 @@ pub fn print_help() -> Result<()> {
     println!("  ducktape [COMMAND] --help");
     println!();
     println!("EXAMPLES:");
-    println!("  ducktape calendar create \"Meeting with Team\" 2025-04-15 10:00 11:00");
-    println!("  ducktape todo add \"Buy groceries\" tomorrow 18:00");
-    println!("  ducktape notes create \"Meeting Notes\" \"Points discussed in the meeting\"");
-    println!("  ducktape config set calendar.default \"Personal\"");
+    println!("  ducktape calendar list                   List available calendars");
+    println!("  ducktape calendar create \"Meeting\" 2024-04-15 14:00 15:00 \"Work\"");
+    println!("  ducktape todo lists                      List available reminder lists");
+    println!("  ducktape todo create \"Buy groceries\" \"Shopping\"");
+    println!("  ducktape note list                       List recent notes");
+    println!("  ducktape note create \"Meeting Notes\" \"Content here\"");
+    println!("  ducktape --api-server                    Start API server only");
     Ok(())
 }
 
