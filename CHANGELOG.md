@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-04-03
+
+### Added
+- Homebrew installation support
+- Enhanced error reporting for API calls
+- Improved documentation for installation process
+
+### Changed
+- Refactored calendar event handling for better performance
+- Updated dependency versions for security and stability
+- Enhanced WebSocket API error messages
+
+### Fixed
+- Fixed timezone handling in recurring events
+- Resolved issue with contact lookup in calendar invitations
+- Improved error handling in natural language processing
+
+## [0.1.7] - 2025-04-01
+
+### Added
+- Additional natural language capabilities for calendar management
+- Enhanced support for DeepSeek LLM integration
+
+### Fixed
+- Bug in reminder list handling
+- Issue with Zoom meeting generation in recurring events
+
 ## [0.1.6] - 2025-03-31
 
 ### Fixed
@@ -79,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
+[0.1.8]: https://github.com/ducktapeai/ducktape/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/ducktapeai/ducktape/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ducktapeai/ducktape/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/ducktapeai/ducktape/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/ducktapeai/ducktape/compare/v0.1.3...v0.1.4
