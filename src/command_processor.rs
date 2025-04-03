@@ -17,7 +17,7 @@ impl CommandArgs {
     pub fn parse(input: &str) -> Result<Self> {
         // Normalize input by replacing non-breaking spaces with regular spaces
         let normalized_input = input.replace('\u{a0}', " ");
-        
+
         debug!("Normalized input: {}", normalized_input);
 
         // Handle exit commands
@@ -320,7 +320,7 @@ impl CommandHandler for CalendarHandler {
                             .map(|s| s.trim().to_string())
                             .filter(|email| crate::calendar::validate_email(email))
                             .collect();
-                        
+
                         debug!("Added {} email attendees", config.emails.len());
                     }
 
