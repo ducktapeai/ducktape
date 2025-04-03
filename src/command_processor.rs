@@ -184,7 +184,7 @@ impl CommandArgs {
                 // Remove surrounding quotes if present
                 let mut arg = parts[i].clone();
                 if arg.starts_with('"') && arg.ends_with('"') {
-                    arg = arg[1..arg.len()-1].to_string();
+                    arg = arg[1..arg.len() - 1].to_string();
                 }
                 args.push(arg);
             }
@@ -955,19 +955,14 @@ mod tests {
         assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Office");
 
         // Test basic command with quotes
-        let args = CommandArgs::parse("ducktape calendar create \"Weekly Team Standup\" 2025-04-03 15:00 16:00 \"Work\"")
-            .unwrap();
+        let args = CommandArgs::parse(
+            "ducktape calendar create \"Weekly Team Standup\" 2025-04-03 15:00 16:00 \"Work\"",
+        )
+        .unwrap();
         assert_eq!(args.command, "calendar");
         assert_eq!(
             args.args,
-            vec![
-                "create",
-                "Weekly Team Standup",
-                "2025-04-03",
-                "15:00",
-                "16:00",
-                "Work"
-            ]
+            vec!["create", "Weekly Team Standup", "2025-04-03", "15:00", "16:00", "Work"]
         );
         assert!(args.flags.is_empty());
 
@@ -979,14 +974,7 @@ mod tests {
         assert_eq!(args.command, "calendar");
         assert_eq!(
             args.args,
-            vec![
-                "create",
-                "Project Review",
-                "2025-04-03",
-                "15:00",
-                "16:00",
-                "Work"
-            ]
+            vec!["create", "Project Review", "2025-04-03", "15:00", "16:00", "Work"]
         );
         assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Conference Room A");
     }
@@ -995,10 +983,10 @@ mod tests {
     fn test_command_args_parse_errors() {
         // Test unclosed quotes
         assert!(CommandArgs::parse("ducktape calendar create \"Unterminated Quote").is_err());
-        
+
         // Test empty command
         assert!(CommandArgs::parse("").is_err());
-        
+
         // Test missing ducktape prefix
         assert!(CommandArgs::parse("invalid command").is_err());
     }
