@@ -15,10 +15,9 @@ pub struct CommandArgs {
 
 impl CommandArgs {
     pub fn parse(input: &str) -> Result<Self> {
-        // Normalize input by replacing non-breaking spaces and multiple spaces with a single space
-        let normalized_input =
-            input.replace('\u{a0}', " ").split_whitespace().collect::<Vec<_>>().join(" ");
-
+        // Normalize input by replacing non-breaking spaces with regular spaces
+        let normalized_input = input.replace('\u{a0}', " ");
+        
         debug!("Normalized input: {}", normalized_input);
 
         // Handle exit commands
@@ -89,7 +88,6 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
-                    // Don't immediately push empty quoted strings
                     if !in_quotes && !current.is_empty() {
                         parts.push(current.clone());
                         current.clear();
@@ -102,11 +100,14 @@ impl CommandArgs {
                     }
                 }
                 _ => {
-                    if escaped && c != '"' {
-                        current.push('\\');
+                    // Always add character when in quotes or it's not a space
+                    if in_quotes || c != ' ' || escaped {
+                        if escaped && c != '"' {
+                            current.push('\\');
+                        }
+                        current.push(c);
+                        escaped = false;
                     }
-                    current.push(c);
-                    escaped = false;
                 }
             }
         }
@@ -229,7 +230,7 @@ impl CommandHandler for CalendarHandler {
                     // Build flags
                     let location = args.flags.get("--location").cloned().flatten();
                     let description = args.flags.get("--notes").cloned().flatten();
-                    let emails = args.flags.get("--attendees").cloned().flatten();
+                    let emails = args.flags.get("--email").cloned().flatten();
                     let contacts = args.flags.get("--contacts").cloned().flatten();
 
                     // Handle recurrence options
@@ -312,12 +313,15 @@ impl CommandHandler for CalendarHandler {
                         }
                     }
 
-                    if let Some(attendees_str) = emails {
-                        config.emails = attendees_str
+                    // Process emails if provided
+                    if let Some(email_str) = emails {
+                        config.emails = email_str
                             .split(',')
                             .map(|s| s.trim().to_string())
                             .filter(|email| crate::calendar::validate_email(email))
                             .collect();
+                        
+                        debug!("Added {} email attendees", config.emails.len());
                     }
 
                     // If contacts are specified, use create_event_with_contacts
