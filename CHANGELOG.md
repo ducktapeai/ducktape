@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2025-04-04
+
+### Fixed
+- Fixed command parsing to properly handle quoted arguments with spaces
+- Improved email attendee handling in calendar events
+- Enhanced error reporting for invalid command formats
+
+### Changed
+- Updated command processing for better quote and space handling
+- Improved validation of calendar event creation parameters
+
 ## [0.1.8] - 2025-04-03
 
 ### Added
@@ -106,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
+[0.1.9]: https://github.com/ducktapeai/ducktape/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ducktapeai/ducktape/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ducktapeai/ducktape/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ducktapeai/ducktape/compare/v0.1.5...v0.1.6
