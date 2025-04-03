@@ -89,6 +89,7 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
+                    // Don't immediately push empty quoted strings
                     if !in_quotes && !current.is_empty() {
                         parts.push(current.clone());
                         current.clear();
@@ -108,6 +109,11 @@ impl CommandArgs {
                     escaped = false;
                 }
             }
+        }
+
+        // Handle unclosed quotes
+        if in_quotes {
+            return Err(anyhow!("Unclosed quotes in command"));
         }
 
         if !current.is_empty() {
@@ -175,7 +181,12 @@ impl CommandArgs {
                     flags.insert(flag, None);
                 }
             } else {
-                args.push(parts[i].clone());
+                // Remove surrounding quotes if present
+                let mut arg = parts[i].clone();
+                if arg.starts_with('"') && arg.ends_with('"') {
+                    arg = arg[1..arg.len()-1].to_string();
+                }
+                args.push(arg);
             }
             i += 1;
         }
@@ -943,16 +954,52 @@ mod tests {
         assert_eq!(args.args, vec!["create", "Test Event", "2023-01-01", "09:00", "10:00"]);
         assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Office");
 
-        // Test help command
-        let args = CommandArgs::parse("ducktape help").unwrap();
-        assert_eq!(args.command, "help");
-        assert!(args.args.is_empty());
+        // Test basic command with quotes
+        let args = CommandArgs::parse("ducktape calendar create \"Weekly Team Standup\" 2025-04-03 15:00 16:00 \"Work\"")
+            .unwrap();
+        assert_eq!(args.command, "calendar");
+        assert_eq!(
+            args.args,
+            vec![
+                "create",
+                "Weekly Team Standup",
+                "2025-04-03",
+                "15:00",
+                "16:00",
+                "Work"
+            ]
+        );
         assert!(args.flags.is_empty());
 
-        // Test version command
-        let args = CommandArgs::parse("ducktape version").unwrap();
-        assert_eq!(args.command, "version");
-        assert!(args.args.is_empty());
-        assert!(args.flags.is_empty());
+        // Test with multiple quoted arguments
+        let args = CommandArgs::parse(
+            "ducktape calendar create \"Project Review\" 2025-04-03 15:00 16:00 \"Work\" --location \"Conference Room A\"",
+        )
+        .unwrap();
+        assert_eq!(args.command, "calendar");
+        assert_eq!(
+            args.args,
+            vec![
+                "create",
+                "Project Review",
+                "2025-04-03",
+                "15:00",
+                "16:00",
+                "Work"
+            ]
+        );
+        assert_eq!(args.flags.get("--location").unwrap().as_ref().unwrap(), "Conference Room A");
+    }
+
+    #[test]
+    fn test_command_args_parse_errors() {
+        // Test unclosed quotes
+        assert!(CommandArgs::parse("ducktape calendar create \"Unterminated Quote").is_err());
+        
+        // Test empty command
+        assert!(CommandArgs::parse("").is_err());
+        
+        // Test missing ducktape prefix
+        assert!(CommandArgs::parse("invalid command").is_err());
     }
 }
