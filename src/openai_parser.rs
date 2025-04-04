@@ -2,9 +2,9 @@
 use crate::calendar;
 use crate::config::Config;
 use anyhow::{Result, anyhow};
-use chrono::{Local, Timelike}; // Remove NaiveTime since it's unused
-use log::debug; // Only keep the debug import since others are unused
-use lru::LruCache; // Fix: use correct import for LruCache
+use chrono::{Local, Timelike};
+use log::debug;  // Only import debug since others are unused
+use lru::LruCache;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
@@ -199,6 +199,66 @@ fn enhance_recurrence_command(command: &str) -> String {
                     enhanced = format!("{} --interval {}", enhanced, interval);
                 }
             }
+        }
+    }
+
+    enhanced
+}
+
+#[allow(dead_code)]
+// Helper function to enhance commands with proper contact and email handling
+fn enhance_command_with_contacts(command: &str, input: &str) -> String {
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+
+    let mut enhanced = command.to_string();
+
+    // Step 1: Extract email addresses from the input
+    if let Ok(email_addresses) = extract_emails(input) {
+        // Step 2: Extract contact names
+        let contact_names = extract_contact_names(input);
+
+        debug!("Email addresses extracted: {:?}", email_addresses);
+        debug!("Contact names extracted: {:?}", contact_names);
+
+        // Step 3: Handle email addresses if they're not already in the command
+        if !email_addresses.is_empty() && !enhanced.contains("--email") {
+            let escaped_emails = email_addresses.join(",").replace("\"", "\\\"");
+            debug!("Adding emails to command: {}", escaped_emails);
+            enhanced = format!(r#"{} --email "{}""#, enhanced, escaped_emails);
+        }
+
+        // Step 4: Clean up any incorrectly placed contact names in email flags
+        if enhanced.contains("--email") {
+            // Pattern: --email "Name Without @ Symbol"
+            let email_regex = regex::Regex::new(r#"--email\s+"([^@"]+)""#).unwrap();
+
+            if let Some(caps) = email_regex.captures(&enhanced) {
+                if let Some(email_match) = caps.get(1) {
+                    let email_value = email_match.as_str();
+                    if !email_value.contains('@') {
+                        debug!("Removing incorrectly formatted email: {}", email_value);
+                        enhanced = email_regex.replace(&enhanced, "").to_string().trim().to_string();
+                    }
+                }
+            }
+
+            // Remove specific contact names from email flags
+            for name in &contact_names {
+                let quoted_name = format!("--email \"{}\"", name);
+                if enhanced.contains(&quoted_name) {
+                    debug!("Removing name '{}' from email flag", name);
+                    enhanced = enhanced.replace(&quoted_name, "").trim().to_string();
+                }
+            }
+        }
+
+        // Step 5: Add contact names if not already in the command
+        if !contact_names.is_empty() && !enhanced.contains("--contacts") {
+            let escaped_contacts = contact_names.join(",").replace("\"", "\\\"");
+            debug!("Adding contacts to command: {}", escaped_contacts);
+            enhanced = format!(r#"{} --contacts "{}""#, enhanced, escaped_contacts);
         }
     }
 
@@ -401,39 +461,7 @@ Rules:
                         || input.contains(" to ")
                         || input.contains("invite")
                     {
-                        let mut contact_names = Vec::new();
-                        let text_to_parse = if input.contains(" with ") {
-                            input.split(" with ").nth(1)
-                        } else if input.contains(" to ") {
-                            input.split(" to ").nth(1)
-                        } else if input.contains("invite") {
-                            input.split("invite").nth(1)
-                        } else {
-                            None
-                        };
-
-                        if let Some(after_word) = text_to_parse {
-                            // Extract names until we hit certain stop words
-                            let name_part = after_word
-                                .split(|c: char| c == ',' || c == ';' || c == '.' || c == ' ')
-                                .take_while(|&word| {
-                                    let word = word.trim().to_lowercase();
-                                    !word.contains("@")
-                                        && !word.contains("about")
-                                        && !word.contains("regarding")
-                                        && !word.contains("concerning")
-                                        && !["at", "on", "tomorrow", "today", "am", "pm", ""]
-                                            .contains(&word.as_str())
-                                })
-                                .collect::<Vec<_>>()
-                                .join(" ")
-                                .trim()
-                                .to_string();
-
-                            if !name_part.is_empty() {
-                                contact_names.push(name_part);
-                            }
-                        }
+                        let contact_names = extract_contact_names(input);
 
                         // Process potential contact names - if they don't contain @ they're contacts, not emails
                         if !contact_names.is_empty() {
@@ -491,11 +519,78 @@ Rules:
     for command in results {
         let enhanced = enhance_recurrence_command(&command);
         let enhanced = enhance_command_with_zoom(&enhanced, &sanitized_input);
+        let enhanced = enhance_command_with_contacts(&enhanced, &sanitized_input);
         validate_calendar_command(&enhanced)?;
         final_results.push(enhanced);
     }
 
     Ok(final_results.join("\n"))
+}
+
+#[allow(dead_code)]
+/// Helper function to extract contact names from natural language input
+fn extract_contact_names(input: &str) -> Vec<String> {
+    let mut contact_names = Vec::new();
+    let input_lower = input.to_lowercase();
+
+    // Check for different contact-related keywords
+    let text_to_parse = if input_lower.contains(" with ") {
+        debug!("Found 'with' keyword for contact extraction");
+        input.split(" with ").nth(1)
+    } else if input_lower.contains(" to ") {
+        debug!("Found 'to' keyword for contact extraction");
+        input.split(" to ").nth(1)
+    } else if input_lower.contains("invite ") {
+        debug!("Found 'invite' keyword for contact extraction");
+        let parts: Vec<&str> = input.splitn(2, "invite ").collect();
+        if parts.len() > 1 { Some(parts[1]) } else { None }
+    } else {
+        None
+    };
+
+    if let Some(after_word) = text_to_parse {
+        debug!("Text to parse for contacts: '{}'", after_word);
+
+        for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
+            let name_part = name_part.trim();
+            if name_part.is_empty() {
+                continue;
+            }
+
+            if name_part.contains(" and ") {
+                let and_parts: Vec<&str> = name_part.split(" and ").collect();
+                for and_part in and_parts {
+                    let final_name = refine_name(and_part);
+                    if !final_name.is_empty() && !final_name.contains('@') {
+                        contact_names.push(final_name);
+                    }
+                }
+            } else {
+                let final_name = refine_name(name_part);
+                if !final_name.is_empty() && !final_name.contains('@') {
+                    contact_names.push(final_name);
+                }
+            }
+        }
+    }
+
+    debug!("Extracted contact names: {:?}", contact_names);
+    contact_names
+}
+
+#[allow(dead_code)]
+/// Helper function to refine a name by removing trailing stop words
+fn refine_name(name_part: &str) -> String {
+    let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
+    let mut final_name = name_part.trim().to_string();
+    
+    for word in &stop_words {
+        if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
+            final_name = final_name[0..pos].trim().to_string();
+        }
+    }
+
+    final_name
 }
 
 #[allow(dead_code)]
@@ -666,5 +761,52 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_extract_contact_names() {
+        // Test basic contact extraction with "with" keyword
+        let input = "Schedule a meeting with John Smith tomorrow at 2pm";
+        let contacts = extract_contact_names(input);
+        assert_eq!(contacts, vec!["John Smith"]);
+
+        // Test basic contact extraction with "invite" keyword
+        let input = "create a zoom event at 10am on April 1 called Project Deadlines and invite Shaun Stuart";
+        let contacts = extract_contact_names(input);
+        assert_eq!(contacts, vec!["Shaun Stuart"]);
+
+        // Test filtering out email addresses
+        let input = "Schedule a meeting with john.doe@example.com tomorrow";
+        let contacts = extract_contact_names(input);
+        assert!(contacts.is_empty());
+
+        // Test handling multiple names
+        let input = "Schedule a meeting with John Smith and Jane Doe tomorrow";
+        let contacts = extract_contact_names(input);
+        assert!(contacts.contains(&"John Smith".to_string()));
+        assert!(contacts.contains(&"Jane Doe".to_string()));
+    }
+
+    #[test]
+    fn test_extract_emails() {
+        // Test basic email extraction
+        let input = "Schedule meeting with john@example.com";
+        let emails = extract_emails(input).unwrap();
+        assert_eq!(emails, vec!["john@example.com"]);
+
+        // Test multiple email addresses
+        let input = "Send invite to john@example.com, jane@example.com";
+        let emails = extract_emails(input).unwrap();
+        assert_eq!(emails, vec!["john@example.com", "jane@example.com"]);
+
+        // Test filtering invalid emails
+        let input = "Send to not.an.email and valid@example.com";
+        let emails = extract_emails(input).unwrap();
+        assert_eq!(emails, vec!["valid@example.com"]);
+
+        // Test handling injection attempts
+        let input = "Send to malicious\"@example.com";
+        let emails = extract_emails(input).unwrap();
+        assert!(emails.is_empty());
     }
 }
