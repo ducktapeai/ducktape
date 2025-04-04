@@ -3,7 +3,7 @@ use crate::calendar;
 use crate::config::Config;
 use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike};
-use log::debug;  // Only import debug since others are unused
+use log::debug; // Only import debug since others are unused
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -239,7 +239,8 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
                     let email_value = email_match.as_str();
                     if !email_value.contains('@') {
                         debug!("Removing incorrectly formatted email: {}", email_value);
-                        enhanced = email_regex.replace(&enhanced, "").to_string().trim().to_string();
+                        enhanced =
+                            email_regex.replace(&enhanced, "").to_string().trim().to_string();
                     }
                 }
             }
@@ -583,7 +584,7 @@ fn extract_contact_names(input: &str) -> Vec<String> {
 fn refine_name(name_part: &str) -> String {
     let stop_words = ["at", "on", "tomorrow", "today", "for", "about", "regarding"];
     let mut final_name = name_part.trim().to_string();
-    
+
     for word in &stop_words {
         if let Some(pos) = final_name.to_lowercase().find(&format!(" {}", word)) {
             final_name = final_name[0..pos].trim().to_string();
