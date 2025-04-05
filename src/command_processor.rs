@@ -339,13 +339,16 @@ impl CommandHandler for CalendarHandler {
                     crate::calendar::create_event(config).await
                 }
                 Some("list") => crate::calendar::list_calendars().await,
+                Some("props") | None if args.command == "calendar-props" => {
+                    crate::calendar::list_event_properties().await
+                }
                 Some("show") => {
                     // TODO: Implement show calendar functionality
                     println!("Show calendar functionality is not implemented yet.");
                     Ok(())
                 }
                 _ => {
-                    println!("Unknown calendar command. Available commands: create, list, show");
+                    println!("Unknown calendar command. Available commands: create, list, show, props");
                     Ok(())
                 }
             }
@@ -353,7 +356,7 @@ impl CommandHandler for CalendarHandler {
     }
 
     fn can_handle(&self, command: &str) -> bool {
-        command == "calendar" || command == "calendars"
+        command == "calendar" || command == "calendars" || command == "calendar-props"
     }
 }
 
