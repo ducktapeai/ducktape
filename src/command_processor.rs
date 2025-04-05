@@ -179,7 +179,7 @@ impl CommandArgs {
                 // Strip any surrounding quotes from the argument
                 let mut arg = parts[i].clone();
                 if arg.starts_with('"') && arg.ends_with('"') {
-                    arg = arg[1..arg.len()-1].to_string();
+                    arg = arg[1..arg.len() - 1].to_string();
                 }
                 args.push(arg);
             }
