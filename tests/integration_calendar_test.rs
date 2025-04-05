@@ -236,11 +236,8 @@ async fn test_calendar_list_deduplication() -> Result<()> {
 #[tokio::test]
 async fn test_calendar_props_command() -> Result<()> {
     // Test via command processor
-    let args = CommandArgs {
-        command: "calendar-props".to_string(),
-        args: vec![],
-        flags: HashMap::new(),
-    };
+    let args =
+        CommandArgs { command: "calendar-props".to_string(), args: vec![], flags: HashMap::new() };
     let handler = CalendarHandler;
     let result = handler.execute(args).await;
     assert!(result.is_ok(), "Failed to execute calendar-props command");

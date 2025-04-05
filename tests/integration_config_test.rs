@@ -5,7 +5,7 @@ use std::collections::HashMap;
 #[tokio::test]
 async fn test_config_show_command() -> Result<()> {
     let handler = ConfigHandler;
-    
+
     // Test 'show all' command
     let show_args = CommandArgs {
         command: "config".to_string(),
