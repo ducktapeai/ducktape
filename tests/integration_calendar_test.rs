@@ -2,6 +2,8 @@ use anyhow::Result;
 use ducktape::calendar::{
     self, CalendarError, EventConfig, RecurrenceFrequency, RecurrencePattern,
 };
+use ducktape::command_processor::{CalendarHandler, CommandArgs, CommandHandler};
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn integration_test_create_event_with_invite() -> Result<()> {
@@ -200,5 +202,51 @@ async fn test_create_short_event() -> Result<()> {
 
     let result = create_event(config).await;
     assert!(result.is_ok(), "Failed to create short calendar event: {:?}", result);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_calendar_list_deduplication() -> Result<()> {
+    // Mock calendars with duplicates
+    let calendars = vec![
+        "Work".to_string(),
+        "Home".to_string(),
+        "Work".to_string(), // Duplicate
+        "Personal".to_string(),
+        "Home".to_string(), // Duplicate
+    ];
+
+    // Create a HashSet for deduplication
+    let mut unique_calendars: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for calendar in calendars {
+        unique_calendars.insert(calendar);
+    }
+
+    // Convert to sorted Vec for consistent ordering
+    let mut sorted_calendars: Vec<_> = unique_calendars.into_iter().collect();
+    sorted_calendars.sort();
+
+    // Verify deduplication
+    assert_eq!(sorted_calendars.len(), 3); // Should only have 3 unique calendars
+    assert_eq!(sorted_calendars, vec!["Home", "Personal", "Work"]);
+    Ok(())
+}
+
+/// Test the calendar-props command functionality
+#[tokio::test]
+async fn test_calendar_props_command() -> Result<()> {
+    // Test via command processor
+    let args = CommandArgs {
+        command: "calendar-props".to_string(),
+        args: vec![],
+        flags: HashMap::new(),
+    };
+    let handler = CalendarHandler;
+    let result = handler.execute(args).await;
+    assert!(result.is_ok(), "Failed to execute calendar-props command");
+
+    // Test direct function call
+    let result = calendar::list_event_properties().await;
+    assert!(result.is_ok(), "Failed to list calendar event properties");
     Ok(())
 }

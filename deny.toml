@@ -1,5 +1,6 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
 ignore = [
     { id = "RUSTSEC-2024-0436", reason = "no safe upgrade available for paste" }

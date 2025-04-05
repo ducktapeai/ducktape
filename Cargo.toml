@@ -58,7 +58,6 @@ test-case = "3.1"
 tempfile = "3.8"
 criterion = { version = "0.5", features = ["html_reports"] }
 cargo-audit = "0.21.2"
-cargo-deny = "0.17.0"  # Updated to get newer gix and rmp-serde
 cargo-udeps = "0.1.40"
 
 [[bench]]
