@@ -47,7 +47,7 @@ pub fn list_calendars() -> Result<()> {
     }
 }
 
-/// Fetch available calendars and return as a vector of strings
+#[allow(dead_code)]
 pub fn fetch_calendars() -> Result<Vec<String>> {
     // First ensure Calendar.app is running
     let launch_script = r#"

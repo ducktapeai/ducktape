@@ -14,6 +14,7 @@ pub struct NoteConfig<'a> {
 }
 
 impl<'a> NoteConfig<'a> {
+    #[allow(dead_code)]
     pub fn new(title: &'a str, content: &'a str) -> Self {
         Self { title, content, folder: None }
     }
@@ -31,6 +32,7 @@ fn escape_applescript_string(input: &str) -> String {
         .collect::<String>()
 }
 
+#[allow(dead_code)]
 pub fn create_note(config: NoteConfig) -> Result<()> {
     let folder_script = if let Some(folder) = config.folder {
         let escaped_folder = escape_applescript_string(folder);
@@ -68,6 +70,7 @@ pub fn create_note(config: NoteConfig) -> Result<()> {
     }
 }
 
+#[allow(dead_code)]
 pub fn list_notes() -> Result<()> {
     let script = r#"tell application "Notes"
         try

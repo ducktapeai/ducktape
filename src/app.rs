@@ -1,4 +1,4 @@
-use crate::command_processor::{CommandArgs, CommandHandler, CommandProcessor};
+use crate::command_processor::{CommandArgs, CommandProcessor};
 use crate::config::{Config, LLMProvider};
 use anyhow::{Result, anyhow};
 use rustyline::DefaultEditor;
@@ -182,7 +182,7 @@ impl Application {
             {
                 let start_time = parts[start_time_index];
                 if let Some((hours_str, minutes_str)) = start_time.split_once(':') {
-                    if let (Ok(hours), Ok(minutes)) =
+                    if let (Ok(hours), Ok(_minutes)) =
                         (hours_str.parse::<u32>(), minutes_str.parse::<u32>())
                     {
                         // Calculate end time one hour later

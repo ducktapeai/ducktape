@@ -41,6 +41,7 @@ impl ContactGroups {
         self.groups.get(id)
     }
 
+    #[allow(dead_code)]
     /// Remove a contact group by ID
     pub fn remove_group(&mut self, id: &str) -> Option<ContactGroup> {
         self.groups.remove(id)
@@ -90,6 +91,7 @@ impl ContactGroups {
         Ok(home_dir.join(".ducktape").join("contact_groups.json"))
     }
 
+    #[allow(dead_code)]
     /// List all available contact groups
     pub fn list_groups(&self) {
         println!("Available contact groups:");
@@ -111,6 +113,7 @@ impl ContactGroups {
     }
 }
 
+#[allow(dead_code)]
 /// Create an event with a predefined contact group
 pub async fn create_event_with_group(config: EventConfig, group_id: &str) -> Result<()> {
     // Load contact groups
