@@ -225,7 +225,18 @@ impl CommandHandler for CalendarHandler {
                     let location = args.flags.get("--location").cloned().flatten();
                     let description = args.flags.get("--notes").cloned().flatten();
                     let emails = args.flags.get("--email").cloned().flatten();
-                    let contacts = args.flags.get("--contacts").cloned().flatten();
+
+                    // Extract contact names before validation
+                    let contact_names: Vec<&str> = if let Some(pos) = args.args.iter().position(|arg| arg == "--contacts") {
+                        args.args.get(pos + 1)
+                            .map(|contacts| contacts.split(',')
+                                .map(|s| s.trim())
+                                .filter(|s| !s.is_empty())
+                                .collect())
+                            .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
 
                     // Handle recurrence options
                     let recurrence_frequency = args
@@ -319,22 +330,13 @@ impl CommandHandler for CalendarHandler {
                     }
 
                     // If contacts are specified, use create_event_with_contacts
-                    if let Some(contacts_str) = contacts {
-                        // Split contacts string by commas and convert to string slices
-                        let contact_names: Vec<&str> = contacts_str
-                            .split(',')
-                            .map(|s| s.trim())
-                            .filter(|s| !s.is_empty())
-                            .collect();
-
-                        if !contact_names.is_empty() {
-                            info!("Creating event with contacts: {:?}", contact_names);
-                            return crate::calendar::create_event_with_contacts(
-                                config,
-                                &contact_names,
-                            )
-                            .await;
-                        }
+                    if !contact_names.is_empty() {
+                        info!("Creating event with contacts: {:?}", contact_names);
+                        return crate::calendar::create_event_with_contacts(
+                            config,
+                            &contact_names,
+                        )
+                        .await;
                     }
 
                     crate::calendar::create_event(config).await
@@ -552,7 +554,7 @@ impl CommandHandler for ConfigHandler {
                     println!("Config updated: {} = {}", key, value);
                     Ok(())
                 }
-                Some("get") => {
+                Some("get") | Some("show") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for config get command");
                         println!("Usage: ducktape config get <key>");
@@ -663,7 +665,7 @@ impl CommandHandler for ConfigHandler {
                     Ok(())
                 }
                 _ => {
-                    println!("Unknown config command. Available commands: set, get");
+                    println!("Unknown config command. Available commands: set, get, show");
                     Ok(())
                 }
             }
