@@ -371,8 +371,16 @@ pub async fn list_calendars() -> Result<()> {
         if calendars.trim().is_empty() {
             println!("  No calendars found. Please ensure Calendar.app is properly configured.");
         } else {
+            // Create a HashSet for deduplication
+            let mut unique_calendars: std::collections::HashSet<String> = std::collections::HashSet::new();
             for calendar in calendars.trim_matches('{').trim_matches('}').split(", ") {
-                println!("  - {}", calendar.trim_matches('"'));
+                unique_calendars.insert(calendar.trim_matches('"').to_string());
+            }
+            // Sort the calendars for consistent display
+            let mut sorted_calendars: Vec<_> = unique_calendars.into_iter().collect();
+            sorted_calendars.sort();
+            for calendar in sorted_calendars {
+                println!("  - {}", calendar);
             }
         }
         Ok(())
