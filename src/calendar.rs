@@ -372,7 +372,8 @@ pub async fn list_calendars() -> Result<()> {
             println!("  No calendars found. Please ensure Calendar.app is properly configured.");
         } else {
             // Create a HashSet for deduplication
-            let mut unique_calendars: std::collections::HashSet<String> = std::collections::HashSet::new();
+            let mut unique_calendars: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
             for calendar in calendars.trim_matches('{').trim_matches('}').split(", ") {
                 unique_calendars.insert(calendar.trim_matches('"').to_string());
             }
