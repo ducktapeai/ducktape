@@ -348,7 +348,9 @@ impl CommandHandler for CalendarHandler {
                     Ok(())
                 }
                 _ => {
-                    println!("Unknown calendar command. Available commands: create, list, show, props");
+                    println!(
+                        "Unknown calendar command. Available commands: create, list, show, props"
+                    );
                     Ok(())
                 }
             }
