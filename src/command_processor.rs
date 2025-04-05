@@ -225,23 +225,7 @@ impl CommandHandler for CalendarHandler {
                     let location = args.flags.get("--location").cloned().flatten();
                     let description = args.flags.get("--notes").cloned().flatten();
                     let emails = args.flags.get("--email").cloned().flatten();
-
-                    // Extract contact names before validation
-                    let contact_names: Vec<&str> =
-                        if let Some(pos) = args.args.iter().position(|arg| arg == "--contacts") {
-                            args.args
-                                .get(pos + 1)
-                                .map(|contacts| {
-                                    contacts
-                                        .split(',')
-                                        .map(|s| s.trim())
-                                        .filter(|s| !s.is_empty())
-                                        .collect()
-                                })
-                                .unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        };
+                    let contacts = args.flags.get("--contacts").cloned().flatten();
 
                     // Handle recurrence options
                     let recurrence_frequency = args
@@ -335,10 +319,17 @@ impl CommandHandler for CalendarHandler {
                     }
 
                     // If contacts are specified, use create_event_with_contacts
-                    if !contact_names.is_empty() {
-                        info!("Creating event with contacts: {:?}", contact_names);
-                        return crate::calendar::create_event_with_contacts(config, &contact_names)
-                            .await;
+                    if let Some(contacts_str) = contacts {
+                        let contact_names: Vec<&str> = contacts_str
+                            .split(',')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+
+                        if !contact_names.is_empty() {
+                            info!("Creating event with contacts: {:?}", contact_names);
+                            return crate::calendar::create_event_with_contacts(config, &contact_names).await;
+                        }
                     }
 
                     crate::calendar::create_event(config).await
