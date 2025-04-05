@@ -1384,7 +1384,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "test-case",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-rustls 0.26.2",
  "toml",
