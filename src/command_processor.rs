@@ -328,7 +328,11 @@ impl CommandHandler for CalendarHandler {
 
                         if !contact_names.is_empty() {
                             info!("Creating event with contacts: {:?}", contact_names);
-                            return crate::calendar::create_event_with_contacts(config, &contact_names).await;
+                            return crate::calendar::create_event_with_contacts(
+                                config,
+                                &contact_names,
+                            )
+                            .await;
                         }
                     }
 
