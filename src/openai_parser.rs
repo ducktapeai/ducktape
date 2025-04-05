@@ -239,7 +239,8 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
                     let email_value = email_match.as_str();
                     if !email_value.contains('@') {
                         debug!("Removing incorrectly formatted email: {}", email_value);
-                        enhanced = email_regex.replace(&enhanced, "").to_string().trim().to_string();
+                        enhanced =
+                            email_regex.replace(&enhanced, "").to_string().trim().to_string();
                     }
                 }
             }
@@ -253,7 +254,7 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
                 }
             }
         }
-        
+
         // Add contacts if they were found
         if !contact_names.is_empty() {
             debug!("Adding contacts: {:?}", contact_names);
