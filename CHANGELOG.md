@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-04-06
+
+### Changed
+- Major version bump to v0.10.0 to align with semantic versioning
+- Improved stability and performance across all features
+
 ## [0.1.9] - 2025-04-04
 
 ### Fixed
@@ -117,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
+[0.10.0]: https://github.com/ducktapeai/ducktape/compare/v0.1.9...v0.10.0
 [0.1.9]: https://github.com/ducktapeai/ducktape/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ducktapeai/ducktape/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ducktapeai/ducktape/compare/v0.1.6...v0.1.7
