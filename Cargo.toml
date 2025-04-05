@@ -43,7 +43,7 @@ async-trait = "0.1.74"
 dotenvy = "0.15"
 
 # Zoom API Integration
-oauth2 = "4.4.2"
+oauth2 = "5.0.0"
 jwt = "0.16.0"
 hmac = "0.12.1"
 sha2 = "0.10.7"
