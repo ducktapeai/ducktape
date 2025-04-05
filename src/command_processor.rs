@@ -558,8 +558,8 @@ impl CommandHandler for ConfigHandler {
                 }
                 Some("get") | Some("show") => {
                     if args.args.len() < 2 {
-                        println!("Not enough arguments for config get command");
-                        println!("Usage: ducktape config get <key>");
+                        println!("Not enough arguments for config get/show command");
+                        println!("Usage: ducktape config get <key> or ducktape config show <key>");
                         return Ok(());
                     }
 
