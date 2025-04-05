@@ -239,8 +239,7 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
                     let email_value = email_match.as_str();
                     if !email_value.contains('@') {
                         debug!("Removing incorrectly formatted email: {}", email_value);
-                        enhanced =
-                            email_regex.replace(&enhanced, "").to_string().trim().to_string();
+                        enhanced = email_regex.replace(&enhanced, "").to_string().trim().to_string();
                     }
                 }
             }
@@ -254,12 +253,12 @@ fn enhance_command_with_contacts(command: &str, input: &str) -> String {
                 }
             }
         }
-
-        // Step 5: Add contact names if not already in the command
-        if !contact_names.is_empty() && !enhanced.contains("--contacts") {
-            let escaped_contacts = contact_names.join(",").replace("\"", "\\\"");
-            debug!("Adding contacts to command: {}", escaped_contacts);
-            enhanced = format!(r#"{} --contacts "{}""#, enhanced, escaped_contacts);
+        
+        // Add contacts if they were found
+        if !contact_names.is_empty() {
+            debug!("Adding contacts: {:?}", contact_names);
+            let contacts_str = contact_names.join(",");
+            enhanced = format!("{} --contacts \"{}\"", enhanced.trim(), contacts_str);
         }
     }
 
