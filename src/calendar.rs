@@ -913,6 +913,7 @@ pub async fn list_event_properties() -> Result<()> {
     }
 }
 
+#[allow(dead_code)]
 pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
     let script = format!(
         r#"tell application "Calendar"

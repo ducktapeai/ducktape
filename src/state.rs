@@ -128,6 +128,7 @@ impl StateManager {
         self.save(&items)
     }
 
+    #[allow(dead_code)]
     pub fn cleanup_old_items(&self) -> Result<()> {
         // Clean up old calendar events
         let mut events: Vec<CalendarItem> = self.load()?;
@@ -163,6 +164,7 @@ impl StateManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn vacuum(&self) -> Result<()> {
         // Compact JSON files by removing whitespace
         for filename in &[TODOS_FILE, EVENTS_FILE, NOTES_FILE] {
@@ -200,12 +202,14 @@ impl StateManager {
 }
 
 // Convenience functions for backward compatibility
+#[allow(dead_code)]
 pub fn load_todos() -> Result<Vec<TodoItem>> {
     let manager = StateManager::new()?;
     manager.cleanup_old_items()?;
     manager.load()
 }
 
+#[allow(dead_code)]
 pub fn load_events() -> Result<Vec<CalendarItem>> {
     let manager = StateManager::new()?;
     manager.cleanup_old_items()?;

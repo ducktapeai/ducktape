@@ -88,37 +88,31 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
-                    if !in_quotes && !current.is_empty() {
-                        parts.push(current.clone());
-                        current.clear();
-                    }
                 }
                 ' ' if !in_quotes && !escaped => {
                     if !current.is_empty() {
-                        parts.push(current.clone());
-                        current.clear();
+                        parts.push(current);
+                        current = String::new();
                     }
                 }
                 _ => {
-                    // Always add character when in quotes or it's not a space
-                    if in_quotes || c != ' ' || escaped {
-                        if escaped && c != '"' {
-                            current.push('\\');
-                        }
-                        current.push(c);
-                        escaped = false;
+                    if escaped && c != '"' {
+                        current.push('\\');
                     }
+                    current.push(c);
+                    escaped = false;
                 }
             }
+        }
+
+        // Add any remaining content
+        if !current.is_empty() {
+            parts.push(current);
         }
 
         // Handle unclosed quotes
         if in_quotes {
             return Err(anyhow!("Unclosed quotes in command"));
-        }
-
-        if !current.is_empty() {
-            parts.push(current);
         }
 
         if parts.is_empty() {
@@ -182,10 +176,10 @@ impl CommandArgs {
                     flags.insert(flag, None);
                 }
             } else {
-                // Remove surrounding quotes if present
+                // Strip any surrounding quotes from the argument
                 let mut arg = parts[i].clone();
                 if arg.starts_with('"') && arg.ends_with('"') {
-                    arg = arg[1..arg.len() - 1].to_string();
+                    arg = arg[1..arg.len()-1].to_string();
                 }
                 args.push(arg);
             }

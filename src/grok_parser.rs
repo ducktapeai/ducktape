@@ -1,7 +1,7 @@
 use crate::config::Config;
 use anyhow::{Result, anyhow};
 use chrono::{Local, Timelike};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use reqwest::Client;
@@ -545,13 +545,16 @@ mod tests {
     }
 }
 
+#[allow(dead_code)]
 pub struct GrokParser;
 
 impl GrokParser {
+    #[allow(dead_code)]
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
 
+    #[allow(dead_code)]
     pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
         match parse_natural_language(input).await {
             Ok(command) => Ok(Some(command)),
