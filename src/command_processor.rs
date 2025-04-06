@@ -223,8 +223,24 @@ impl CommandHandler for CalendarHandler {
                     let mut config = crate::calendar::EventConfig::new(title, date, start_time);
                     config.end_time = Some(end_time.clone());
 
-                    if let Some(cal) = calendar {
-                        config.calendars = vec![cal];
+                    // Validate calendar name
+                    let available_calendars = crate::calendar::get_available_calendars().await?;
+                    if let Some(cal) = &calendar {
+                        if !available_calendars.contains(cal) {
+                            warn!(
+                                "Specified calendar '{}' not found. Falling back to default calendar.",
+                                cal
+                            );
+                            println!(
+                                "Warning: Calendar '{}' not found. Using default calendar.",
+                                cal
+                            );
+                            config.calendars = vec!["Work".to_string()]; // Fallback to default calendar
+                        } else {
+                            config.calendars = vec![cal.clone()];
+                        }
+                    } else {
+                        config.calendars = vec!["Work".to_string()]; // Use default calendar if none specified
                     }
 
                     config.location = location;

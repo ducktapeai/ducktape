@@ -150,10 +150,53 @@ export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
 
 You can add these to your shell profile file (e.g., `.zshrc`, `.bashrc`, or `.bash_profile`) for persistence across terminal sessions.
 
+## Using Natural Language Mode
+
+DuckTape supports natural language commands for creating events, reminders, and notes. This mode requires API keys for supported AI providers.
+
+### Setting Up Natural Language Mode
+
+1. **Obtain API Keys**:
+   - OpenAI: [Get your API key](https://platform.openai.com/)
+   - Grok (X.AI): [Get your API key](https://x.ai/)
+   - DeepSeek: [Get your API key](https://deepseek.ai/)
+
+2. **Set Environment Variables**:
+   Add the required API keys to your environment variables:
+   ```bash
+   export OPENAI_API_KEY='your-openai-api-key-here'
+   export XAI_API_KEY='your-xai-api-key-here'
+   export DEEPSEEK_API_KEY='your-deepseek-api-key-here'
+   ```
+
+   To make these changes persistent, add them to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
+   ```bash
+   echo "export OPENAI_API_KEY='your-openai-api-key-here'" >> ~/.zshrc
+   echo "export XAI_API_KEY='your-xai-api-key-here'" >> ~/.zshrc
+   echo "export DEEPSEEK_API_KEY='your-deepseek-api-key-here'" >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+3. **Run DuckTape**:
+   Use natural language commands directly in the terminal:
+   ```bash
+   ducktape "create an event roadtrip with David Johnston for Tuesday and Wednesday"
+   ```
+
+   DuckTape will process the command and translate it into the appropriate calendar action.
+
+### Example Commands
+
+- "schedule a meeting with John tomorrow at 2pm"
+- "create a weekly team meeting every Tuesday at 10am"
+- "schedule a zoom meeting with the team tomorrow at 3pm"
+- "create an event for my dentist appointment next Friday at 2pm"
+- "set up a monthly book club meeting on the first Friday"
+
 ## Natural Language Examples
 
 Just type what you want to do:
-- "schedule a meeting with John tomorrow at 2pm"
+- "schedule a meeting with Shaun tomorrow at 2pm"
 - "create a weekly team meeting every Tuesday at 10am"
 - "schedule a zoom meeting with the team tomorrow at 3pm"
 - "create an event for my dentist appointment next Friday at 2pm"
@@ -207,7 +250,7 @@ ducktape calendar create "Weekly_Standup" 2025-04-03 09:00 09:30 "Work" --repeat
 ducktape calendar create "Client_Call" 2025-04-12 14:00 15:00 "Work" --zoom
 ```
 
-> **Important: When using the terminal directly, event titles with spaces must be enclosed in quotes.**
+> **Important: When using the terminal directly, event titles with spaces must be enclosed in quotes.This will be fixed to allow spaces in a coming release**
 > 
 > When quotes are not properly handled by your terminal, use underscores or hyphens instead:
 > ```bash
