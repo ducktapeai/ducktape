@@ -592,7 +592,8 @@ fn extract_contact_names(input: &str) -> Vec<String> {
         debug!("Text to parse for contacts: '{}'", after_word);
 
         // Pattern to detect email addresses (simple version)
-        let email_pattern = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
+        let email_pattern =
+            regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
 
         // Split by known separators that indicate multiple people
         for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
