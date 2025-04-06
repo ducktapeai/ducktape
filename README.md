@@ -154,105 +154,68 @@ You can add these to your shell profile file (e.g., `.zshrc`, `.bashrc`, or `.ba
 
 Just type what you want to do:
 - "schedule a meeting with John tomorrow at 2pm"
-- "remind me to buy groceries next Monday morning"
-- "take notes about the project meeting"
-- "add a todo about calling the bank"
-- "create an event for 7pm tonight to my KIDS calendar inviting joe.blogs@gmail.com"
-- "schedule a weekly team meeting every Tuesday at 10am with Jane and Bob"
-- "create a monthly book club meeting on the first Friday until December"
-- "schedule a zoom meeting with the team tomorrow at 3pm for one hour"
+- "create a weekly team meeting every Tuesday at 10am"
+- "schedule a zoom meeting with the team tomorrow at 3pm"
+- "create an event for my dentist appointment next Friday at 2pm"
+- "set up a monthly book club meeting on the first Friday"
 
 ## Command Reference
 
 ### Configuration Commands
 ```bash
-# Switch language model provider (OpenAI, Grok, or DeepSeek)
-ducktape config llm openai
-ducktape config llm grok
-Note - deepseek still under development
-ducktape config llm deepseek
+# Switch language model provider
+ducktape config llm [openai|grok]  # deepseek support coming soon
 
-# Show current configuration settings
+# Show current configuration
 ducktape config show
+
+# Set default calendar
+ducktape config set calendar.default "<calendar_name>"
 ```
 
 ### Calendar Commands
 ```bash
-# Create a calendar event
+# Create a calendar event (basic)
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar]
-# Example: Create a meeting tomorrow at 3 PM for an hour
-ducktape calendar create "Weekly Team Standup" 2025-04-03 15:00 16:00 "Work"
+# Example: ducktape calendar create "Team Meeting" 2025-04-15 14:00 15:00 "Work"
 
-# Create event with attendee
+# Create event with attendees
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --email "attendee@example.com"
-# Example: Create a project review meeting with a client
-ducktape calendar create "Q2 Project Review" 2025-04-10 13:00 14:30 "Work" --email "client@company.com,manager@ourcompany.com"
+# Example: ducktape calendar create "Project Review" 2025-04-10 13:00 14:30 --email "client@company.com"
 
-# Create recurring event
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat daily
-# Example: Create a daily check-in meeting at 9 AM
-ducktape calendar create "Morning Check-in" 2025-04-03 09:00 09:15 "Work" --repeat daily
-
-# Create recurring event with contacts
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat weekly --contacts "Jane Doe"
-# Example: Create a weekly 1:1 meeting with your team member
-ducktape calendar create "1:1 with Marketing Team" 2025-04-07 11:00 12:00 "Work" --repeat weekly --contacts "Jane Smith,Michael Johnson"
-
-# Create event with Zoom meeting
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --zoom
-# Example: Create a remote team meeting with Zoom link automatically generated
-ducktape calendar create "Remote Team Sync" 2025-04-04 14:00 15:00 "Work" --zoom --email "team@company.com"
+# Create event with contacts (uses Apple Contacts)
+ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --contacts "Jane Smith,John Doe"
 
 # Create event with location and reminder
 ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --location "<location>" --reminder <minutes>
-# Example: Create a doctor's appointment with a reminder 1 hour before
-ducktape calendar create "Dr. Smith Appointment" 2025-04-15 10:30 11:30 "Personal" --location "123 Medical Plaza, Suite 45" --reminder 60
 
-# Delete events
-ducktape calendar delete "<title>"
-# Example: Delete all events with "Interview" in the title
-ducktape calendar delete "Interview"
+# Create recurring event
+ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat [daily|weekly|monthly|yearly]
 
-# Set the default calendar (if no calendar is specified in event creation, this calendar will be used)
-ducktape calendar set-default "<calendar_name>"
-# Example: Set your work calendar as default
-ducktape calendar set-default "Work"
+# Create event with Zoom meeting
+ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --zoom
 
 # List available calendars
 ducktape calendars
-# Example: See all the calendars available on your system
-ducktape calendars
+
+# Delete events
+ducktape calendar delete "<title>"
 
 # List calendar properties
 ducktape calendar-props
-# Example: View available properties that can be set on calendar events
-ducktape calendar-props
-
-# List all events
-ducktape list-events
-# Example: View all upcoming events
-ducktape list-events
-
-# Import calendar events (new!)
-ducktape calendar import "<file_path>" [--format csv|ics] [--calendar "<calendar_name>"]
-# Example: Import events from a CSV file to your Work calendar
-ducktape calendar import "~/Downloads/events.csv" --format csv --calendar "Work"
-# Example: Import events from an ICS file (iCalendar)
-ducktape calendar import "~/Downloads/conference_schedule.ics" --format ics
 ```
 
 ### Calendar Options
 - `--all-day` - Create an all-day event
 - `--location "<location>"` - Set event location
 - `--description "<desc>"` - Set event description
-- `--email "<email>"` - Add attendee
-- `--reminder <minutes>` - Set reminder (minutes before event)
-- `--contacts "<name1,name2>"` - Add contacts by name (automatically looks up email addresses)
-- `--zoom` - Create a Zoom meeting for the event (requires Zoom API credentials)
+- `--email "<email>"` - Add attendee(s), separate multiple with commas
+- `--reminder <minutes>` - Set reminder time in minutes before event
+- `--contacts "<name1,name2>"` - Add contacts by name (uses Apple Contacts)
+- `--zoom` - Create a Zoom meeting for the event
 
 ### Recurring Event Options
-- `--repeat <daily|weekly|monthly|yearly>` - Set recurrence frequency
-- `--recurring <daily|weekly|monthly|yearly>` - Alternative to --repeat
+- `--repeat [daily|weekly|monthly|yearly]` - Set recurrence frequency
 - `--interval <number>` - Set interval (e.g., every 2 weeks)
 - `--until <YYYY-MM-DD>` - Set end date for recurrence
 - `--count <number>` - Set number of occurrences
@@ -337,7 +300,7 @@ Once configured, you can add Zoom meetings to calendar events using:
 ducktape calendar create "Meeting Title" 2023-06-15 14:00 15:00 --zoom
 
 # Or using natural language
-"schedule a zoom meeting with the team tomorrow at 3pm for one hour"
+"schedule a zoom meeting with the team tomorrow at 3pm"
 ```
 
 ## Apple Contacts Integration
