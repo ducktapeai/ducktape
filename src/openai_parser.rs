@@ -551,10 +551,19 @@ fn extract_contact_names(input: &str) -> Vec<String> {
 
     if let Some(after_word) = text_to_parse {
         debug!("Text to parse for contacts: '{}'", after_word);
+        
+        // Pattern to detect email addresses (simple version)
+        let email_pattern = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
 
         for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
             let name_part = name_part.trim();
             if name_part.is_empty() {
+                continue;
+            }
+            
+            // Skip if the whole part looks like an email address
+            if email_pattern.is_match(name_part) {
+                debug!("Skipping email-like string: {}", name_part);
                 continue;
             }
 
@@ -562,13 +571,13 @@ fn extract_contact_names(input: &str) -> Vec<String> {
                 let and_parts: Vec<&str> = name_part.split(" and ").collect();
                 for and_part in and_parts {
                     let final_name = refine_name(and_part);
-                    if !final_name.is_empty() && !final_name.contains('@') {
+                    if !final_name.is_empty() && !email_pattern.is_match(&final_name) {
                         contact_names.push(final_name);
                     }
                 }
             } else {
                 let final_name = refine_name(name_part);
-                if !final_name.is_empty() && !final_name.contains('@') {
+                if !final_name.is_empty() && !email_pattern.is_match(&final_name) {
                     contact_names.push(final_name);
                 }
             }

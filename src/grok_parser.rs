@@ -519,7 +519,8 @@ mod tests {
         // Test handling multiple names
         let input = "Schedule a meeting with John Smith and Jane Doe tomorrow";
         let contacts = extract_contact_names(input);
-        assert!(contacts.contains(&"John".to_string()));
+        assert!(contacts.contains(&"John Smith".to_string()));
+        assert!(contacts.contains(&"Jane Doe".to_string()));
     }
 
     #[test]
@@ -590,6 +591,9 @@ fn extract_contact_names(input: &str) -> Vec<String> {
     if let Some(after_word) = text_to_parse {
         debug!("Text to parse for contacts: '{}'", after_word);
 
+        // Pattern to detect email addresses (simple version)
+        let email_pattern = regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
+
         // Split by known separators that indicate multiple people
         for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
             let name_part = name_part.trim();
@@ -599,19 +603,25 @@ fn extract_contact_names(input: &str) -> Vec<String> {
                 continue;
             }
 
+            // Skip if the whole part looks like an email address
+            if email_pattern.is_match(name_part) {
+                debug!("Skipping email-like string: {}", name_part);
+                continue;
+            }
+
             // Further process parts with "and" to extract multiple names
             if name_part.contains(" and ") {
                 let and_parts: Vec<&str> = name_part.split(" and ").collect();
                 for and_part in and_parts {
                     let final_name = refine_name(and_part);
-                    if !final_name.is_empty() && !final_name.contains('@') {
+                    if !final_name.is_empty() && !email_pattern.is_match(&final_name) {
                         contact_names.push(final_name);
                     }
                 }
             } else {
                 // Process single name
                 let final_name = refine_name(name_part);
-                if !final_name.is_empty() && !final_name.contains('@') {
+                if !final_name.is_empty() && !email_pattern.is_match(&final_name) {
                     contact_names.push(final_name);
                 }
             }
