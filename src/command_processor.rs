@@ -20,7 +20,7 @@ impl CommandArgs {
 
         debug!("Normalized input: {}", normalized_input);
 
-        // Handle exit commands
+        // Handle special commands first
         if normalized_input.eq_ignore_ascii_case("exit")
             || normalized_input.eq_ignore_ascii_case("quit")
             || normalized_input.eq_ignore_ascii_case("ducktape exit")
@@ -40,7 +40,6 @@ impl CommandArgs {
             || normalized_input.eq_ignore_ascii_case("ducktape -h")
             || normalized_input.eq_ignore_ascii_case("--h")
             || normalized_input.eq_ignore_ascii_case("-h")
-            || normalized_input.eq_ignore_ascii_case("ducktape --h")
         {
             return Ok(CommandArgs {
                 command: "help".to_string(),
@@ -88,6 +87,8 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
+                    // Don't include the quotes in the final string
+                    continue;
                 }
                 ' ' if !in_quotes && !escaped => {
                     if !current.is_empty() {
@@ -105,14 +106,14 @@ impl CommandArgs {
             }
         }
 
-        // Add any remaining content
-        if !current.is_empty() {
-            parts.push(current);
-        }
-
         // Handle unclosed quotes
         if in_quotes {
             return Err(anyhow!("Unclosed quotes in command"));
+        }
+
+        // Add any remaining content
+        if !current.is_empty() {
+            parts.push(current);
         }
 
         if parts.is_empty() {
@@ -121,39 +122,22 @@ impl CommandArgs {
 
         debug!("Parsed parts after normalization: {:?}", parts);
 
-        // Special case for help command
-        if parts.len() == 1
-            && (parts[0].eq_ignore_ascii_case("--help") || parts[0].eq_ignore_ascii_case("-h"))
-        {
-            return Ok(CommandArgs {
-                command: "help".to_string(),
-                args: vec![],
-                flags: HashMap::new(),
-            });
-        }
-
-        // Check for and remove "ducktape" prefix, being more lenient with case and whitespace
+        // Check for and remove "ducktape" prefix
         let first_part = parts[0].trim();
         if !first_part.eq_ignore_ascii_case("ducktape") {
-            // If the first word is a valid command on its own (like "calendars", "calendar", etc.)
-            // then assume we're missing the ducktape prefix and proceed
-            if first_part.eq_ignore_ascii_case("calendars")
-                || first_part.eq_ignore_ascii_case("calendar")
-                || first_part.eq_ignore_ascii_case("todo")
-                || first_part.eq_ignore_ascii_case("note")
-                || first_part.eq_ignore_ascii_case("notes")
-                || first_part.eq_ignore_ascii_case("config")
-                || first_part.eq_ignore_ascii_case("version")
-                || first_part.eq_ignore_ascii_case("help")
+            // If the first word is a valid command on its own, keep it
+            if !first_part.eq_ignore_ascii_case("calendars")
+                && !first_part.eq_ignore_ascii_case("calendar")
+                && !first_part.eq_ignore_ascii_case("todo")
+                && !first_part.eq_ignore_ascii_case("note")
+                && !first_part.eq_ignore_ascii_case("notes")
+                && !first_part.eq_ignore_ascii_case("config")
+                && !first_part.eq_ignore_ascii_case("version")
+                && !first_part.eq_ignore_ascii_case("help")
             {
-                // Don't remove first part, just proceed
-                debug!("First part '{}' is a valid command, keeping it", first_part);
-            } else {
-                debug!("First part '{}' does not match 'ducktape'", first_part);
                 return Err(anyhow!("Commands must start with 'ducktape'"));
             }
         } else {
-            // Remove "ducktape" prefix
             parts.remove(0);
         }
 
@@ -167,23 +151,19 @@ impl CommandArgs {
         let mut i = 0;
 
         while i < parts.len() {
-            if parts[i].starts_with("--") {
-                let flag = parts[i].clone();
+            let part = &parts[i];
+            if part.starts_with("--") {
                 if i + 1 < parts.len() && !parts[i + 1].starts_with("--") {
-                    flags.insert(flag, Some(parts[i + 1].clone()));
-                    i += 1;
+                    flags.insert(part.to_string(), Some(parts[i + 1].to_string()));
+                    i += 2;
                 } else {
-                    flags.insert(flag, None);
+                    flags.insert(part.to_string(), None);
+                    i += 1;
                 }
             } else {
-                // Strip any surrounding quotes from the argument
-                let mut arg = parts[i].clone();
-                if arg.starts_with('"') && arg.ends_with('"') {
-                    arg = arg[1..arg.len() - 1].to_string();
-                }
-                args.push(arg);
+                args.push(part.to_string());
+                i += 1;
             }
-            i += 1;
         }
 
         debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, args, flags);
