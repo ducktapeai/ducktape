@@ -169,8 +169,20 @@ ducktape config llm [openai|grok]  # deepseek support coming soon
 # Show current configuration
 ducktape config show all
 
+# Show a specific configuration setting
+ducktape config show calendar.default
+
 # Set default calendar
 ducktape config set calendar.default "<calendar_name>"
+
+# Set default reminder time (in minutes before events)
+ducktape config set calendar.reminder 30
+
+# Set default event duration (in minutes)
+ducktape config set calendar.duration 60
+
+# Set language model provider
+ducktape config set language_model.provider "grok"
 ```
 
 ### Calendar Commands
@@ -195,13 +207,16 @@ ducktape calendar create "Weekly_Standup" 2025-04-03 09:00 09:30 "Work" --repeat
 ducktape calendar create "Client_Call" 2025-04-12 14:00 15:00 "Work" --zoom
 ```
 
-> **Important: When using the terminal directly, event titles should not contain spaces.** 
-> Use underscores or hyphens instead (e.g., `"Weekly_Team_Standup"` or `"Project-Review"`).
-> If you need to use spaces in titles, enclose the entire command in quotes:
+> **Important: When using the terminal directly, event titles with spaces must be enclosed in quotes.**
+> 
+> When quotes are not properly handled by your terminal, use underscores or hyphens instead:
 > ```bash
-> ducktape "calendar create \"Weekly Team Standup\" 2025-04-03 16:00 17:00 \"Work\""
-> ``tape calendar-props
-```
+> # Use underscores for spaces
+> ducktape calendar create Weekly_Team_Standup 2025-04-03 16:00 17:00 Work
+> 
+> # Or use hyphens
+> ducktape calendar create Project-Review 2025-04-20 15:00 16:00 Work
+> ```
 
 ### Calendar Options
 - `--all-day` - Create an all-day event
