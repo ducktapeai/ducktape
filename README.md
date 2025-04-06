@@ -167,7 +167,7 @@ Just type what you want to do:
 ducktape config llm [openai|grok]  # deepseek support coming soon
 
 # Show current configuration
-ducktape config show
+ducktape config show all
 
 # Set default calendar
 ducktape config set calendar.default "<calendar_name>"
