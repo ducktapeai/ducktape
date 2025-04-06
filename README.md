@@ -174,35 +174,33 @@ ducktape config set calendar.default "<calendar_name>"
 ```
 
 ### Calendar Commands
+
 ```bash
-# Create a calendar event (basic)
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar]
-# Example: ducktape calendar create "Team Meeting" 2025-04-15 14:00 15:00 "Work"
-
-# Create event with attendees
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --email "attendee@example.com"
-# Example: ducktape calendar create "Project Review" 2025-04-10 13:00 14:30 --email "client@company.com"
-
-# Create event with contacts (uses Apple Contacts)
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --contacts "Jane Smith,John Doe"
-
-# Create event with location and reminder
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --location "<location>" --reminder <minutes>
-
-# Create recurring event
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --repeat [daily|weekly|monthly|yearly]
-
-# Create event with Zoom meeting
-ducktape calendar create "<title>" <date> <start_time> <end_time> [calendar] --zoom
-
-# List available calendars
+# List all available calendars
 ducktape calendars
 
-# Delete events
-ducktape calendar delete "<title>"
+# Create a new calendar event
+ducktape calendar create "Meeting_Title" 2025-04-10 13:00 14:30 "Work"
 
-# List calendar properties
-ducktape calendar-props
+# Create with email invites
+ducktape calendar create "Team_Meeting" 2025-04-15 10:00 11:00 "Work" --email "colleague@example.com,manager@example.com"
+
+# Create with contact invites (will look up email addresses automatically)
+ducktape calendar create "Project_Review" 2025-04-20 15:00 16:00 "Work" --contacts "John Smith,Jane Doe"
+
+# Create recurring events
+ducktape calendar create "Weekly_Standup" 2025-04-03 09:00 09:30 "Work" --repeat weekly
+
+# Create event with Zoom meeting
+ducktape calendar create "Client_Call" 2025-04-12 14:00 15:00 "Work" --zoom
+```
+
+> **Important: When using the terminal directly, event titles should not contain spaces.** 
+> Use underscores or hyphens instead (e.g., `"Weekly_Team_Standup"` or `"Project-Review"`).
+> If you need to use spaces in titles, enclose the entire command in quotes:
+> ```bash
+> ducktape "calendar create \"Weekly Team Standup\" 2025-04-03 16:00 17:00 \"Work\""
+> ``tape calendar-props
 ```
 
 ### Calendar Options
