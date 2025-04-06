@@ -87,7 +87,7 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
-                    // Don't include the quotes in the final string
+                    // For quoted strings, we don't include the quotes
                     continue;
                 }
                 ' ' if !in_quotes && !escaped => {
@@ -120,7 +120,7 @@ impl CommandArgs {
             return Err(anyhow!("No command provided"));
         }
 
-        debug!("Parsed parts after normalization: {:?}", parts);
+        debug!("Parsed parts before processing: {:?}", parts);
 
         // Check for and remove "ducktape" prefix
         let first_part = parts[0].trim();
