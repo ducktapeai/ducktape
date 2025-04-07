@@ -64,7 +64,9 @@ impl Application {
 
         let mut rl = DefaultEditor::new()?;
 
-        println!("Welcome to DuckTape Terminal! Type 'help' for commands.");
+        println!("Welcome to DuckTape! How can I assist you today?");
+        println!("Example: schedule a meeting with Siya tomorrow at 3pm about project review");
+
         let prompt = "🦆 ";
 
         loop {
