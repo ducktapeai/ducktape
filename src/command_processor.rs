@@ -124,19 +124,9 @@ impl CommandArgs {
 
         // Check for and remove "ducktape" prefix
         let first_part = parts[0].trim();
+        // Allow commands without 'ducktape' prefix in Terminal Mode
         if !first_part.eq_ignore_ascii_case("ducktape") {
-            // If the first word is a valid command on its own, keep it
-            if !first_part.eq_ignore_ascii_case("calendars")
-                && !first_part.eq_ignore_ascii_case("calendar")
-                && !first_part.eq_ignore_ascii_case("todo")
-                && !first_part.eq_ignore_ascii_case("note")
-                && !first_part.eq_ignore_ascii_case("notes")
-                && !first_part.eq_ignore_ascii_case("config")
-                && !first_part.eq_ignore_ascii_case("version")
-                && !first_part.eq_ignore_ascii_case("help")
-            {
-                return Err(anyhow!("Commands must start with 'ducktape'"));
-            }
+            log::debug!("Command does not start with 'ducktape', allowing in Terminal Mode");
         } else {
             parts.remove(0);
         }
@@ -526,14 +516,16 @@ impl CommandHandler for ConfigHandler {
                         }
                         "language_model.provider" => match value.to_lowercase().as_str() {
                             "openai" => {
-                                config.language_model.provider = crate::config::LLMProvider::OpenAI;
+                                config.language_model.provider =
+                                    Some(crate::config::LLMProvider::OpenAI);
                             }
                             "grok" => {
-                                config.language_model.provider = crate::config::LLMProvider::Grok;
+                                config.language_model.provider =
+                                    Some(crate::config::LLMProvider::Grok);
                             }
                             "deepseek" => {
                                 config.language_model.provider =
-                                    crate::config::LLMProvider::DeepSeek;
+                                    Some(crate::config::LLMProvider::DeepSeek);
                             }
                             _ => {
                                 println!("Invalid language model provider: {}", value);
@@ -608,9 +600,10 @@ impl CommandHandler for ConfigHandler {
                         }
                         "language_model.provider" => {
                             let provider = match config.language_model.provider {
-                                crate::config::LLMProvider::OpenAI => "openai",
-                                crate::config::LLMProvider::Grok => "grok",
-                                crate::config::LLMProvider::DeepSeek => "deepseek",
+                                Some(crate::config::LLMProvider::OpenAI) => "openai",
+                                Some(crate::config::LLMProvider::Grok) => "grok",
+                                Some(crate::config::LLMProvider::DeepSeek) => "deepseek",
+                                None => "none",
                             };
                             println!("language_model.provider = {}", provider);
                         }
@@ -650,9 +643,10 @@ impl CommandHandler for ConfigHandler {
                                     .unwrap_or_else(|| "Not set".to_string())
                             );
                             let provider = match config.language_model.provider {
-                                crate::config::LLMProvider::OpenAI => "openai",
-                                crate::config::LLMProvider::Grok => "grok",
-                                crate::config::LLMProvider::DeepSeek => "deepseek",
+                                Some(crate::config::LLMProvider::OpenAI) => "openai",
+                                Some(crate::config::LLMProvider::Grok) => "grok",
+                                Some(crate::config::LLMProvider::DeepSeek) => "deepseek",
+                                None => "none",
                             };
                             println!("language_model.provider = {}", provider);
                         }

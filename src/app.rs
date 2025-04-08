@@ -14,7 +14,25 @@ impl Application {
 
     pub async fn run(&self) -> Result<()> {
         log::info!("Starting DuckTape Terminal");
-        let config = Config::load()?;
+        let mut config = Config::load()?;
+
+        let use_natural_language = config.language_model.provider.is_some();
+        log::debug!("Provider: {:?}, use_natural_language: {}", config.language_model.provider, use_natural_language);
+
+        match Config::load()?.language_model.provider {
+            Some(LLMProvider::OpenAI) => {
+                log::info!("Using OpenAI for natural language processing");
+            }
+            Some(LLMProvider::Grok) => {
+                log::info!("Using Grok for natural language processing");
+            }
+            Some(LLMProvider::DeepSeek) => {
+                log::info!("Using DeepSeek for natural language processing");
+            }
+            None => {
+                log::info!("Terminal Mode enabled (no API key required)");
+            }
+        }
 
         // Start the API server in a background thread
         log::info!("Starting API server on port 3000");
@@ -34,7 +52,7 @@ impl Application {
             match rl.readline(prompt) {
                 Ok(line) => {
                     let _ = rl.add_history_entry(line.as_str());
-                    if let Err(err) = self.process_input(&line).await {
+                    if let Err(err) = self.process_input(&line, use_natural_language).await {
                         log::error!("Failed to process command: {:?}", err);
                     }
                 }
@@ -62,6 +80,10 @@ impl Application {
     pub async fn run_terminal_only(&self) -> Result<()> {
         log::info!("Starting DuckTape Terminal");
 
+        let config = Config::load()?;
+        let use_natural_language = config.language_model.provider.is_some();
+        log::debug!("Provider: {:?}, use_natural_language: {}", config.language_model.provider, use_natural_language);
+
         let mut rl = DefaultEditor::new()?;
 
         println!("Welcome to DuckTape! How can I assist you today?");
@@ -73,7 +95,7 @@ impl Application {
             match rl.readline(prompt) {
                 Ok(line) => {
                     let _ = rl.add_history_entry(line.as_str());
-                    if let Err(err) = self.process_input(&line).await {
+                    if let Err(err) = self.process_input(&line, use_natural_language).await {
                         log::error!("Failed to process command: {:?}", err);
                     }
                 }
@@ -95,22 +117,28 @@ impl Application {
         Ok(())
     }
 
-    async fn process_input(&self, input: &str) -> Result<()> {
-        if input.starts_with("ducktape") {
-            let args = CommandArgs::parse(input)?;
-            if args.command == "exit" || args.command == "quit" {
-                std::process::exit(0);
-            }
-            self.command_processor.execute(args).await
-        } else {
-            // If input doesn't start with "ducktape", treat as natural language
-            self.process_natural_language(input).await
+    async fn process_input(&self, input: &str, use_natural_language: bool) -> Result<()> {
+        log::debug!("Inside process_input: use_natural_language = {}", use_natural_language);
+
+        if !use_natural_language {
+            log::info!("Skipping natural language processing as Terminal Mode is enabled");
+            return self.process_command(input).await;
         }
+
+        log::info!("Proceeding with natural language processing");
+
+        // Proceed with natural language processing if enabled
+        self.process_natural_language(input).await
     }
 
     /// Process a direct command string - now public for CLI use
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
+
+        if Config::load()?.language_model.provider.is_none() {
+            log::info!("Terminal Mode: Direct command processing only");
+            return self.command_processor.execute(CommandArgs::parse(input)?).await;
+        }
 
         // Add "ducktape" prefix if missing for consistency
         let normalized_input = if !input.trim().starts_with("ducktape") {
@@ -118,6 +146,7 @@ impl Application {
         } else {
             input.to_string()
         };
+        log::debug!("Normalized input: {}", normalized_input);
 
         // Determine if this is a natural language command that needs AI processing
         // or a direct command with parameters
@@ -129,23 +158,26 @@ impl Application {
         } else {
             // For natural language, we need to process via one of the AI models
             match Config::load()?.language_model.provider {
-                LLMProvider::OpenAI => {
+                Some(LLMProvider::OpenAI) => {
                     match crate::openai_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("OpenAI parser error: {}", e)),
                     }
                 }
-                LLMProvider::Grok => {
+                Some(LLMProvider::Grok) => {
                     match crate::grok_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("Grok parser error: {}", e)),
                     }
                 }
-                LLMProvider::DeepSeek => {
+                Some(LLMProvider::DeepSeek) => {
                     match crate::deepseek_parser::parse_natural_language(&normalized_input).await {
                         Ok(command) => command,
                         Err(e) => return Err(anyhow!("DeepSeek parser error: {}", e)),
                     }
+                }
+                None => {
+                    return Err(anyhow!("No language model provider configured"));
                 }
             }
         };
