@@ -17,7 +17,11 @@ impl Application {
         let mut config = Config::load()?;
 
         let use_natural_language = config.language_model.provider.is_some();
-        log::debug!("Provider: {:?}, use_natural_language: {}", config.language_model.provider, use_natural_language);
+        log::debug!(
+            "Provider: {:?}, use_natural_language: {}",
+            config.language_model.provider,
+            use_natural_language
+        );
 
         match Config::load()?.language_model.provider {
             Some(LLMProvider::OpenAI) => {
@@ -82,7 +86,11 @@ impl Application {
 
         let config = Config::load()?;
         let use_natural_language = config.language_model.provider.is_some();
-        log::debug!("Provider: {:?}, use_natural_language: {}", config.language_model.provider, use_natural_language);
+        log::debug!(
+            "Provider: {:?}, use_natural_language: {}",
+            config.language_model.provider,
+            use_natural_language
+        );
 
         let mut rl = DefaultEditor::new()?;
 
