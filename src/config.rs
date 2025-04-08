@@ -34,6 +34,7 @@ pub struct NotesConfig {
     pub default_folder: Option<String>,
 }
 
+#[derive(PartialEq)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum LLMProvider {
@@ -50,7 +51,7 @@ impl Default for LLMProvider {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LanguageModelConfig {
-    pub provider: LLMProvider,
+    pub provider: Option<LLMProvider>,
 }
 
 impl Default for Config {
@@ -75,16 +76,38 @@ impl Config {
     pub fn load() -> Result<Self> {
         let config_path = get_config_path()?;
 
+        log::info!("Using configuration file at: {:?}", config_path);
+
         // If config doesn't exist, create default
         if !config_path.exists() {
             let default_config = Config::default();
             default_config.save()?;
+            log::info!("Default config created at: {:?}", config_path);
             return Ok(default_config);
         }
 
         // Read and parse config file
         let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
-        toml::from_str(&content).context("Failed to parse config file")
+        let mut config: Config = toml::from_str(&content).context("Failed to parse config file")?;
+
+        // Handle missing provider field explicitly
+        if config.language_model.provider.is_none() {
+            log::info!("Defaulting to Terminal Mode as no provider is set");
+        }
+
+        // Debug log the loaded configuration
+        log::debug!("Loaded configuration: {:?}", config);
+
+        // Check if the provider field is set to a valid value
+        if let Some(provider) = &config.language_model.provider {
+            match provider {
+                LLMProvider::OpenAI | LLMProvider::Grok | LLMProvider::DeepSeek => {
+                    log::info!("Natural Language Mode detected: provider is {:?}", provider);
+                }
+            }
+        }
+
+        Ok(config)
     }
 
     pub fn save(&self) -> Result<()> {
@@ -122,7 +145,7 @@ mod tests {
         assert_eq!(config.calendar.default_calendar, Some("Calendar".to_string()));
         assert_eq!(config.calendar.default_reminder_minutes, Some(15));
         assert_eq!(config.todo.default_list, Some("Reminders".to_string()));
-        assert!(matches!(config.language_model.provider, LLMProvider::OpenAI));
+        assert!(matches!(config.language_model.provider, None));
     }
 
     #[test]
@@ -143,7 +166,7 @@ mod tests {
                 default_reminder: false,
             },
             notes: NotesConfig { default_folder: Some("TestFolder".to_string()) },
-            language_model: LanguageModelConfig { provider: LLMProvider::Grok },
+            language_model: LanguageModelConfig { provider: Some(LLMProvider::Grok) },
         };
 
         // Serialize and write directly to file
@@ -169,7 +192,7 @@ mod tests {
         assert_eq!(loaded_config.notes.default_folder, test_config.notes.default_folder);
 
         // Test that different LLM providers are correctly serialized/deserialized
-        assert!(matches!(loaded_config.language_model.provider, LLMProvider::Grok));
+        assert!(matches!(loaded_config.language_model.provider, Some(LLMProvider::Grok)));
 
         Ok(())
     }
