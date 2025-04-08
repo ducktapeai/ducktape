@@ -34,8 +34,7 @@ pub struct NotesConfig {
     pub default_folder: Option<String>,
 }
 
-#[derive(PartialEq)]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum LLMProvider {
     OpenAI,
