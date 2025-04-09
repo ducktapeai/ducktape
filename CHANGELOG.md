@@ -1,3 +1,8 @@
+## [0.11.11] - 2025-04-10
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
 ## [0.11.10] - 2025-04-09
 ### Changed
 - Started new development cycle with minor version bump
@@ -183,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.11.10...HEAD
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.11.11...HEAD
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducktapeai/ducktape/compare/v0.1.9...v0.10.0
 [0.1.9]: https://github.com/ducktapeai/ducktape/compare/v0.1.8...v0.1.9
@@ -205,3 +210,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.11.8]: https://github.com/ducktapeai/ducktape/compare/v0.11.7...v0.11.8
 [0.11.9]: https://github.com/ducktapeai/ducktape/compare/v0.11.8...v0.11.9
 [0.11.10]: https://github.com/ducktapeai/ducktape/compare/v0.11.9...v0.11.10
+[0.11.11]: https://github.com/ducktapeai/ducktape/compare/v0.11.10...v0.11.11
