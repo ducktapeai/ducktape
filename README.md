@@ -96,7 +96,7 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 1. Open your terminal.
 2. Use explicit commands to interact with DuckTape:
    ```bash
-   ducktape calendar create "Team Meeting" 2025-04-15 10:00 11:00 "Work"
+   ducktape calendar create "Team-Meeting" 2025-04-15 10:00 11:00 "Work"
    ```
 
 ---
