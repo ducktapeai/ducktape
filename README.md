@@ -116,7 +116,7 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
   ```
 - Create a calendar event:
   ```bash
-  ducktape calendar create "Project Review" 2025-04-20 15:00 16:00 "Work"
+  ducktape calendar create "Project-Review" 2025-04-20 15:00 16:00 "Work"
   ```
 - Add attendees by email:
   ```bash
