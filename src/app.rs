@@ -130,6 +130,7 @@ impl Application {
 
         if !use_natural_language {
             log::info!("Skipping natural language processing as Terminal Mode is enabled");
+            println!("Note: To enable natural language processing, update and enable the 'provider' field in the 'language_model' section of your config.toml file.");
             return self.process_command(input).await;
         }
 
