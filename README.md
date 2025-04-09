@@ -127,6 +127,38 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 
 ## Configuration
 
+DuckTape uses a `config.toml` file located in the root of the repository to manage its settings. This file allows you to configure various aspects of the application, such as whether to use a language model (LLM) or operate in Terminal Mode.
+
+### Example Configuration
+```toml
+[language_model]
+provider = "OpenAI"  # Options: "OpenAI", "Grok", "DeepSeek", or leave empty for Terminal Mode
+
+[calendar]
+default_calendar = "Work"
+default_reminder_minutes = 15
+default_duration_minutes = 60
+
+[todo]
+default_list = "Reminders"
+default_reminder = true
+
+[notes]
+default_folder = "Notes"
+```
+
+### Viewing and Editing Configuration
+- To view the current configuration, open the `config.toml` file in the root of the repository.
+- To change settings, edit the file and save your changes.
+
+### Key Settings
+- **Language Model Provider**: Set the `provider` field under `[language_model]` to enable natural language processing. Leave it empty to use Terminal Mode.
+- **Default Calendar**: Specify the default calendar for events under `[calendar]`.
+- **Default Todo List**: Set the default list for todos under `[todo]`.
+- **Default Notes Folder**: Define the folder for notes under `[notes]`.
+
+For more details, refer to the documentation or examples in the `config.toml` file.
+
 ### Default Settings
 You can configure default settings for DuckTape using the `config` command:
 
