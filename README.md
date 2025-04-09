@@ -84,7 +84,7 @@ source ~/.zshrc
 1. Open your terminal.
 2. Run DuckTape with a natural language command:
    ```bash
-   ducktape "create an event roadtrip with Duck Tape for Tuesday and Wednesday"
+   ducktape "create an event roadtrip with Duck Tape for this coming Tuesday"
    ```
 
 ### 2. Terminal Mode (No API Key Required)
