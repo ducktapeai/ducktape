@@ -1,0 +1,13 @@
+[calendar]
+default_calendar = "shaun.stuart@hashicorp.com"
+default_reminder_minutes = 30
+default_duration_minutes = 45
+
+[todo]
+default_list = "Reminders"
+default_reminder = true
+
+[notes]
+
+[language_model]
+# provider = "grok"

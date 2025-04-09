@@ -126,10 +126,7 @@ impl Config {
 }
 
 fn get_config_path() -> Result<PathBuf> {
-    let proj_dirs = ProjectDirs::from("com", "ducktape", "ducktape")
-        .context("Failed to determine config directory")?;
-
-    Ok(proj_dirs.config_dir().join("config.toml"))
+    Ok(std::env::current_dir()?.join("config.toml"))
 }
 
 #[cfg(test)]
