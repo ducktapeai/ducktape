@@ -1,6 +1,6 @@
 [package]
 name = "ducktape"
-version = "0.11.12"
+version = "0.11.13"
 edition = "2021"
 authors = ["DuckTapeAI"]
 description = "A terminal-based calendar management tool with natural language processing and AI integration"
