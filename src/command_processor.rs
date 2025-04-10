@@ -74,6 +74,7 @@ impl CommandArgs {
             });
         }
 
+        // Enhanced logic to handle quoted strings and edge cases
         let mut parts = Vec::new();
         let mut current = String::new();
         let mut in_quotes = false;
@@ -87,8 +88,7 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
-                    // For quoted strings, we don't include the quotes
-                    continue;
+                    continue; // Skip the quote character
                 }
                 ' ' if !in_quotes && !escaped => {
                     if !current.is_empty() {
@@ -97,7 +97,7 @@ impl CommandArgs {
                     }
                 }
                 _ => {
-                    if escaped && c != '"' {
+                    if escaped && c != '"' && c != '\\' {
                         current.push('\\');
                     }
                     current.push(c);
