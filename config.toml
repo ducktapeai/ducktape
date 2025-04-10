@@ -10,4 +10,4 @@ default_reminder = true
 [notes]
 
 [language_model]
-provider = "grok"
+# provider = "grok"
