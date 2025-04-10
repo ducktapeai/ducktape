@@ -74,6 +74,7 @@ impl CommandArgs {
             });
         }
 
+        // Enhanced logic to handle quoted strings and edge cases
         let mut parts = Vec::new();
         let mut current = String::new();
         let mut in_quotes = false;
@@ -87,8 +88,7 @@ impl CommandArgs {
                 }
                 '"' if !escaped => {
                     in_quotes = !in_quotes;
-                    // For quoted strings, we don't include the quotes
-                    continue;
+                    continue; // Skip the quote character
                 }
                 ' ' if !in_quotes && !escaped => {
                     if !current.is_empty() {
@@ -97,11 +97,12 @@ impl CommandArgs {
                     }
                 }
                 _ => {
-                    if escaped && c != '"' {
-                        current.push('\\');
+                    if escaped {
+                        escaped = false;
+                        current.push(c);
+                        continue;
                     }
                     current.push(c);
-                    escaped = false;
                 }
             }
         }
@@ -120,11 +121,7 @@ impl CommandArgs {
             return Err(anyhow!("No command provided"));
         }
 
-        debug!("Parsed parts before processing: {:?}", parts);
-
-        // Check for and remove "ducktape" prefix
         let first_part = parts[0].trim();
-        // Allow commands without 'ducktape' prefix in Terminal Mode
         if !first_part.eq_ignore_ascii_case("ducktape") {
             log::debug!("Command does not start with 'ducktape', allowing in Terminal Mode");
         } else {
