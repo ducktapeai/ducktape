@@ -20,8 +20,39 @@ impl CommandArgs {
 
         debug!("Normalized input: {}", normalized_input);
 
-        // Split the input into arguments
-        let mut args: Vec<String> = normalized_input.split_whitespace().map(String::from).collect();
+        // Parse the command line with proper handling of quoted strings
+        let mut args = Vec::new();
+        let mut current_arg = String::new();
+        let mut in_quotes = false;
+        let mut escaped = false;
+
+        for c in normalized_input.chars() {
+            if escaped {
+                current_arg.push(c);
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_quotes = !in_quotes;
+                // We don't include the quote characters
+            } else if c.is_whitespace() && !in_quotes {
+                if !current_arg.is_empty() {
+                    args.push(current_arg.clone());
+                    current_arg.clear();
+                }
+            } else {
+                current_arg.push(c);
+            }
+        }
+
+        if !current_arg.is_empty() {
+            args.push(current_arg);
+        }
+
+        // Check if quotes were left unclosed
+        if in_quotes {
+            return Err(anyhow!("Unclosed quote in command"));
+        }
 
         if args.is_empty() {
             return Err(anyhow!("No command provided"));
@@ -134,13 +165,22 @@ impl CommandHandler for CalendarHandler {
                         date_index = 3; // Date is at position 3
                     }
 
-                    let title =
-                        if !combined_title.is_empty() { &combined_title } else { &args.args[1] };
+                    // Get title and trim surrounding quotes if present
+                    let raw_title = if !combined_title.is_empty() {
+                        combined_title
+                    } else {
+                        args.args[1].clone()
+                    };
+                    let title = raw_title.trim_matches('"');
 
                     let date = &args.args[date_index];
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
-                    let calendar = args.args.get(date_index + 3).cloned();
+                    let calendar = args
+                        .args
+                        .get(date_index + 3)
+                        .cloned()
+                        .map(|cal| cal.trim_matches('"').to_string());
 
                     log::info!(
                         "Processing calendar event with title: '{}', date: {}, times: {} to {}",
@@ -150,11 +190,31 @@ impl CommandHandler for CalendarHandler {
                         end_time
                     );
 
-                    // Build flags
-                    let location = args.flags.get("--location").cloned().flatten();
-                    let description = args.flags.get("--notes").cloned().flatten();
-                    let emails = args.flags.get("--email").cloned().flatten();
-                    let contacts = args.flags.get("--contacts").cloned().flatten();
+                    // Build flags and trim surrounding quotes if present
+                    let location = args
+                        .flags
+                        .get("--location")
+                        .cloned()
+                        .flatten()
+                        .map(|loc| loc.trim_matches('"').to_string());
+                    let description = args
+                        .flags
+                        .get("--notes")
+                        .cloned()
+                        .flatten()
+                        .map(|desc| desc.trim_matches('"').to_string());
+                    let emails = args
+                        .flags
+                        .get("--email")
+                        .cloned()
+                        .flatten()
+                        .map(|email| email.trim_matches('"').to_string());
+                    let contacts = args
+                        .flags
+                        .get("--contacts")
+                        .cloned()
+                        .flatten()
+                        .map(|contact| contact.trim_matches('"').to_string());
 
                     // Handle recurrence options
                     let recurrence_frequency = args

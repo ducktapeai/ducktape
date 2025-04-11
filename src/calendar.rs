@@ -226,21 +226,22 @@ impl EventConfig {
         // Process title to safely handle quotes from NLP-generated commands
         // First trim quotes if they're at the start and end
         let mut sanitized_title = self.title.trim_matches('"').to_string();
-        
+
         // Handle escaped quotes as well
         if sanitized_title.contains("\\\"") {
             sanitized_title = sanitized_title.replace("\\\"", "");
         }
-        
+
         debug!("Original title: '{}', Sanitized title: '{}'", self.title, sanitized_title);
-        
+
         // Check for truly dangerous characters (excluding quotes which are handled above)
-        if sanitized_title.contains(';') 
+        if sanitized_title.contains(';')
             || sanitized_title.contains('&')
             || sanitized_title.contains('|')
             || sanitized_title.contains('<')
             || sanitized_title.contains('>')
-            || sanitized_title.contains('$') {
+            || sanitized_title.contains('$')
+        {
             return Err(anyhow!("Title contains potentially dangerous characters"));
         }
 
@@ -248,9 +249,10 @@ impl EventConfig {
         if let Some(location) = &self.location {
             let mut sanitized_location = location.replace("\\\"", "").replace("\"", "");
             if sanitized_location.starts_with('"') && sanitized_location.ends_with('"') {
-                sanitized_location = sanitized_location[1..sanitized_location.len() - 1].to_string();
+                sanitized_location =
+                    sanitized_location[1..sanitized_location.len() - 1].to_string();
             }
-            
+
             if contains_dangerous_characters(&sanitized_location) {
                 return Err(anyhow!("Location contains potentially dangerous characters"));
             }
