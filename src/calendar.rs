@@ -223,14 +223,35 @@ impl EventConfig {
             }
         }
 
-        // Validate title doesn't contain dangerous characters
-        if contains_dangerous_characters(&self.title) {
+        // Process title to safely handle quotes from NLP-generated commands
+        // First trim quotes if they're at the start and end
+        let mut sanitized_title = self.title.trim_matches('"').to_string();
+        
+        // Handle escaped quotes as well
+        if sanitized_title.contains("\\\"") {
+            sanitized_title = sanitized_title.replace("\\\"", "");
+        }
+        
+        debug!("Original title: '{}', Sanitized title: '{}'", self.title, sanitized_title);
+        
+        // Check for truly dangerous characters (excluding quotes which are handled above)
+        if sanitized_title.contains(';') 
+            || sanitized_title.contains('&')
+            || sanitized_title.contains('|')
+            || sanitized_title.contains('<')
+            || sanitized_title.contains('>')
+            || sanitized_title.contains('$') {
             return Err(anyhow!("Title contains potentially dangerous characters"));
         }
 
         // Validate location if specified
         if let Some(location) = &self.location {
-            if contains_dangerous_characters(location) {
+            let mut sanitized_location = location.replace("\\\"", "").replace("\"", "");
+            if sanitized_location.starts_with('"') && sanitized_location.ends_with('"') {
+                sanitized_location = sanitized_location[1..sanitized_location.len() - 1].to_string();
+            }
+            
+            if contains_dangerous_characters(&sanitized_location) {
                 return Err(anyhow!("Location contains potentially dangerous characters"));
             }
         }
@@ -332,8 +353,8 @@ pub fn validate_email(email: &str) -> bool {
 
 /// Check for potentially dangerous characters that could cause AppleScript injection
 fn contains_dangerous_characters(input: &str) -> bool {
-    input.contains('\"')
-        || input.contains(';')
+    // Note: Double quotes are handled separately in title/location sanitization
+    input.contains(';')
         || input.contains('&')
         || input.contains('|')
         || input.contains('<')
