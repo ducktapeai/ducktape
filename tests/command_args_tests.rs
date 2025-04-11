@@ -44,6 +44,21 @@ fn test_command_args_parse() {
 }
 
 #[test]
+fn test_command_args_parse_with_quoted_strings() {
+    // Test command with quoted strings
+    let args = CommandArgs::parse(
+        "ducktape calendar create \"Team Meeting\" 2025-04-15 10:00 11:00 \"Work\"",
+    )
+    .unwrap();
+    assert_eq!(args.command, "calendar");
+    assert_eq!(
+        args.args,
+        vec!["create", "Team Meeting", "2025-04-15", "10:00", "11:00", "Work"]
+    );
+    assert!(args.flags.is_empty());
+}
+
+#[test]
 fn test_command_args_parse_errors() {
     // Test unclosed quotes
     assert!(CommandArgs::parse("ducktape calendar create \"Unterminated Quote").is_err());

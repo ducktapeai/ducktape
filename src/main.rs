@@ -43,14 +43,62 @@ async fn main() -> Result<()> {
     env_debug::force_set_api_key();
 
     // Parse command line arguments
-    let args: Vec<String> = env::args().collect();
+    // Normalize the command name to handle full binary paths
+    let args: Vec<String> = env::args()
+        .enumerate()
+        .map(|(i, arg)| {
+            if i == 0 {
+                // Extract only the binary name from the full path
+                std::path::Path::new(&arg)
+                    .file_name()
+                    .map(|name| name.to_string_lossy().to_string())
+                    .unwrap_or(arg)
+            } else {
+                arg
+            }
+        })
+        .collect();
+
+    // Special handling for calendar commands with multi-word titles
+    let args_len = args.len();
+    let mut processed_args = args.clone();
+
+    // Check if we have at least the pattern: ducktape calendar create <title1> <title2> <date> <time1> <time2>
+    if args_len >= 7 && (processed_args[1] == "calendar" && processed_args[2] == "create") {
+        // If title parts are followed by a date (contains '-'), combine them
+        if !processed_args[3].contains('-')
+            && !processed_args[4].contains('-')
+            && processed_args[5].contains('-')
+        {
+            // Combine the title parts
+            let title = format!("{} {}", processed_args[3], processed_args[4]);
+
+            // Create new args with combined title
+            let mut new_args = Vec::with_capacity(args_len - 1);
+            new_args.push(processed_args[0].clone());
+            new_args.push("calendar".to_string());
+            new_args.push("create".to_string());
+            new_args.push(title);
+
+            // Add remaining args (date, times, etc.)
+            for i in 5..args_len {
+                new_args.push(processed_args[i].clone());
+            }
+
+            processed_args = new_args;
+            log::debug!(
+                "Processed command line arguments for multi-word title: {:?}",
+                processed_args
+            );
+        }
+    }
 
     // Create application instance early so we can use it for commands
     let app = Application::new();
 
     // Check command line flags
-    if args.len() > 1 {
-        match args[1].as_str() {
+    if processed_args.len() > 1 {
+        match processed_args[1].as_str() {
             "--api-server" => {
                 // Load config and start API server only
                 let config = Config::load()?;
@@ -79,8 +127,8 @@ async fn main() -> Result<()> {
             }
             "calendar" => {
                 // Handle calendar subcommands
-                if args.len() > 2 {
-                    let subcommand = args[2].as_str();
+                if processed_args.len() > 2 {
+                    let subcommand = processed_args[2].as_str();
                     match subcommand {
                         "list" => {
                             calendar::list_calendars().await?;
@@ -92,7 +140,7 @@ async fn main() -> Result<()> {
                         }
                         "create" | "add" => {
                             // For calendar create/add, process the full command
-                            let full_command = args.join(" ");
+                            let full_command = processed_args.join(" ");
                             return app.process_command(&full_command).await;
                         }
                         "delete" | "remove" => {

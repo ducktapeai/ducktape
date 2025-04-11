@@ -200,7 +200,11 @@ impl Application {
             || processed_input.contains("calendar add")
         {
             // Check if it has a start time but no end time
-            let parts: Vec<&str> = processed_input.split_whitespace().collect();
+            let parts = match CommandArgs::parse(&processed_input) {
+                Ok(parsed_args) => parsed_args.args,
+                Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
+            };
+
             let mut has_start_time = false;
             let mut has_end_time = false;
             let mut start_time_index = 0;
@@ -225,7 +229,7 @@ impl Application {
                 && start_time_index > 0
                 && start_time_index < parts.len()
             {
-                let start_time = parts[start_time_index];
+                let start_time = &parts[start_time_index];
                 if let Some((hours_str, minutes_str)) = start_time.split_once(':') {
                     if let (Ok(hours), Ok(_minutes)) =
                         (hours_str.parse::<u32>(), minutes_str.parse::<u32>())
@@ -235,19 +239,18 @@ impl Application {
                         let end_time = format!("{}:{}", end_hours, minutes_str);
 
                         let mut new_parts = parts.clone();
-                        new_parts.insert(start_time_index + 1, &end_time);
+                        new_parts.insert(start_time_index + 1, end_time);
                         let fixed_command = new_parts.join(" ");
                         log::info!("Added missing end time. Fixed command: {}", fixed_command);
-                        fixed_command
-                    } else {
-                        processed_input.clone()
+                        return self
+                            .command_processor
+                            .execute(CommandArgs::parse(&fixed_command)?)
+                            .await;
                     }
-                } else {
-                    processed_input.clone()
                 }
-            } else {
-                processed_input.clone()
             }
+
+            processed_input.clone()
         } else {
             processed_input.clone()
         };
