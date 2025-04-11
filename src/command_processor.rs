@@ -20,142 +20,75 @@ impl CommandArgs {
 
         debug!("Normalized input: {}", normalized_input);
 
-        // Handle special commands first
-        if normalized_input.eq_ignore_ascii_case("exit")
-            || normalized_input.eq_ignore_ascii_case("quit")
-            || normalized_input.eq_ignore_ascii_case("ducktape exit")
-            || normalized_input.eq_ignore_ascii_case("ducktape quit")
-        {
-            return Ok(CommandArgs {
-                command: "exit".to_string(),
-                args: vec![],
-                flags: HashMap::new(),
-            });
-        }
+        // Split the input into arguments
+        let mut args: Vec<String> = normalized_input.split_whitespace().map(String::from).collect();
 
-        // Special case for help commands
-        if normalized_input.eq_ignore_ascii_case("help")
-            || normalized_input.eq_ignore_ascii_case("ducktape help")
-            || normalized_input.eq_ignore_ascii_case("ducktape --help")
-            || normalized_input.eq_ignore_ascii_case("ducktape -h")
-            || normalized_input.eq_ignore_ascii_case("--h")
-            || normalized_input.eq_ignore_ascii_case("-h")
-        {
-            return Ok(CommandArgs {
-                command: "help".to_string(),
-                args: vec![],
-                flags: HashMap::new(),
-            });
-        }
-
-        // Special case for version commands
-        if normalized_input.eq_ignore_ascii_case("version")
-            || normalized_input.eq_ignore_ascii_case("ducktape version")
-            || normalized_input.eq_ignore_ascii_case("ducktape --version")
-            || normalized_input.eq_ignore_ascii_case("ducktape -v")
-            || normalized_input.eq_ignore_ascii_case("--version")
-            || normalized_input.eq_ignore_ascii_case("-v")
-        {
-            return Ok(CommandArgs {
-                command: "version".to_string(),
-                args: vec![],
-                flags: HashMap::new(),
-            });
-        }
-
-        // Special case for calendars command
-        if normalized_input.eq_ignore_ascii_case("calendars")
-            || normalized_input.eq_ignore_ascii_case("ducktape calendars")
-        {
-            return Ok(CommandArgs {
-                command: "calendars".to_string(),
-                args: vec![],
-                flags: HashMap::new(),
-            });
-        }
-
-        // Enhanced logic to handle quoted strings and edge cases
-        let mut parts = Vec::new();
-        let mut current = String::new();
-        let mut in_quotes = false;
-        let mut chars = normalized_input.chars().peekable();
-        let mut escaped = false;
-
-        while let Some(c) = chars.next() {
-            match c {
-                '\\' if !escaped => {
-                    escaped = true;
-                }
-                '"' if !escaped => {
-                    in_quotes = !in_quotes;
-                    continue; // Skip the quote character
-                }
-                ' ' if !in_quotes && !escaped => {
-                    if !current.is_empty() {
-                        parts.push(current);
-                        current = String::new();
-                    }
-                }
-                _ => {
-                    if escaped {
-                        escaped = false;
-                        current.push(c);
-                        continue;
-                    }
-                    current.push(c);
-                }
-            }
-        }
-
-        // Handle unclosed quotes
-        if in_quotes {
-            return Err(anyhow!("Unclosed quotes in command"));
-        }
-
-        // Add any remaining content
-        if !current.is_empty() {
-            parts.push(current);
-        }
-
-        if parts.is_empty() {
+        if args.is_empty() {
             return Err(anyhow!("No command provided"));
         }
 
-        let first_part = parts[0].trim();
-        if !first_part.eq_ignore_ascii_case("ducktape") {
-            log::debug!("Command does not start with 'ducktape', allowing in Terminal Mode");
-        } else {
-            parts.remove(0);
+        // Remove the 'ducktape' prefix if it exists
+        if args[0].eq_ignore_ascii_case("ducktape") {
+            args.remove(0);
         }
 
-        if parts.is_empty() {
+        if args.is_empty() {
             return Err(anyhow!("No command provided after 'ducktape'"));
         }
 
-        let command = parts.remove(0).to_lowercase();
-        let mut args = Vec::new();
+        // Extract the command (first argument)
+        let command = args.remove(0).to_lowercase();
+
+        // Special handling for calendar create commands
+        if command == "calendar" && args.len() >= 5 && args[0] == "create" {
+            // Combine multi-word titles into a single argument
+            let mut processed_args = vec![args[0].clone()]; // "create"
+            let mut title_parts = Vec::new();
+            let mut i = 1;
+
+            // Collect words until we find something that looks like a date or time
+            while i < args.len() {
+                let arg = &args[i];
+                if arg.contains('-') || arg.contains(':') {
+                    break;
+                }
+                title_parts.push(arg.clone());
+                i += 1;
+            }
+
+            if !title_parts.is_empty() {
+                processed_args.push(title_parts.join(" ")); // Combined title
+
+                // Add remaining args
+                processed_args.extend(args[i..].iter().cloned());
+                args = processed_args;
+            }
+        }
+
+        // Parse flags and remaining arguments
+        let mut command_args = Vec::new();
         let mut flags = HashMap::new();
         let mut i = 0;
 
-        while i < parts.len() {
-            let part = &parts[i];
+        while i < args.len() {
+            let part = &args[i];
             if part.starts_with("--") {
-                if i + 1 < parts.len() && !parts[i + 1].starts_with("--") {
-                    flags.insert(part.to_string(), Some(parts[i + 1].to_string()));
+                if i + 1 < args.len() && !args[i + 1].starts_with("--") {
+                    flags.insert(part.to_string(), Some(args[i + 1].to_string()));
                     i += 2;
                 } else {
                     flags.insert(part.to_string(), None);
                     i += 1;
                 }
             } else {
-                args.push(part.to_string());
+                command_args.push(part.to_string());
                 i += 1;
             }
         }
 
-        debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, args, flags);
+        debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, command_args, flags);
 
-        Ok(CommandArgs { command, args, flags })
+        Ok(CommandArgs { command, args: command_args, flags })
     }
 }
 
@@ -182,11 +115,36 @@ impl CommandHandler for CalendarHandler {
                         return Ok(());
                     }
 
-                    let title = &args.args[1];
-                    let date = &args.args[2];
-                    let start_time = &args.args[3];
-                    let end_time = &args.args[4];
-                    let calendar = args.args.get(5).cloned();
+                    // Special handling for multi-word titles in calendar create command
+                    let mut combined_title = String::new();
+                    let mut title_index = 1;
+                    let mut date_index = 2;
+                    
+                    // Check if we have multiple words before a date format
+                    if args.args.len() >= 6 
+                        && !args.args[1].contains('-') && !args.args[1].contains(':')
+                        && !args.args[2].contains('-') && !args.args[2].contains(':')
+                        && (args.args[3].contains('-') || args.args[3].contains('/'))
+                    {
+                        debug!("Detected potential multi-word title");
+                        combined_title = format!("{} {}", args.args[1], args.args[2]);
+                        title_index = 0; // We'll use our combined title instead
+                        date_index = 3;  // Date is at position 3
+                    }
+                    
+                    let title = if !combined_title.is_empty() {
+                        &combined_title
+                    } else {
+                        &args.args[1]
+                    };
+                    
+                    let date = &args.args[date_index];
+                    let start_time = &args.args[date_index + 1];
+                    let end_time = &args.args[date_index + 2];
+                    let calendar = args.args.get(date_index + 3).cloned();
+                    
+                    log::info!("Processing calendar event with title: '{}', date: {}, times: {} to {}", 
+                              title, date, start_time, end_time);
 
                     // Build flags
                     let location = args.flags.get("--location").cloned().flatten();
