@@ -49,7 +49,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 
     // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
-    debug!("Parsing natural language input: {}", sanitized_input);
+    debug!("Sanitized input: {}", sanitized_input);
 
     // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")

@@ -271,12 +271,30 @@ impl Application {
             Ok(command) => {
                 println!("Translated to command: {}", command);
 
+                // Sanitize the NLP-generated command to remove unnecessary quotes
+                let sanitized_command = self.sanitize_nlp_command(&command);
+                println!("Sanitized command: {}", sanitized_command);
+                log::debug!("Sanitized NLP command: {}", sanitized_command);
+
                 // Check if the generated command starts with ducktape
-                if command.starts_with("ducktape") {
-                    let args = CommandArgs::parse(&command)?;
+                if sanitized_command.starts_with("ducktape") {
+                    // Parse the command into arguments and handle quotes properly
+                    let mut args = CommandArgs::parse(&sanitized_command)?;
+
+                    // Further sanitize individual arguments to remove any remaining quotes
+                    args.args = args
+                        .args
+                        .into_iter()
+                        .map(|arg| arg.trim_matches('"').to_string())
+                        .collect();
+
+                    log::debug!("Final parsed arguments: {:?}", args);
                     self.command_processor.execute(args).await
                 } else {
-                    println!("Generated command doesn't start with 'ducktape': {}", command);
+                    println!(
+                        "Generated command doesn't start with 'ducktape': {}",
+                        sanitized_command
+                    );
                     Ok(())
                 }
             }
@@ -286,6 +304,21 @@ impl Application {
                 Ok(())
             }
         }
+    }
+
+    /// Sanitize NLP-generated commands to remove unnecessary quotes
+    fn sanitize_nlp_command(&self, command: &str) -> String {
+        command
+            .split_whitespace()
+            .map(|arg| {
+                if arg.starts_with('"') && arg.ends_with('"') {
+                    arg.trim_matches('"') // Remove surrounding quotes
+                } else {
+                    arg
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
