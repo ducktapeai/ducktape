@@ -119,32 +119,36 @@ impl CommandHandler for CalendarHandler {
                     let mut combined_title = String::new();
                     let mut title_index = 1;
                     let mut date_index = 2;
-                    
+
                     // Check if we have multiple words before a date format
-                    if args.args.len() >= 6 
-                        && !args.args[1].contains('-') && !args.args[1].contains(':')
-                        && !args.args[2].contains('-') && !args.args[2].contains(':')
+                    if args.args.len() >= 6
+                        && !args.args[1].contains('-')
+                        && !args.args[1].contains(':')
+                        && !args.args[2].contains('-')
+                        && !args.args[2].contains(':')
                         && (args.args[3].contains('-') || args.args[3].contains('/'))
                     {
                         debug!("Detected potential multi-word title");
                         combined_title = format!("{} {}", args.args[1], args.args[2]);
                         title_index = 0; // We'll use our combined title instead
-                        date_index = 3;  // Date is at position 3
+                        date_index = 3; // Date is at position 3
                     }
-                    
-                    let title = if !combined_title.is_empty() {
-                        &combined_title
-                    } else {
-                        &args.args[1]
-                    };
-                    
+
+                    let title =
+                        if !combined_title.is_empty() { &combined_title } else { &args.args[1] };
+
                     let date = &args.args[date_index];
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
                     let calendar = args.args.get(date_index + 3).cloned();
-                    
-                    log::info!("Processing calendar event with title: '{}', date: {}, times: {} to {}", 
-                              title, date, start_time, end_time);
+
+                    log::info!(
+                        "Processing calendar event with title: '{}', date: {}, times: {} to {}",
+                        title,
+                        date,
+                        start_time,
+                        end_time
+                    );
 
                     // Build flags
                     let location = args.flags.get("--location").cloned().flatten();

@@ -242,7 +242,10 @@ impl Application {
                         new_parts.insert(start_time_index + 1, end_time);
                         let fixed_command = new_parts.join(" ");
                         log::info!("Added missing end time. Fixed command: {}", fixed_command);
-                        return self.command_processor.execute(CommandArgs::parse(&fixed_command)?).await;
+                        return self
+                            .command_processor
+                            .execute(CommandArgs::parse(&fixed_command)?)
+                            .await;
                     }
                 }
             }

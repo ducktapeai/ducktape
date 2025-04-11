@@ -58,33 +58,38 @@ async fn main() -> Result<()> {
             }
         })
         .collect();
-    
+
     // Special handling for calendar commands with multi-word titles
     let args_len = args.len();
     let mut processed_args = args.clone();
-    
+
     // Check if we have at least the pattern: ducktape calendar create <title1> <title2> <date> <time1> <time2>
-    if args_len >= 7 && 
-       (processed_args[1] == "calendar" && processed_args[2] == "create") {
+    if args_len >= 7 && (processed_args[1] == "calendar" && processed_args[2] == "create") {
         // If title parts are followed by a date (contains '-'), combine them
-        if !processed_args[3].contains('-') && !processed_args[4].contains('-') && processed_args[5].contains('-') {
+        if !processed_args[3].contains('-')
+            && !processed_args[4].contains('-')
+            && processed_args[5].contains('-')
+        {
             // Combine the title parts
             let title = format!("{} {}", processed_args[3], processed_args[4]);
-            
+
             // Create new args with combined title
             let mut new_args = Vec::with_capacity(args_len - 1);
             new_args.push(processed_args[0].clone());
             new_args.push("calendar".to_string());
             new_args.push("create".to_string());
             new_args.push(title);
-            
+
             // Add remaining args (date, times, etc.)
             for i in 5..args_len {
                 new_args.push(processed_args[i].clone());
             }
-            
+
             processed_args = new_args;
-            log::debug!("Processed command line arguments for multi-word title: {:?}", processed_args);
+            log::debug!(
+                "Processed command line arguments for multi-word title: {:?}",
+                processed_args
+            );
         }
     }
 
