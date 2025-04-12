@@ -8,7 +8,7 @@ use std::path::Path;
 async fn main() -> Result<()> {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    
+
     // Load environment variables from .env file
     if let Err(e) = load_env_file() {
         eprintln!("Warning: {}", e);
@@ -17,21 +17,21 @@ async fn main() -> Result<()> {
 
     // Parse command line arguments directly, preserving quoted strings
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    
+
     // Build input string with proper handling of quoted arguments
     let mut input = String::from("ducktape ");
     let mut i = 0;
-    
+
     // Process all arguments and preserve quotes for multi-word values
     while i < raw_args.len() {
         let arg = &raw_args[i];
-        
+
         // Special handling for flags that might have multi-word values
-        if arg.starts_with("--") && i + 1 < raw_args.len() && !raw_args[i+1].starts_with("--") {
+        if arg.starts_with("--") && i + 1 < raw_args.len() && !raw_args[i + 1].starts_with("--") {
             // This is a flag with a value
             let flag_name = arg;
-            let flag_value = &raw_args[i+1];
-            
+            let flag_value = &raw_args[i + 1];
+
             // If the value contains spaces, wrap it in quotes
             if flag_value.contains(' ') {
                 input.push_str(&format!("{} \"{}\" ", flag_name, flag_value));
@@ -49,9 +49,9 @@ async fn main() -> Result<()> {
             i += 1;
         }
     }
-    
+
     debug!("Processed command input: {}", input);
-    
+
     // Parse the arguments using our command processor
     match CommandArgs::parse(&input) {
         Ok(args) => {
@@ -75,7 +75,7 @@ fn load_env_file() -> Result<()> {
     if Path::new(".env").exists() {
         dotenvy::from_path(".env")?;
         info!("Loaded environment variables from .env file in current directory");
-    } 
+    }
     // Then try to load from the project root directory
     else if Path::new("/Users/shaunstuart/RustroverProjects/ducktape/.env").exists() {
         dotenvy::from_path("/Users/shaunstuart/RustroverProjects/ducktape/.env")?;
@@ -88,15 +88,18 @@ fn load_env_file() -> Result<()> {
             Err(e) => return Err(anyhow::anyhow!("Failed to load .env file: {}", e)),
         }
     }
-    
+
     // Verify that Zoom credentials are available in the environment
-    if env::var("ZOOM_ACCOUNT_ID").is_err() || 
-       env::var("ZOOM_CLIENT_ID").is_err() || 
-       env::var("ZOOM_CLIENT_SECRET").is_err() {
+    if env::var("ZOOM_ACCOUNT_ID").is_err()
+        || env::var("ZOOM_CLIENT_ID").is_err()
+        || env::var("ZOOM_CLIENT_SECRET").is_err()
+    {
         info!("One or more required Zoom credentials are missing from environment");
-        return Err(anyhow::anyhow!("One or more required Zoom credentials are missing in .env file"));
+        return Err(anyhow::anyhow!(
+            "One or more required Zoom credentials are missing in .env file"
+        ));
     }
-    
+
     info!("Successfully loaded Zoom credentials from environment");
     Ok(())
 }
@@ -111,10 +114,6 @@ fn process_contact_string(contacts_str: &str) -> Vec<&str> {
         vec![contacts_str.trim()]
     } else {
         // Otherwise, split by comma as usual for multiple contacts
-        contacts_str
-            .split(',')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect()
+        contacts_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect()
     }
 }

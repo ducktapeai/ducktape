@@ -1,8 +1,8 @@
 // Make this module public so it can be used from external crates
+pub use crate::command_processor::CommandArgs;
 pub use anyhow::Result;
 pub use async_trait::async_trait;
 pub use log::debug;
-pub use crate::command_processor::CommandArgs;
 
 /// Trait defining the interface for all parsers in the system
 /// This allows for a clean separation between terminal mode and natural language processing
@@ -10,9 +10,11 @@ pub use crate::command_processor::CommandArgs;
 pub trait Parser {
     /// Parse input text and return either command string or structured command args
     async fn parse_input(&self, input: &str) -> Result<ParseResult>;
-    
+
     /// Create a new instance of the parser
-    fn new() -> Result<Self> where Self: Sized;
+    fn new() -> Result<Self>
+    where
+        Self: Sized;
 }
 
 /// Results from parsing user input
@@ -20,7 +22,7 @@ pub trait Parser {
 pub enum ParseResult {
     /// A command string that needs further parsing with CommandArgs::parse
     CommandString(String),
-    
+
     /// Already structured command arguments that can bypass string parsing
     StructuredCommand(CommandArgs),
 }
@@ -34,11 +36,11 @@ impl ParserFactory {
         // Temporarily always use terminal mode until the parser modules are fixed
         // This ensures proper handling of "--contacts" with multi-word names
         create_terminal_parser()
-        
+
         // Original code commented out for now
         /*
         let config = crate::config::Config::load()?;
-        
+
         // Create appropriate parser based on configuration
         match config.language_model.provider {
             Some(crate::config::LLMProvider::OpenAI) => {
@@ -70,29 +72,29 @@ impl ParserFactory {
 fn create_terminal_parser() -> Result<Box<dyn Parser + Send + Sync>> {
     // Avoid direct use of TerminalParser to prevent module resolution issues
     struct SimpleTerminalParser;
-    
+
     #[async_trait]
     impl Parser for SimpleTerminalParser {
         async fn parse_input(&self, input: &str) -> Result<ParseResult> {
             debug!("Terminal parser processing input: {}", input);
-            
+
             // Normalize the input by adding "ducktape" prefix if missing
             let normalized_input = if !input.trim().starts_with("ducktape") {
                 format!("ducktape {}", input)
             } else {
                 input.to_string()
             };
-            
+
             debug!("Terminal parser normalized input: {}", normalized_input);
-            
+
             // Just return the command string to be parsed by CommandArgs::parse
             Ok(ParseResult::CommandString(normalized_input))
         }
-        
+
         fn new() -> Result<Self> {
             Ok(Self)
         }
     }
-    
+
     Ok(Box::new(SimpleTerminalParser) as Box<dyn Parser + Send + Sync>)
 }

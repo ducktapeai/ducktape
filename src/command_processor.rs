@@ -182,8 +182,14 @@ impl CommandHandler for CalendarHandler {
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
                     // Check if the date_index + 3 argument is a calendar or part of a flag
-                    let calendar = if args.args.get(date_index + 3).map_or(false, |arg| !arg.starts_with("--")) {
-                        args.args.get(date_index + 3).cloned()
+                    let calendar = if args
+                        .args
+                        .get(date_index + 3)
+                        .map_or(false, |arg| !arg.starts_with("--"))
+                    {
+                        args.args
+                            .get(date_index + 3)
+                            .cloned()
                             .map(|cal| cal.trim_matches('"').to_string())
                     } else {
                         debug!("No explicit calendar specified, will use default calendar");
@@ -217,17 +223,12 @@ impl CommandHandler for CalendarHandler {
                         .cloned()
                         .flatten()
                         .map(|email| email.trim_matches('"').to_string());
-                    let contacts = args
-                        .flags
-                        .get("--contacts")
-                        .cloned()
-                        .flatten()
-                        .map(|contact| {
-                            // Properly trim surrounding quotes
-                            let trimmed = contact.trim_matches('"').to_string();
-                            debug!("Contacts flag value after trimming quotes: '{}'", trimmed);
-                            trimmed
-                        });
+                    let contacts = args.flags.get("--contacts").cloned().flatten().map(|contact| {
+                        // Properly trim surrounding quotes
+                        let trimmed = contact.trim_matches('"').to_string();
+                        debug!("Contacts flag value after trimming quotes: '{}'", trimmed);
+                        trimmed
+                    });
 
                     // Handle recurrence options
                     let recurrence_frequency = args
@@ -913,11 +914,7 @@ fn process_contact_string(contacts_str: &str) -> Vec<&str> {
         vec![contacts_str.trim()]
     } else {
         // Otherwise, split by comma as usual for multiple contacts
-        contacts_str
-            .split(',')
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .collect()
+        contacts_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect()
     }
 }
 

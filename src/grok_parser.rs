@@ -546,7 +546,7 @@ mod tests {
     }
 }
 
-use crate::parser_trait::{Parser, ParseResult};
+use crate::parser_trait::{ParseResult, Parser};
 use async_trait::async_trait;
 
 /// Parser that uses Grok/X.AI's model for natural language understanding
@@ -564,22 +564,22 @@ impl Parser for GrokParser {
         match parse_natural_language(input).await {
             Ok(command) => {
                 debug!("Grok parser generated command: {}", command);
-                
+
                 // Before parsing, sanitize quotes in the command
                 let sanitized_command = sanitize_nlp_command(&command);
                 debug!("Sanitized command: {}", sanitized_command);
-                
+
                 // For now, return as a command string
                 // In the future, we could parse this into structured CommandArgs here
                 Ok(ParseResult::CommandString(sanitized_command))
-            },
+            }
             Err(e) => {
                 error!("Grok parser error: {}", e);
                 Err(e)
             }
         }
     }
-    
+
     fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
@@ -592,7 +592,7 @@ fn sanitize_nlp_command(command: &str) -> String {
     if !command.starts_with("ducktape") {
         return command.to_string();
     }
-    
+
     // Basic sanitization to fix common issues with NLP-generated commands
     command
         .replace("\u{a0}", " ") // Replace non-breaking spaces

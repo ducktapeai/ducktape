@@ -996,7 +996,7 @@ pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
 /// Lookup a contact by name and return their email addresses
 pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     debug!("Looking up contact by name: '{}'", name);
-    
+
     // Try exact match first
     let exact_script = format!(
         r#"tell application "Contacts"
@@ -1039,13 +1039,18 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .map(|s| s.trim_matches('"').trim().to_string())
             .filter(|email| validate_email(email))
             .collect();
-            
+
         if !email_list.is_empty() {
-            debug!("Found {} email(s) for '{}' with exact match: {:?}", email_list.len(), name, email_list);
+            debug!(
+                "Found {} email(s) for '{}' with exact match: {:?}",
+                email_list.len(),
+                name,
+                email_list
+            );
             return Ok(email_list);
         }
     }
-    
+
     // If exact match returned no results, try contains match
     debug!("No exact match found for '{}', trying contains match", name);
     let contains_script = format!(
@@ -1093,13 +1098,18 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .map(|s| s.trim_matches('"').trim().to_string())
             .filter(|email| validate_email(email))
             .collect();
-            
+
         if email_list.is_empty() {
             debug!("No emails found for contact '{}'", name);
         } else {
-            debug!("Found {} email(s) for '{}' with contains match: {:?}", email_list.len(), name, email_list);
+            debug!(
+                "Found {} email(s) for '{}' with contains match: {:?}",
+                email_list.len(),
+                name,
+                email_list
+            );
         }
-        
+
         return Ok(email_list);
     } else {
         let error = String::from_utf8_lossy(&output.stderr);

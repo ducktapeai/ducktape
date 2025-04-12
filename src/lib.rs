@@ -23,8 +23,8 @@ pub mod parser_trait; // Make sure the parser trait is included
 pub mod env_manager;
 pub mod reminders;
 pub mod state;
-pub mod terminal_parser; // Add our new terminal parser
 pub mod storage; // Add storage module
+pub mod terminal_parser; // Add our new terminal parser
 pub mod todo;
 pub mod utils;
 pub mod validation;
