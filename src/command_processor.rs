@@ -34,7 +34,7 @@ impl CommandArgs {
                 escaped = true;
             } else if c == '"' {
                 in_quotes = !in_quotes;
-                // We don't include the quote characters
+                current_arg.push(c); // Include quote characters for proper flag value handling
             } else if c.is_whitespace() && !in_quotes {
                 if !current_arg.is_empty() {
                     args.push(current_arg.clone());
@@ -104,14 +104,19 @@ impl CommandArgs {
         while i < args.len() {
             let part = &args[i];
             if part.starts_with("--") {
+                // This is a flag
                 if i + 1 < args.len() && !args[i + 1].starts_with("--") {
-                    flags.insert(part.to_string(), Some(args[i + 1].to_string()));
+                    // Check if the value contains quotes and handle them properly
+                    let flag_value = args[i + 1].trim_matches('"').to_string();
+                    debug!("Processing flag: {} with value: {}", part, flag_value);
+                    flags.insert(part.to_string(), Some(flag_value));
                     i += 2;
                 } else {
                     flags.insert(part.to_string(), None);
                     i += 1;
                 }
             } else {
+                // This is a regular argument
                 command_args.push(part.to_string());
                 i += 1;
             }
@@ -176,11 +181,14 @@ impl CommandHandler for CalendarHandler {
                     let date = &args.args[date_index];
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
-                    let calendar = args
-                        .args
-                        .get(date_index + 3)
-                        .cloned()
-                        .map(|cal| cal.trim_matches('"').to_string());
+                    // Check if the date_index + 3 argument is a calendar or part of a flag
+                    let calendar = if args.args.get(date_index + 3).map_or(false, |arg| !arg.starts_with("--")) {
+                        args.args.get(date_index + 3).cloned()
+                            .map(|cal| cal.trim_matches('"').to_string())
+                    } else {
+                        debug!("No explicit calendar specified, will use default calendar");
+                        None
+                    };
 
                     log::info!(
                         "Processing calendar event with title: '{}', date: {}, times: {} to {}",
@@ -214,7 +222,12 @@ impl CommandHandler for CalendarHandler {
                         .get("--contacts")
                         .cloned()
                         .flatten()
-                        .map(|contact| contact.trim_matches('"').to_string());
+                        .map(|contact| {
+                            // Properly trim surrounding quotes
+                            let trimmed = contact.trim_matches('"').to_string();
+                            debug!("Contacts flag value after trimming quotes: '{}'", trimmed);
+                            trimmed
+                        });
 
                     // Handle recurrence options
                     let recurrence_frequency = args
@@ -325,11 +338,8 @@ impl CommandHandler for CalendarHandler {
 
                     // If contacts are specified, use create_event_with_contacts
                     if let Some(contacts_str) = contacts {
-                        let contact_names: Vec<&str> = contacts_str
-                            .split(',')
-                            .map(|s| s.trim())
-                            .filter(|s| !s.is_empty())
-                            .collect();
+                        // Process contacts string to correctly handle quoted multi-word names
+                        let contact_names: Vec<&str> = process_contact_string(&contacts_str);
 
                         if !contact_names.is_empty() {
                             info!("Creating event with contacts: {:?}", contact_names);
@@ -891,6 +901,24 @@ pub fn print_help() -> Result<()> {
     println!("  ducktape notes create \"Meeting Notes\" \"Points discussed in the meeting\"");
     println!("  ducktape config set calendar.default \"Personal\"");
     Ok(())
+}
+
+/// Helper function to properly process contact names from command string
+/// Handles both comma-separated lists and multi-word contact names
+fn process_contact_string(contacts_str: &str) -> Vec<&str> {
+    // Check if the contact string contains spaces but no commas
+    // This handles the case where a single contact name has multiple words
+    if !contacts_str.contains(',') && contacts_str.contains(' ') {
+        // Treat the entire string as one contact name if it has spaces but no commas
+        vec![contacts_str.trim()]
+    } else {
+        // Otherwise, split by comma as usual for multiple contacts
+        contacts_str
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
 }
 
 // Command processor that manages handlers and executes commands

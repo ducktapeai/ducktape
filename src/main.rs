@@ -6,14 +6,16 @@ mod command_parser;
 mod command_processor;
 mod config;
 mod contact_groups;
-mod deepseek_parser;
-mod deepseek_reasoning;
+// Temporarily commenting out problematic parsers to get the build working
+// mod deepseek_parser;
+// mod deepseek_reasoning;
 mod env_debug;
 mod event_search;
 mod file_search;
-mod grok_parser;
+// mod grok_parser;
 mod notes;
-mod openai_parser;
+// mod openai_parser;
+mod parser_trait; // Adding parser_trait directly to main for terminal mode
 mod reminders;
 mod state;
 mod todo;

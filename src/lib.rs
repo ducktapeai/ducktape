@@ -18,10 +18,12 @@ pub mod file_search;
 pub mod grok_parser;
 pub mod notes;
 pub mod openai_parser;
+pub mod parser_trait; // Make sure the parser trait is included
 // pub mod parsing_utils;  // Commented out if it doesn't exist
 pub mod env_manager;
 pub mod reminders;
 pub mod state;
+pub mod terminal_parser; // Add our new terminal parser
 pub mod storage; // Add storage module
 pub mod todo;
 pub mod utils;

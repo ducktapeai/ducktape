@@ -995,12 +995,14 @@ pub async fn delete_event(title: &str, _date: &str) -> Result<()> {
 
 /// Lookup a contact by name and return their email addresses
 pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
-    debug!("Looking up contact: {}", name);
-    let script = format!(
+    debug!("Looking up contact by name: '{}'", name);
+    
+    // Try exact match first
+    let exact_script = format!(
         r#"tell application "Contacts"
             set the_emails to {{}}
             try
-                set the_people to (every person whose name contains "{}")
+                set the_people to (every person whose name is "{}")
                 repeat with the_person in the_people
                     if exists email of the_person then
                         repeat with the_email in (get every email of the_person)
@@ -1021,27 +1023,84 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
 
     let output = tokio::process::Command::new("osascript")
         .arg("-e")
-        .arg(&script)
+        .arg(&exact_script)
         .output()
         .await
         .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
 
     if output.status.success() {
         let emails = String::from_utf8_lossy(&output.stdout);
-        debug!("Raw contact lookup output: {}", emails);
+        debug!("Raw contact lookup output (exact match): '{}'", emails);
         let email_list: Vec<String> = emails
             .trim_matches('{')
             .trim_matches('}')
             .split(", ")
             .filter(|s| !s.is_empty() && !s.contains("missing value"))
             .map(|s| s.trim_matches('"').trim().to_string())
+            .filter(|email| validate_email(email))
             .collect();
+            
+        if !email_list.is_empty() {
+            debug!("Found {} email(s) for '{}' with exact match: {:?}", email_list.len(), name, email_list);
+            return Ok(email_list);
+        }
+    }
+    
+    // If exact match returned no results, try contains match
+    debug!("No exact match found for '{}', trying contains match", name);
+    let contains_script = format!(
+        r#"tell application "Contacts"
+            set the_emails to {{}}
+            try
+                set searchText to "{}"
+                set the_people to (every person whose name contains searchText)
+                repeat with the_person in the_people
+                    set personName to name of the_person
+                    if personName contains searchText then
+                        if exists email of the_person then
+                            repeat with the_email in (get every email of the_person)
+                                if value of the_email is not missing value then
+                                    set the end of the_emails to (value of the_email as text)
+                                end if
+                            end repeat
+                        end if
+                    end if
+                end repeat
+                return the_emails
+            on error errMsg
+                log "Error looking up contact: " & errMsg
+                return {{}}
+            end try
+        end tell"#,
+        name.replace("\"", "\\\"")
+    );
+
+    let output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&contains_script)
+        .output()
+        .await
+        .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
+
+    if output.status.success() {
+        let emails = String::from_utf8_lossy(&output.stdout);
+        debug!("Raw contact lookup output (contains match): '{}'", emails);
+        let email_list: Vec<String> = emails
+            .trim_matches('{')
+            .trim_matches('}')
+            .split(", ")
+            .filter(|s| !s.is_empty() && !s.contains("missing value"))
+            .map(|s| s.trim_matches('"').trim().to_string())
+            .filter(|email| validate_email(email))
+            .collect();
+            
         if email_list.is_empty() {
             debug!("No emails found for contact '{}'", name);
         } else {
-            debug!("Found {} email(s) for '{}': {:?}", email_list.len(), name, email_list);
+            debug!("Found {} email(s) for '{}' with contains match: {:?}", email_list.len(), name, email_list);
         }
-        Ok(email_list)
+        
+        return Ok(email_list);
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
         error!("Contact lookup error: {}", error);

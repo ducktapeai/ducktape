@@ -13,23 +13,58 @@ use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
-/// Add a struct for the parser
-#[allow(dead_code)]
+use crate::parser_trait::{Parser, ParseResult};
+use async_trait::async_trait;
+
+/// Parser that uses OpenAI's models for natural language understanding
 pub struct OpenAIParser;
 
 impl OpenAIParser {
-    #[allow(dead_code)]
     pub fn new() -> anyhow::Result<Self> {
         Ok(Self)
     }
+}
 
-    #[allow(dead_code)]
-    pub async fn parse_input(&self, input: &str) -> anyhow::Result<Option<String>> {
+#[async_trait]
+impl Parser for OpenAIParser {
+    async fn parse_input(&self, input: &str) -> anyhow::Result<ParseResult> {
         match parse_natural_language(input).await {
-            Ok(command) => Ok(Some(command)),
-            Err(e) => Err(e),
+            Ok(command) => {
+                debug!("OpenAI parser generated command: {}", command);
+                
+                // Before parsing, sanitize quotes in the command
+                let sanitized_command = sanitize_nlp_command(&command);
+                debug!("Sanitized command: {}", sanitized_command);
+                
+                // For now, return as a command string
+                // In the future, we could parse this into structured CommandArgs here
+                Ok(ParseResult::CommandString(sanitized_command))
+            },
+            Err(e) => {
+                debug!("OpenAI parser error: {}", e);
+                Err(e)
+            }
         }
     }
+    
+    fn new() -> anyhow::Result<Self> {
+        Ok(Self)
+    }
+}
+
+/// Helper function to clean up NLP-generated commands
+/// Removes unnecessary quotes and normalizes spacing
+fn sanitize_nlp_command(command: &str) -> String {
+    // Ensure the command starts with ducktape
+    if !command.starts_with("ducktape") {
+        return command.to_string();
+    }
+    
+    // Basic sanitization to fix common issues with NLP-generated commands
+    command
+        .replace("\u{a0}", " ") // Replace non-breaking spaces
+        .replace("\"\"", "\"") // Replace double quotes
+        .to_string()
 }
 
 #[allow(dead_code)]
