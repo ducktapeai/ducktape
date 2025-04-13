@@ -1358,6 +1358,7 @@ dependencies = [
  "cargo-udeps",
  "chrono",
  "chrono-tz",
+ "clap",
  "colored",
  "criterion",
  "csv",

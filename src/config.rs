@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -87,7 +86,7 @@ impl Config {
 
         // Read and parse config file
         let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
-        let mut config: Config = toml::from_str(&content).context("Failed to parse config file")?;
+        let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
 
         // Handle missing provider field explicitly
         if config.language_model.provider.is_none() {

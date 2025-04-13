@@ -14,117 +14,247 @@ pub struct CommandArgs {
 }
 
 impl CommandArgs {
+    /// Create a new CommandArgs instance directly
+    pub fn new(command: String, args: Vec<String>, flags: HashMap<String, Option<String>>) -> Self {
+        Self { command, args, flags }
+    }
+
+    /// Legacy method for parsing command arguments from a string
+    /// This is deprecated in favor of using the Clap-based command line parser
+    #[deprecated(note = "Use the Clap-based command line parser instead")]
     pub fn parse(input: &str) -> Result<Self> {
         // Normalize input by replacing non-breaking spaces with regular spaces
         let normalized_input = input.replace('\u{a0}', " ");
-
         debug!("Normalized input: {}", normalized_input);
 
-        // Parse the command line with proper handling of quoted strings
-        let mut args = Vec::new();
-        let mut current_arg = String::new();
-        let mut in_quotes = false;
-        let mut escaped = false;
+        // Tokenize the input, correctly handling quoted strings
+        let tokens = tokenize_input(&normalized_input)?;
+        debug!("Tokenized input: {:?}", tokens);
 
-        for c in normalized_input.chars() {
-            if escaped {
-                current_arg.push(c);
-                escaped = false;
-            } else if c == '\\' {
-                escaped = true;
-            } else if c == '"' {
-                in_quotes = !in_quotes;
-                current_arg.push(c); // Include quote characters for proper flag value handling
-            } else if c.is_whitespace() && !in_quotes {
-                if !current_arg.is_empty() {
-                    args.push(current_arg.clone());
-                    current_arg.clear();
-                }
-            } else {
-                current_arg.push(c);
-            }
-        }
-
-        if !current_arg.is_empty() {
-            args.push(current_arg);
-        }
-
-        // Check if quotes were left unclosed
-        if in_quotes {
-            return Err(anyhow!("Unclosed quote in command"));
-        }
-
-        if args.is_empty() {
+        if tokens.is_empty() {
             return Err(anyhow!("No command provided"));
         }
 
-        // Remove the 'ducktape' prefix if it exists
-        if args[0].eq_ignore_ascii_case("ducktape") {
-            args.remove(0);
-        }
+        // Extract command, removing 'ducktape' if present
+        let mut tokens_iter = tokens.into_iter();
+        let first_token = tokens_iter.next().unwrap();
 
-        if args.is_empty() {
-            return Err(anyhow!("No command provided after 'ducktape'"));
-        }
+        // Command is either the first token or the second if first is "ducktape"
+        let command = if first_token.eq_ignore_ascii_case("ducktape") {
+            tokens_iter
+                .next()
+                .ok_or_else(|| anyhow!("No command provided after 'ducktape'"))?
+                .to_lowercase()
+        } else {
+            first_token.to_lowercase()
+        };
 
-        // Extract the command (first argument)
-        let command = args.remove(0).to_lowercase();
-
-        // Special handling for calendar create commands
-        if command == "calendar" && args.len() >= 5 && args[0] == "create" {
-            // Combine multi-word titles into a single argument
-            let mut processed_args = vec![args[0].clone()]; // "create"
-            let mut title_parts = Vec::new();
-            let mut i = 1;
-
-            // Collect words until we find something that looks like a date or time
-            while i < args.len() {
-                let arg = &args[i];
-                if arg.contains('-') || arg.contains(':') {
-                    break;
-                }
-                title_parts.push(arg.clone());
-                i += 1;
-            }
-
-            if !title_parts.is_empty() {
-                processed_args.push(title_parts.join(" ")); // Combined title
-
-                // Add remaining args
-                processed_args.extend(args[i..].iter().cloned());
-                args = processed_args;
-            }
-        }
-
-        // Parse flags and remaining arguments
-        let mut command_args = Vec::new();
+        // Process remaining tokens into args and flags
+        let mut args = Vec::new();
         let mut flags = HashMap::new();
-        let mut i = 0;
 
-        while i < args.len() {
-            let part = &args[i];
-            if part.starts_with("--") {
-                // This is a flag
-                if i + 1 < args.len() && !args[i + 1].starts_with("--") {
-                    // Check if the value contains quotes and handle them properly
-                    let flag_value = args[i + 1].trim_matches('"').to_string();
-                    debug!("Processing flag: {} with value: {}", part, flag_value);
-                    flags.insert(part.to_string(), Some(flag_value));
-                    i += 2;
+        let mut current_flag: Option<String> = None;
+
+        for token in tokens_iter {
+            if token.starts_with("--") {
+                // This is a new flag
+                if let Some(flag_name) = current_flag.take() {
+                    // Previous flag had no value
+                    flags.insert(flag_name, None);
+                }
+
+                // Store new flag name (without prefix)
+                current_flag = Some(token[2..].to_string());
+                debug!("Found flag: --{}", current_flag.as_ref().unwrap());
+            } else if let Some(flag_name) = current_flag.take() {
+                // This token is the value for the current flag
+                debug!("Flag --{} has value: '{}'", flag_name, token);
+                flags.insert(flag_name, Some(token));
+            } else {
+                // Regular argument
+                args.push(token);
+            }
+        }
+
+        // Handle any remaining flag with no value
+        if let Some(flag_name) = current_flag {
+            flags.insert(flag_name, None);
+        }
+
+        // Process special cases like calendar create with multi-word titles
+        if command == "calendar" && !args.is_empty() && args[0] == "create" {
+            process_calendar_create_args(&mut args);
+        }
+
+        debug!("Final parsed command: {:?}, args: {:?}, flags: {:?}", command, args, flags);
+
+        Ok(CommandArgs { command, args, flags })
+    }
+
+    // Keep for backward compatibility, but mark as deprecated
+    #[deprecated(note = "This method is no longer used")]
+    #[allow(dead_code)]
+    fn process_special_flag(_args: &[String], i: usize) -> (usize, String, Option<String>) {
+        // Just a stub to maintain backward compatibility
+        let flag_name = _args[i][2..].to_string();
+        (i + 1, flag_name, None)
+    }
+}
+
+/// Tokenizes the input command line, properly handling both escaped and regular quotes
+fn tokenize_input(input: &str) -> Result<Vec<String>> {
+    debug!("Starting tokenization of input: '{}'", input);
+
+    let mut tokens = Vec::new();
+    let mut current_token = String::new();
+
+    // State variables
+    let mut in_quotes = false;
+    let mut escaped = false;
+
+    for c in input.chars() {
+        if escaped {
+            current_token.push(c);
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if c == '"' {
+            in_quotes = !in_quotes;
+        } else if c.is_whitespace() && !in_quotes {
+            if !current_token.is_empty() {
+                tokens.push(current_token);
+                current_token = String::new();
+            }
+        } else {
+            current_token.push(c);
+        }
+    }
+
+    if !current_token.is_empty() {
+        tokens.push(current_token);
+    }
+
+    if in_quotes {
+        return Err(anyhow!("Unclosed quote in input"));
+    }
+
+    debug!("Tokenization result: {:?}", tokens);
+    Ok(tokens)
+}
+
+/// Post-processes flags to handle special cases
+fn postprocess_flags(tokens: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < tokens.len() {
+        // Get the current token
+        let token = &tokens[i];
+
+        // Special handling for --contacts flag to combine multi-word names
+        if token == "--contacts" && i + 1 < tokens.len() {
+            debug!("Found --contacts flag, checking for multi-word value");
+            result.push(token.clone());
+
+            // Check if the next token is quoted - if so, keep it as is
+            let next_token = &tokens[i + 1];
+            if (next_token.starts_with('"') && next_token.ends_with('"'))
+                || (next_token.starts_with('\'') && next_token.ends_with('\''))
+            {
+                debug!("Found quoted contact name: {}", next_token);
+                result.push(next_token.clone());
+                i += 2; // Skip the flag and the quoted value
+                continue;
+            }
+
+            // The next token is the first name (e.g., "Joe")
+            let first_name = &tokens[i + 1];
+
+            // Check if the second name exists and might be part of a name
+            if i + 2 < tokens.len() {
+                let second_name = &tokens[i + 2];
+
+                // If the second name doesn't look like a flag or date/time value, combine them
+                if !second_name.starts_with("--")
+                    && !second_name.contains('-')
+                    && !second_name.contains(':')
+                {
+                    // Combine the names
+                    let combined_name = format!("{} {}", first_name, second_name);
+                    debug!(
+                        "Combined contact name: '{}' + '{}' = '{}'",
+                        first_name, second_name, combined_name
+                    );
+
+                    result.push(format!("\"{}\"", combined_name)); // Add quotes to keep it together
+                    i += 3; // Skip the flag and both name parts
                 } else {
-                    flags.insert(part.to_string(), None);
-                    i += 1;
+                    // Just use the single name
+                    debug!("Using single contact name: '{}'", first_name);
+                    result.push(first_name.clone());
+                    i += 2; // Skip the flag and the single name
                 }
             } else {
-                // This is a regular argument
-                command_args.push(part.to_string());
-                i += 1;
+                // Just use the single name (no second name exists)
+                debug!("Using single contact name: '{}'", first_name);
+                result.push(first_name.clone());
+                i += 2; // Skip the flag and the single name
             }
         }
+        // General case for other special flags
+        else if token.starts_with("--")
+            && ["location", "notes", "email"].contains(&&token[2..])
+            && i + 1 < tokens.len()
+        {
+            debug!("Found special flag: {}", token);
+            result.push(token.clone());
 
-        debug!("Parsed command: {:?}, args: {:?}, flags: {:?}", command, command_args, flags);
+            // Add the value as-is, preserving quotes if present
+            let value = &tokens[i + 1];
+            result.push(value.clone());
+            i += 2; // Skip the flag and value
+        } else {
+            // No special handling needed
+            result.push(token.clone());
+            i += 1;
+        }
+    }
 
-        Ok(CommandArgs { command, args: command_args, flags })
+    result
+}
+
+/// Process calendar create command arguments to handle multi-word titles
+fn process_calendar_create_args(args: &mut Vec<String>) {
+    if args.len() < 2 {
+        return;
+    }
+
+    // Only process if the first argument doesn't already contain spaces
+    // (which would indicate it was properly quoted)
+    if !args[1].contains(' ') {
+        let mut i = 1;
+        let mut title_parts = vec![args[i].clone()];
+        i += 1;
+
+        // Collect words until we find a date/time-like format
+        while i < args.len() {
+            if args[i].contains('-') || args[i].contains(':') {
+                break;
+            }
+            title_parts.push(args[i].clone());
+            i += 1;
+        }
+
+        if title_parts.len() > 1 {
+            let combined_title = title_parts.join(" ");
+            debug!("Combined multi-word title: '{}'", combined_title);
+
+            // Create new args vector
+            let mut new_args = vec![args[0].clone()];
+            new_args.push(combined_title);
+            new_args.extend_from_slice(&args[title_parts.len() + 1..]);
+            *args = new_args;
+        }
     }
 }
 
@@ -153,7 +283,7 @@ impl CommandHandler for CalendarHandler {
 
                     // Special handling for multi-word titles in calendar create command
                     let mut combined_title = String::new();
-                    let mut title_index = 1;
+                    let mut _title_index = 1;
                     let mut date_index = 2;
 
                     // Check if we have multiple words before a date format
@@ -166,7 +296,7 @@ impl CommandHandler for CalendarHandler {
                     {
                         debug!("Detected potential multi-word title");
                         combined_title = format!("{} {}", args.args[1], args.args[2]);
-                        title_index = 0; // We'll use our combined title instead
+                        _title_index = 0; // We'll use our combined title instead
                         date_index = 3; // Date is at position 3
                     }
 
@@ -177,7 +307,6 @@ impl CommandHandler for CalendarHandler {
                         args.args[1].clone()
                     };
                     let title = raw_title.trim_matches('"');
-
                     let date = &args.args[date_index];
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
@@ -207,40 +336,39 @@ impl CommandHandler for CalendarHandler {
                     // Build flags and trim surrounding quotes if present
                     let location = args
                         .flags
-                        .get("--location")
+                        .get("location")
                         .cloned()
                         .flatten()
                         .map(|loc| loc.trim_matches('"').to_string());
                     let description = args
                         .flags
-                        .get("--notes")
+                        .get("notes")
                         .cloned()
                         .flatten()
                         .map(|desc| desc.trim_matches('"').to_string());
                     let emails = args
                         .flags
-                        .get("--email")
+                        .get("email")
                         .cloned()
                         .flatten()
                         .map(|email| email.trim_matches('"').to_string());
-                    let contacts = args.flags.get("--contacts").cloned().flatten().map(|contact| {
+                    
+                    let contacts = args.flags.get("contacts").cloned().flatten().map(|contact| {
                         // Properly trim surrounding quotes
-                        let trimmed = contact.trim_matches('"').to_string();
+                        let trimmed = contact.trim_matches('"').trim_matches('\'').to_string();
                         debug!("Contacts flag value after trimming quotes: '{}'", trimmed);
                         trimmed
                     });
 
+                    debug!("Contacts flag value: {:?}", contacts);
+
                     // Handle recurrence options
-                    let recurrence_frequency = args
-                        .flags
-                        .get("--repeat")
-                        .or(args.flags.get("--recurring"))
-                        .cloned()
-                        .flatten();
-                    let interval = args.flags.get("--interval").cloned().flatten();
-                    let until_date = args.flags.get("--until").cloned().flatten();
-                    let count = args.flags.get("--count").cloned().flatten();
-                    let days = args.flags.get("--days").cloned().flatten();
+                    let recurrence_frequency =
+                        args.flags.get("repeat").or(args.flags.get("recurring")).cloned().flatten();
+                    let interval = args.flags.get("interval").cloned().flatten();
+                    let until_date = args.flags.get("until").cloned().flatten();
+                    let count = args.flags.get("count").cloned().flatten();
+                    let days = args.flags.get("days").cloned().flatten();
 
                     // Create event config and pass to calendar module
                     let mut config = crate::calendar::EventConfig::new(title, date, start_time);
@@ -270,7 +398,7 @@ impl CommandHandler for CalendarHandler {
                     config.description = description;
 
                     // Check for --zoom flag and set create_zoom_meeting property
-                    if args.flags.contains_key("--zoom") {
+                    if args.flags.contains_key("zoom") {
                         info!("Zoom flag detected, creating event with Zoom meeting");
                         config.create_zoom_meeting = true;
                     }
@@ -311,7 +439,6 @@ impl CommandHandler for CalendarHandler {
                                         .split(',')
                                         .filter_map(|s| s.trim().parse::<u8>().ok())
                                         .collect();
-
                                     if !day_values.is_empty() {
                                         recurrence = recurrence.with_days_of_week(&day_values);
                                         debug!("Setting recurrence days: {:?}", day_values);
@@ -333,20 +460,29 @@ impl CommandHandler for CalendarHandler {
                             .map(|s| s.trim().to_string())
                             .filter(|email| crate::calendar::validate_email(email))
                             .collect();
-
                         debug!("Added {} email attendees", config.emails.len());
                     }
 
                     // If contacts are specified, use create_event_with_contacts
                     if let Some(contacts_str) = contacts {
-                        // Process contacts string to correctly handle quoted multi-word names
-                        let contact_names: Vec<&str> = process_contact_string(&contacts_str);
+                        info!("Processing contacts string: '{}'", contacts_str);
 
-                        if !contact_names.is_empty() {
-                            info!("Creating event with contacts: {:?}", contact_names);
+                        // Process contact string and convert to a vector of string slices
+                        let contact_vec: Vec<&str> = contacts_str
+                            .split(',')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+
+                        if !contact_vec.is_empty() {
+                            info!(
+                                "Creating event with {} contacts: {:?}",
+                                contact_vec.len(),
+                                contact_vec
+                            );
                             return crate::calendar::create_event_with_contacts(
                                 config,
-                                &contact_names,
+                                &contact_vec,
                             )
                             .await;
                         }
@@ -927,7 +1063,6 @@ pub struct CommandProcessor {
 impl CommandProcessor {
     pub fn new() -> Self {
         let handlers: Vec<Box<dyn CommandHandler>> = vec![
-            Box::new(HelpHandler),
             Box::new(CalendarHandler),
             Box::new(TodoHandler),
             Box::new(NotesHandler),
@@ -935,20 +1070,27 @@ impl CommandProcessor {
             Box::new(UtilitiesHandler),
             Box::new(ContactGroupsHandler),
             Box::new(VersionHandler),
+            Box::new(HelpHandler),
         ];
-
         Self { handlers }
     }
 
     pub async fn execute(&self, args: CommandArgs) -> Result<()> {
         debug!("Attempting to execute command: {}", args.command);
+        debug!("Parsed arguments: {:?}", args.args);
+        debug!("Parsed flags: {:?}", args.flags);
+
         let command_name = args.command.clone(); // Clone the command name for logging
         let args_debug = format!("{:?}", args.args); // Format args for debug logging
 
         for handler in &self.handlers {
             if handler.can_handle(&command_name) {
                 info!("Executing command '{}' with arguments: {}", command_name, args_debug);
-                match handler.execute(args).await {
+
+                // Use the args directly - our tokenizer should have handled quoted strings correctly
+                let args_to_use = args.clone();
+
+                match handler.execute(args_to_use).await {
                     Ok(()) => {
                         debug!("Command '{}' executed successfully", command_name);
                         return Ok(());
@@ -965,4 +1107,75 @@ impl CommandProcessor {
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
     }
+}
+
+/// Helper function to properly process contact names from command string
+/// Handles both comma-separated lists and multi-word contact names
+fn process_contact_string(contacts_str: &str) -> Vec<&str> {
+    debug!("Processing contact string: '{}'", contacts_str);
+
+    // First trim any surrounding quotes that might have been preserved
+    let trimmed = contacts_str.trim_matches('"').trim_matches('\'').trim();
+    debug!("After trimming quotes: '{}'", trimmed);
+
+    // Split by commas, handling both single contact and multiple contacts
+    let contacts: Vec<&str> =
+        trimmed.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+
+    debug!("Detected contacts: {:?}", contacts);
+    contacts
+}
+
+/// Centralized function to resolve contacts from input
+pub fn resolve_contacts(input: &str) -> Vec<String> {
+    let mut contacts = Vec::new();
+
+    debug!("resolve_contacts called with input: '{}'", input);
+
+    // Example logic for resolving contacts with exact matching
+    let name_to_emails = vec![
+        (
+            "Shaun Stuart",
+            vec![
+                "shaun.stuart@gmail.com",
+                "shaun.stuart@hashicorp.com",
+                "shaun.stuart@live.com",
+                "shaun@surfergolfer.com",
+            ],
+        ),
+        (
+            "Joe Bloggs",
+            vec![
+                "joe.blogs@gmail.com",
+                "joe.blogs@company.com",
+                "joe.blogs@live.com",
+                "joe@freelancer.com",
+            ],
+        ),
+        (
+            "Jane Doe",
+            vec![
+                "jane.doe@gmail.com",
+                "jane.doe@company.com",
+                "jane.doe@live.com",
+                "jane@freelancer.com",
+            ],
+        ),
+    ];
+
+    for (name, emails) in name_to_emails {
+        debug!("Checking if '{}' matches '{}'", input.trim(), name);
+        if input.trim().eq_ignore_ascii_case(name) {
+            debug!("Match found for '{}', adding emails: {:?}", name, emails);
+            contacts.extend(emails.into_iter().map(String::from));
+        }
+    }
+
+    debug!("Resolved contacts: {:?}", contacts);
+    contacts
+}
+
+/// Standardized input preprocessing function
+pub fn preprocess_input(input: &str) -> String {
+    input.trim().to_lowercase()
 }
