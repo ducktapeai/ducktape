@@ -1047,12 +1047,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .collect();
 
         if !email_list.is_empty() {
-            info!(
-                "Found {} email(s) for contact '{}': {:?}",
-                email_list.len(),
-                name,
-                email_list
-            );
+            info!("Found {} email(s) for contact '{}': {:?}", email_list.len(), name, email_list);
             return Ok(email_list);
         }
     }

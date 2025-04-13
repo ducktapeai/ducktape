@@ -352,7 +352,7 @@ impl CommandHandler for CalendarHandler {
                         .cloned()
                         .flatten()
                         .map(|email| email.trim_matches('"').to_string());
-                    
+
                     let contacts = args.flags.get("contacts").cloned().flatten().map(|contact| {
                         // Properly trim surrounding quotes
                         let trimmed = contact.trim_matches('"').trim_matches('\'').to_string();
