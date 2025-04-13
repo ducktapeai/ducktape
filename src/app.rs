@@ -14,7 +14,7 @@ impl Application {
 
     pub async fn run(&self) -> Result<()> {
         log::info!("Starting DuckTape Terminal");
-        let mut config = Config::load()?;
+        let config = Config::load()?;
 
         let use_natural_language = config.language_model.provider.is_some();
         log::debug!(
@@ -146,16 +146,19 @@ impl Application {
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
 
+        // Preprocess the input for normalization
+        let preprocessed_input = crate::command_processor::preprocess_input(input);
+
         if Config::load()?.language_model.provider.is_none() {
             log::info!("Terminal Mode: Direct command processing only");
-            return self.command_processor.execute(CommandArgs::parse(input)?).await;
+            return self.command_processor.execute(CommandArgs::parse(&preprocessed_input)?).await;
         }
 
         // Add "ducktape" prefix if missing for consistency
-        let normalized_input = if !input.trim().starts_with("ducktape") {
-            format!("ducktape {}", input)
+        let normalized_input = if !preprocessed_input.trim().starts_with("ducktape") {
+            format!("ducktape {}", preprocessed_input)
         } else {
-            input.to_string()
+            preprocessed_input
         };
         log::debug!("Normalized input: {}", normalized_input);
 

@@ -340,17 +340,23 @@ pub fn validate_time_format(time: &str) -> bool {
     false
 }
 
-/// Validate email format
+/// Enhanced email validation to handle edge cases and improve error reporting
 pub fn validate_email(email: &str) -> bool {
     let re = Regex::new(r"^[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.){1,125}[A-Za-z]{2,63}$")
         .unwrap();
 
     if !re.is_match(email) {
+        debug!("Invalid email format detected: {}", email);
         return false;
     }
 
     // Check for dangerous characters that could cause script injection
-    !contains_dangerous_characters(email)
+    if contains_dangerous_characters(email) {
+        debug!("Email contains dangerous characters: {}", email);
+        return false;
+    }
+
+    true
 }
 
 /// Check for potentially dangerous characters that could cause AppleScript injection
@@ -431,7 +437,7 @@ pub async fn create_event(config: EventConfig) -> Result<()> {
 
     // Load configuration and get default calendar if none specified
     let app_config = Config::load()?;
-    let requested_calendars = if config.calendars.is_empty() {
+    let requested_calendars = if (config.calendars.is_empty()) {
         vec![app_config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())]
     } else {
         // Validate that specified calendars exist
@@ -1041,12 +1047,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .collect();
 
         if !email_list.is_empty() {
-            debug!(
-                "Found {} email(s) for '{}' with exact match: {:?}",
-                email_list.len(),
-                name,
-                email_list
-            );
+            info!("Found {} email(s) for contact '{}': {:?}", email_list.len(), name, email_list);
             return Ok(email_list);
         }
     }
@@ -1099,15 +1100,15 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .filter(|email| validate_email(email))
             .collect();
 
-        if email_list.is_empty() {
-            debug!("No emails found for contact '{}'", name);
-        } else {
-            debug!(
+        if !email_list.is_empty() {
+            info!(
                 "Found {} email(s) for '{}' with contains match: {:?}",
                 email_list.len(),
                 name,
                 email_list
             );
+        } else {
+            debug!("No emails found for contact '{}'", name);
         }
 
         return Ok(email_list);
@@ -1120,35 +1121,49 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
 
 /// Enhanced event creation with contact lookup
 pub async fn create_event_with_contacts(config: EventConfig, contact_names: &[&str]) -> Result<()> {
-    // Look up emails for each contact name
+    info!("Creating event with {} contact names: {:?}", contact_names.len(), contact_names);
     let mut found_emails = Vec::new();
+
     for name in contact_names {
+        info!("Looking up contact: '{}'", name);
         match lookup_contact(name).await {
             Ok(emails) => {
                 if emails.is_empty() {
-                    debug!("No email found for contact: {}", name);
+                    info!("No email found for contact: '{}'", name);
                 } else {
-                    found_emails.extend(emails.into_iter().map(|e| e.trim().to_string()));
+                    info!("Found {} email(s) for contact '{}': {:?}", emails.len(), name, emails);
+                    found_emails.extend(emails.into_iter().filter(|e| validate_email(e)));
                 }
             }
             Err(e) => {
-                error!("Failed to lookup contact {}: {}", name, e);
+                error!("Failed to lookup contact '{}': {}", name, e);
             }
         }
     }
 
-    // Create a new config with the found emails
     let mut config = EventConfig {
         emails: Vec::with_capacity(config.emails.len() + found_emails.len()),
         ..config
     };
-    config.emails.extend(found_emails);
 
-    // Deduplicate and clean emails
-    config.emails.sort_unstable();
-    config.emails.dedup();
+    // First add any existing emails
+    if !config.emails.is_empty() {
+        info!("Adding {} existing email(s): {:?}", config.emails.len(), config.emails);
+        config.emails.extend(config.emails.clone());
+    }
 
-    // Create the event with the updated config
+    // Then add newly found emails
+    if !found_emails.is_empty() {
+        info!("Adding {} found email(s): {:?}", found_emails.len(), found_emails);
+        config.emails.extend(found_emails);
+
+        config.emails.sort_unstable();
+        config.emails.dedup();
+        info!("Final email list after deduplication: {}", config.emails.len());
+    } else {
+        info!("No emails found for any of the contacts");
+    }
+
     create_event(config).await
 }
 
