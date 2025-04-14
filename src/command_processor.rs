@@ -169,10 +169,10 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
 
         // Special handling for --contacts flag
         if token == "--contacts" && i + 1 < tokens.len() {
-            debug!("Found --contacts flag, checking for multi-word value");
+            debug!("Found --contacts flag, checking for multi-word/multi-contact value");
             result.push(token.clone());
-
-            // Get the next token (potential contact name)
+            
+            // Get the next token for reference
             let next_token = &tokens[i + 1];
             
             // Check if the value is already quoted properly - we'll keep it as is
@@ -185,45 +185,32 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
                 continue;
             }
             
-            // If not quoted, we need to check if the next tokens form a multi-word name
-            // or possibly multiple comma-separated names
+            // Need to collect all tokens that might be part of the contact string
+            // (until we hit another flag or end of input)
             let mut contact_parts = Vec::new();
-            contact_parts.push(next_token.clone());
-            let mut current_pos = i + 2;
+            let mut j = i + 1;
             
-            // Keep collecting tokens until we hit a flag, date format, or end
-            while current_pos < tokens.len() {
-                let current_token = &tokens[current_pos];
-                
-                // Stop if we hit a flag or date/time format
-                if current_token.starts_with("--") || 
-                   current_token.contains('-') || 
-                   current_token.contains(':') {
-                    break;
-                }
-                
-                // If we see a comma, it's a separator between contact names
-                if current_token == "," {
-                    // Add to our parts and continue
-                    contact_parts.push(current_token.clone());
-                    current_pos += 1;
-                    continue;
-                }
-                
-                // Otherwise, it's part of a contact name
-                contact_parts.push(current_token.clone());
-                current_pos += 1;
+            while j < tokens.len() && !tokens[j].starts_with("--") {
+                contact_parts.push(tokens[j].clone());
+                j += 1;
             }
             
-            // Now combine all collected parts into a properly quoted string
+            // If we have multiple parts, combine them
             if !contact_parts.is_empty() {
-                let combined = contact_parts.join(" ");
-                debug!("Combined contacts: '{}'", combined);
-                result.push(format!("\"{}\"", combined));
-                i = current_pos; // Skip to where we finished
+                let contact_str = contact_parts.join(" ");
+                debug!("Combined contact string: '{}'", contact_str);
+                
+                // Add quotes around the combined contact string if it's not already quoted
+                if (contact_str.starts_with('"') && contact_str.ends_with('"')) || 
+                   (contact_str.starts_with('\'') && contact_str.ends_with('\'')) {
+                    result.push(contact_str);
+                } else {
+                    result.push(format!("\"{}\"", contact_str));
+                }
+                
+                i = j; // Skip to the position after all contact parts
             } else {
-                // Fallback for empty case (shouldn't happen)
-                result.push(next_token.clone());
+                // No contact parts found (shouldn't normally happen)
                 i += 2;
             }
         }
