@@ -135,10 +135,6 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
   ```bash
   ducktape calendar create "Weekly Standup" 2025-04-15 09:00 09:30 "Work" --repeat weekly
   ```
-- Delete an event:
-  ```bash
-  ducktape calendar delete "Team Meeting"
-  ```
 
 #### Todo Commands
 - Create a todo:
