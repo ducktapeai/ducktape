@@ -132,7 +132,7 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 
 DuckTape uses a `config.toml` file located in the root of the repository to manage its settings. This file allows you to configure various aspects of the application, such as whether to use a language model (LLM) or operate in Terminal Mode.
 
-### Example Configuration
+## Example Configuration
 ```toml
 [language_model]
 provider = "OpenAI"  # Options: "OpenAI", "Grok", "DeepSeek", or leave empty for Terminal Mode
