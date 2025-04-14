@@ -102,44 +102,60 @@ impl CommandArgs {
 }
 
 /// Tokenizes the input command line, properly handling both escaped and regular quotes
+/// Tokenizes the input command line, properly handling both escaped and regular quotes
 fn tokenize_input(input: &str) -> Result<Vec<String>> {
     debug!("Starting tokenization of input: '{}'", input);
 
-    let mut tokens = Vec::new();
-    let mut current_token = String::new();
+    // Use shell_words for robust shell-like parsing
+    match shell_words::split(input) {
+        Ok(tokens) => {
+            // Post-process the tokens to handle special flags like --contacts
+            let processed_tokens = postprocess_flags(&tokens);
+            debug!("Tokenization result after post-processing: {:?}", processed_tokens);
+            Ok(processed_tokens)
+        }
+        Err(e) => {
+            debug!("shell_words parsing failed: {}, falling back to manual parsing", e);
+            // Fall back to our manual parser
+            let mut tokens = Vec::new();
+            let mut current_token = String::new();
 
-    // State variables
-    let mut in_quotes = false;
-    let mut escaped = false;
+            // State variables
+            let mut in_quotes = false;
+            let mut escaped = false;
 
-    for c in input.chars() {
-        if escaped {
-            current_token.push(c);
-            escaped = false;
-        } else if c == '\\' {
-            escaped = true;
-        } else if c == '"' {
-            in_quotes = !in_quotes;
-        } else if c.is_whitespace() && !in_quotes {
+            for c in input.chars() {
+                if escaped {
+                    current_token.push(c);
+                    escaped = false;
+                } else if c == '\\' {
+                    escaped = true;
+                } else if c == '"' {
+                    in_quotes = !in_quotes;
+                } else if c.is_whitespace() && !in_quotes {
+                    if !current_token.is_empty() {
+                        tokens.push(current_token);
+                        current_token = String::new();
+                    }
+                } else {
+                    current_token.push(c);
+                }
+            }
+
             if !current_token.is_empty() {
                 tokens.push(current_token);
-                current_token = String::new();
             }
-        } else {
-            current_token.push(c);
+
+            if in_quotes {
+                return Err(anyhow!("Unclosed quote in input"));
+            }
+
+            // Post-process the manually parsed tokens as well
+            let processed_tokens = postprocess_flags(&tokens);
+            debug!("Manual tokenization result after post-processing: {:?}", processed_tokens);
+            Ok(processed_tokens)
         }
     }
-
-    if !current_token.is_empty() {
-        tokens.push(current_token);
-    }
-
-    if in_quotes {
-        return Err(anyhow!("Unclosed quote in input"));
-    }
-
-    debug!("Tokenization result: {:?}", tokens);
-    Ok(tokens)
 }
 
 /// Post-processes flags to handle special cases
@@ -151,61 +167,64 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
         // Get the current token
         let token = &tokens[i];
 
-        // Special handling for --contacts flag to combine multi-word names
+        // Special handling for --contacts flag
         if token == "--contacts" && i + 1 < tokens.len() {
             debug!("Found --contacts flag, checking for multi-word value");
             result.push(token.clone());
 
-            // Check if the next token is quoted - if so, keep it as is
+            // Get the next token (potential contact name)
             let next_token = &tokens[i + 1];
-            if (next_token.starts_with('"') && next_token.ends_with('"'))
-                || (next_token.starts_with('\'') && next_token.ends_with('\''))
-            {
-                debug!("Found quoted contact name: {}", next_token);
+            
+            // Check if the value is already quoted properly
+            let (is_quoted, inner_value) = if (next_token.starts_with('"') && next_token.ends_with('"')) || 
+                                             (next_token.starts_with('\'') && next_token.ends_with('\'')) {
+                (true, next_token[1..next_token.len()-1].to_string())
+            } else {
+                (false, next_token.clone())
+            };
+
+            // If already quoted, keep as is
+            if is_quoted {
+                debug!("Using already quoted contact name: '{}'", next_token);
                 result.push(next_token.clone());
-                i += 2; // Skip the flag and the quoted value
+                i += 2; // Skip flag and quoted value
                 continue;
             }
-
-            // The next token is the first name (e.g., "Joe")
-            let first_name = &tokens[i + 1];
-
-            // Check if the second name exists and might be part of a name
+            
+            // If not quoted, check if we need to combine multiple tokens for multi-word names
             if i + 2 < tokens.len() {
-                let second_name = &tokens[i + 2];
-
-                // If the second name doesn't look like a flag or date/time value, combine them
-                if !second_name.starts_with("--")
-                    && !second_name.contains('-')
-                    && !second_name.contains(':')
-                {
-                    // Combine the names
-                    let combined_name = format!("{} {}", first_name, second_name);
-                    debug!(
-                        "Combined contact name: '{}' + '{}' = '{}'",
-                        first_name, second_name, combined_name
-                    );
-
-                    result.push(format!("\"{}\"", combined_name)); // Add quotes to keep it together
+                let second_token = &tokens[i + 2];
+                
+                // If second token doesn't look like a flag or date/time, it might be part of the name
+                if !second_token.starts_with("--") && 
+                   !second_token.contains('-') && 
+                   !second_token.contains(':') {
+                    
+                    // Combine the names and add proper quotes
+                    let combined_name = format!("{} {}", inner_value, second_token);
+                    debug!("Combined contact name: '{}' + '{}' = '{}'", inner_value, second_token, combined_name);
+                    
+                    // Add quotes around the combined name
+                    result.push(format!("\"{}\"", combined_name));
                     i += 3; // Skip the flag and both name parts
                 } else {
-                    // Just use the single name
-                    debug!("Using single contact name: '{}'", first_name);
-                    result.push(first_name.clone());
-                    i += 2; // Skip the flag and the single name
+                    // Single word name, add quotes for consistency
+                    debug!("Using single contact name with quotes: '{}'", inner_value);
+                    result.push(format!("\"{}\"", inner_value));
+                    i += 2; // Skip the flag and name
                 }
             } else {
-                // Just use the single name (no second name exists)
-                debug!("Using single contact name: '{}'", first_name);
-                result.push(first_name.clone());
-                i += 2; // Skip the flag and the single name
+                // Single word name at the end of the command
+                debug!("Using single contact name with quotes: '{}'", inner_value);
+                result.push(format!("\"{}\"", inner_value));
+                i += 2; // Skip the flag and name
             }
         }
-        // General case for other special flags
-        else if token.starts_with("--")
-            && ["location", "notes", "email"].contains(&&token[2..])
-            && i + 1 < tokens.len()
-        {
+        // Special handling for other flags that might need quoted values
+        else if token.starts_with("--") && 
+                ["location", "notes", "email", "contacts"].contains(&&token[2..]) && 
+                i + 1 < tokens.len() {
+                
             debug!("Found special flag: {}", token);
             result.push(token.clone());
 
@@ -222,7 +241,6 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
 
     result
 }
-
 /// Process calendar create command arguments to handle multi-word titles
 fn process_calendar_create_args(args: &mut Vec<String>) {
     if args.len() < 2 {
@@ -354,7 +372,7 @@ impl CommandHandler for CalendarHandler {
                         .map(|email| email.trim_matches('"').to_string());
 
                     let contacts = args.flags.get("contacts").cloned().flatten().map(|contact| {
-                        // Properly trim surrounding quotes
+                        // Properly trim surrounding quotes and maintain multi-word names
                         let trimmed = contact.trim_matches('"').trim_matches('\'').to_string();
                         debug!("Contacts flag value after trimming quotes: '{}'", trimmed);
                         trimmed
@@ -468,6 +486,7 @@ impl CommandHandler for CalendarHandler {
                         info!("Processing contacts string: '{}'", contacts_str);
 
                         // Process contact string and convert to a vector of string slices
+                        // First split by commas to handle multiple contacts
                         let contact_vec: Vec<&str> = contacts_str
                             .split(',')
                             .map(|s| s.trim())
@@ -476,7 +495,7 @@ impl CommandHandler for CalendarHandler {
 
                         if !contact_vec.is_empty() {
                             info!(
-                                "Creating event with {} contacts: {:?}",
+                                "Creating event with {} contact(s): {:?}",
                                 contact_vec.len(),
                                 contact_vec
                             );

@@ -1,13 +1,15 @@
-use ducktape::command_processor::{CommandArgs, CommandProcessor, preprocess_input, resolve_contacts};
-use ducktape::cli;
 use ducktape::api_server;
 use ducktape::app::Application;
+use ducktape::cli;
+use ducktape::command_processor::{
+    CommandArgs, CommandProcessor, preprocess_input, resolve_contacts,
+};
 use ducktape::config::Config;
-use ducktape::env_manager;
 use ducktape::env_debug;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
+use log::debug;
 use std::env;
 
 /// Name of the application used in help and version output
@@ -28,6 +30,11 @@ async fn main() -> Result<()> {
     // Force set the API key
     env_debug::force_set_api_key();
 
+    // Create a String from all command line args to preserve exact quoting
+    let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
+
+    debug!("Raw input from command line: '{}'", input);
+
     // Parse command line arguments using Clap
     let cli = cli::Cli::parse();
 
@@ -46,11 +53,9 @@ async fn main() -> Result<()> {
         return app.run().await;
     }
 
-    // If no special flags, check for commands
-    if let Some(command_args) = cli::convert_to_command_args(&cli) {
-        // Use the CommandProcessor with the extracted arguments
-        let processor = CommandProcessor::new();
-        return processor.execute(command_args).await;
+    // If we have command line arguments, process them directly
+    if !input.trim().is_empty() {
+        return app.process_command(&input).await;
     }
 
     // No command specified, run in terminal-only mode
@@ -60,7 +65,9 @@ async fn main() -> Result<()> {
 /// Unified command processing pipeline
 fn process_command(input: &str, mode: Mode) -> Result<()> {
     let preprocessed = preprocess_input(input);
-    let contacts = resolve_contacts(&preprocessed);
+
+    // We don't use contacts directly here, but store for later use
+    let _contacts = resolve_contacts(&preprocessed);
 
     match mode {
         Mode::Terminal => {

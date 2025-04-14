@@ -542,13 +542,25 @@ pub async fn get_available_calendars() -> Result<Vec<String>> {
 async fn create_single_event(config: EventConfig) -> Result<()> {
     debug!("Creating event with config: {:?}", config);
 
-    // Add explicit logging to help diagnose time issues
+    // Parse start datetime with improved date handling
+    let start_datetime = format!(
+        "{} {}",
+        config.start_date,
+        if config.all_day { "00:00" } else { &config.start_time }
+    );
+
+    debug!("Parsing start datetime: {}", start_datetime);
+
+    // Parse the date directly from user input, not using the current date components
+    let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
+        .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
+
+    // Log parsed components for debugging
     info!(
-        "Using explicit date components for event '{}': year={}, month={} ({}), day={}, raw_date={}",
-        config.title,
-        Local::now().year(),
-        Local::now().month(),
-        match Local::now().month() {
+        "Using explicitly parsed date components: year={}, month={} ({}), day={}, raw_date={}",
+        start_dt.year(),
+        start_dt.month(),
+        match start_dt.month() {
             1 => "January",
             2 => "February",
             3 => "March",
@@ -563,18 +575,9 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
             12 => "December",
             _ => "Unknown",
         },
-        Local::now().day(),
+        start_dt.day(),
         config.start_date
     );
-
-    // Parse start datetime with timezone handling
-    let start_datetime = format!(
-        "{} {}",
-        config.start_date,
-        if config.all_day { "00:00" } else { &config.start_time }
-    );
-    let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
-        .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
 
     // Convert to local timezone with consistent type
     let local_start = if let Some(tz_str) = config.timezone.as_deref() {
@@ -1634,5 +1637,27 @@ mod tests {
 
         let missing_title = vec!["date", "time", "location", "description"];
         assert!(!required.iter().all(|&req| missing_title.contains(&req)));
+    }
+
+    #[test]
+    fn test_date_parsing() {
+        // Test parsing and components of date strings
+        let date_str = "2025-04-15";
+        let time_str = "10:30";
+
+        let full_dt_str = format!("{} {}", date_str, time_str);
+        let dt = NaiveDateTime::parse_from_str(&full_dt_str, "%Y-%m-%d %H:%M").unwrap();
+
+        // Verify each component is correctly parsed
+        assert_eq!(dt.year(), 2025, "Year should be 2025");
+        assert_eq!(dt.month(), 4, "Month should be 4 (April)");
+        assert_eq!(dt.day(), 15, "Day should be 15");
+        assert_eq!(dt.hour(), 10, "Hour should be 10");
+        assert_eq!(dt.minute(), 30, "Minute should be 30");
+
+        // Test formatting of components for AppleScript
+        assert_eq!(dt.format("%Y").to_string(), "2025");
+        assert_eq!(dt.format("%-m").to_string(), "4"); // Month without leading zero
+        assert_eq!(dt.format("%-d").to_string(), "15"); // Day without leading zero
     }
 }
