@@ -175,49 +175,56 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
             // Get the next token (potential contact name)
             let next_token = &tokens[i + 1];
             
-            // Check if the value is already quoted properly
-            let (is_quoted, inner_value) = if (next_token.starts_with('"') && next_token.ends_with('"')) || 
-                                             (next_token.starts_with('\'') && next_token.ends_with('\'')) {
-                (true, next_token[1..next_token.len()-1].to_string())
-            } else {
-                (false, next_token.clone())
-            };
-
-            // If already quoted, keep as is
-            if is_quoted {
-                debug!("Using already quoted contact name: '{}'", next_token);
+            // Check if the value is already quoted properly - we'll keep it as is
+            // as it might contain comma-separated values that should be preserved
+            if (next_token.starts_with('"') && next_token.ends_with('"')) || 
+               (next_token.starts_with('\'') && next_token.ends_with('\'')) {
+                debug!("Using quoted contacts list: '{}'", next_token);
                 result.push(next_token.clone());
                 i += 2; // Skip flag and quoted value
                 continue;
             }
             
-            // If not quoted, check if we need to combine multiple tokens for multi-word names
-            if i + 2 < tokens.len() {
-                let second_token = &tokens[i + 2];
+            // If not quoted, we need to check if the next tokens form a multi-word name
+            // or possibly multiple comma-separated names
+            let mut contact_parts = Vec::new();
+            contact_parts.push(next_token.clone());
+            let mut current_pos = i + 2;
+            
+            // Keep collecting tokens until we hit a flag, date format, or end
+            while current_pos < tokens.len() {
+                let current_token = &tokens[current_pos];
                 
-                // If second token doesn't look like a flag or date/time, it might be part of the name
-                if !second_token.starts_with("--") && 
-                   !second_token.contains('-') && 
-                   !second_token.contains(':') {
-                    
-                    // Combine the names and add proper quotes
-                    let combined_name = format!("{} {}", inner_value, second_token);
-                    debug!("Combined contact name: '{}' + '{}' = '{}'", inner_value, second_token, combined_name);
-                    
-                    // Add quotes around the combined name
-                    result.push(format!("\"{}\"", combined_name));
-                    i += 3; // Skip the flag and both name parts
-                } else {
-                    // Single word name, add quotes for consistency
-                    debug!("Using single contact name with quotes: '{}'", inner_value);
-                    result.push(format!("\"{}\"", inner_value));
-                    i += 2; // Skip the flag and name
+                // Stop if we hit a flag or date/time format
+                if current_token.starts_with("--") || 
+                   current_token.contains('-') || 
+                   current_token.contains(':') {
+                    break;
                 }
+                
+                // If we see a comma, it's a separator between contact names
+                if current_token == "," {
+                    // Add to our parts and continue
+                    contact_parts.push(current_token.clone());
+                    current_pos += 1;
+                    continue;
+                }
+                
+                // Otherwise, it's part of a contact name
+                contact_parts.push(current_token.clone());
+                current_pos += 1;
+            }
+            
+            // Now combine all collected parts into a properly quoted string
+            if !contact_parts.is_empty() {
+                let combined = contact_parts.join(" ");
+                debug!("Combined contacts: '{}'", combined);
+                result.push(format!("\"{}\"", combined));
+                i = current_pos; // Skip to where we finished
             } else {
-                // Single word name at the end of the command
-                debug!("Using single contact name with quotes: '{}'", inner_value);
-                result.push(format!("\"{}\"", inner_value));
-                i += 2; // Skip the flag and name
+                // Fallback for empty case (shouldn't happen)
+                result.push(next_token.clone());
+                i += 2;
             }
         }
         // Special handling for other flags that might need quoted values
