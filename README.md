@@ -83,7 +83,10 @@ source ~/.zshrc
 
 1. Open your terminal.
 2. Type Ducktape and click enter. This will place you in the interactive Natural Language terminal.
-3. Then type in what you want to do with natural language commands:
+3.    ```bash
+   Ducktape
+   ```
+4. Then type in what you want to do with natural language commands:
    ```bash
    create an event roadtrip with Joe Blogs for this coming Tuesday
    ```
