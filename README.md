@@ -79,35 +79,14 @@ echo "export DEEPSEEK_API_KEY='your-deepseek-api-key-here'" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### Configure Your Language Model Provider
-
-Edit your `config.toml` file to set your preferred language model provider:
-
-```toml
-[language_model]
-provider = "grok"  # Options: "openai", "grok", "deepseek"
-```
-
 #### Running in Natural Language Mode
 
-There are two ways to use natural language with DuckTape:
-
-1. **Interactive Terminal Mode** (Recommended):
+1. Open your terminal.
+2. Type Ducktape and click enter. This will place you in the interactive Natural Language terminal.
+3. Then type in what you want to do with natural language commands:
    ```bash
-   # Start the interactive terminal
-   ducktape
-   
-   # Then type your natural language request at the prompt
-   🦆 create an event Team Meeting with Joe Bloggs for this coming Tuesday
+   create an event roadtrip with Joe Blogs for this coming Tuesday
    ```
-
-2. **Command Line Mode**:
-   ```bash
-   # Run ducktape with the interactive terminal
-   ducktape
-   ```
-   
-   The interactive terminal provides real-time feedback and is the most reliable way to use natural language processing with DuckTape.
 
 ### 2. Terminal Mode (No API Key Required)
 
