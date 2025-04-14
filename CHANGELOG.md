@@ -13,6 +13,11 @@
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
 
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
 ## [0.11.18] - 2025-04-14
 ### Changed
 - Started new development cycle with minor version bump
@@ -269,5 +274,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.11.17]: https://github.com/ducktapeai/ducktape/compare/v0.11.16...v0.11.17
 [0.11.18]: https://github.com/ducktapeai/ducktape/compare/v0.11.17...v0.11.18
 [0.11.19]: https://github.com/ducktapeai/ducktape/compare/v0.11.18...v0.11.19
+[0.11.19]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.19
 [0.11.19]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.19
 [0.11.19]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.19
