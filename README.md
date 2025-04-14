@@ -93,7 +93,7 @@ source ~/.zshrc
 ----
 ### Example Commands
 
-## Natural Language Examples
+### Natural Language Examples
 - "schedule a meeting with John tomorrow at 2pm"
 - "create a weekly team meeting every Tuesday at 10am"
 - "schedule a Zoom meeting with the team tomorrow at 3pm"
