@@ -113,9 +113,11 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 
 ---
 ### Terminal Command Examples
+
+#### Calendar Commands
 - List all calendars:
   ```bash
-  ducktape calendars
+  ducktape calendar list
   ```
 - Create a calendar event:
   ```bash
@@ -124,6 +126,74 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 - Add attendees by email:
   ```bash
   ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "john@example.com,jane@example.com"
+  ```
+- Create an event with a Zoom meeting:
+  ```bash
+  ducktape calendar create "Team Meeting" 2025-04-15 10:00 11:00 "Work" --zoom
+  ```
+- Create a recurring event:
+  ```bash
+  ducktape calendar create "Weekly Standup" 2025-04-15 09:00 09:30 "Work" --repeat weekly
+  ```
+- Delete an event:
+  ```bash
+  ducktape calendar delete "Team Meeting"
+  ```
+
+#### Todo Commands
+- Create a todo:
+  ```bash
+  ducktape todo create "Buy groceries" "Reminders"
+  ```
+- List todos:
+  ```bash
+  ducktape todo list
+  ```
+- Delete a todo:
+  ```bash
+  ducktape todo delete "Buy groceries"
+  ```
+
+#### Notes Commands
+- Create a note:
+  ```bash
+  ducktape note create "Project ideas" "Content for the note"
+  ```
+- List notes:
+  ```bash
+  ducktape note list
+  ```
+- Search notes:
+  ```bash
+  ducktape note search "project"
+  ```
+- Delete a note:
+  ```bash
+  ducktape note delete "Project ideas"
+  ```
+
+#### Configuration Commands
+- Show configuration:
+  ```bash
+  ducktape config show all
+  ```
+- Set default calendar:
+  ```bash
+  ducktape config set calendar.default "Work"
+  ```
+- Set language model provider:
+  ```bash
+  ducktape config set language_model.provider "grok"
+  ```
+
+#### Utility Commands
+- Show version:
+  ```bash
+  ducktape --version
+  ```
+- Show help:
+  ```bash
+  ducktape --help
   ```
 
 ---
