@@ -171,43 +171,45 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
         if token == "--contacts" && i + 1 < tokens.len() {
             debug!("Found --contacts flag, checking for multi-word/multi-contact value");
             result.push(token.clone());
-            
+
             // Get the next token for reference
             let next_token = &tokens[i + 1];
-            
+
             // Check if the value is already quoted properly - we'll keep it as is
             // as it might contain comma-separated values that should be preserved
-            if (next_token.starts_with('"') && next_token.ends_with('"')) || 
-               (next_token.starts_with('\'') && next_token.ends_with('\'')) {
+            if (next_token.starts_with('"') && next_token.ends_with('"'))
+                || (next_token.starts_with('\'') && next_token.ends_with('\''))
+            {
                 debug!("Using quoted contacts list: '{}'", next_token);
                 result.push(next_token.clone());
                 i += 2; // Skip flag and quoted value
                 continue;
             }
-            
+
             // Need to collect all tokens that might be part of the contact string
             // (until we hit another flag or end of input)
             let mut contact_parts = Vec::new();
             let mut j = i + 1;
-            
+
             while j < tokens.len() && !tokens[j].starts_with("--") {
                 contact_parts.push(tokens[j].clone());
                 j += 1;
             }
-            
+
             // If we have multiple parts, combine them
             if !contact_parts.is_empty() {
                 let contact_str = contact_parts.join(" ");
                 debug!("Combined contact string: '{}'", contact_str);
-                
+
                 // Add quotes around the combined contact string if it's not already quoted
-                if (contact_str.starts_with('"') && contact_str.ends_with('"')) || 
-                   (contact_str.starts_with('\'') && contact_str.ends_with('\'')) {
+                if (contact_str.starts_with('"') && contact_str.ends_with('"'))
+                    || (contact_str.starts_with('\'') && contact_str.ends_with('\''))
+                {
                     result.push(contact_str);
                 } else {
                     result.push(format!("\"{}\"", contact_str));
                 }
-                
+
                 i = j; // Skip to the position after all contact parts
             } else {
                 // No contact parts found (shouldn't normally happen)
@@ -215,10 +217,10 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
             }
         }
         // Special handling for other flags that might need quoted values
-        else if token.starts_with("--") && 
-                ["location", "notes", "email", "contacts"].contains(&&token[2..]) && 
-                i + 1 < tokens.len() {
-                
+        else if token.starts_with("--")
+            && ["location", "notes", "email", "contacts"].contains(&&token[2..])
+            && i + 1 < tokens.len()
+        {
             debug!("Found special flag: {}", token);
             result.push(token.clone());
 
