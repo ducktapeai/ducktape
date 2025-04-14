@@ -90,6 +90,14 @@ source ~/.zshrc
    ```bash
    create an event roadtrip with Joe Blogs for this coming Tuesday
    ```
+----
+### Example Commands
+
+## Natural Language Examples
+- "schedule a meeting with John tomorrow at 2pm"
+- "create a weekly team meeting every Tuesday at 10am"
+- "schedule a Zoom meeting with the team tomorrow at 3pm"
+- "create an event for my dentist appointment next Friday at 2pm"   
 
 ### 2. Terminal Mode (No API Key Required)
 
@@ -104,15 +112,6 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
    ```
 
 ---
-
-## Example Commands
-
-### Natural Language Examples
-- "schedule a meeting with John tomorrow at 2pm"
-- "create a weekly team meeting every Tuesday at 10am"
-- "schedule a Zoom meeting with the team tomorrow at 3pm"
-- "create an event for my dentist appointment next Friday at 2pm"
-
 ### Terminal Command Examples
 - List all calendars:
   ```bash
