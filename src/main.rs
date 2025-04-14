@@ -1,32 +1,13 @@
-mod api_server;
-mod app;
-mod calendar;
-mod calendar_legacy;
-mod cli;
-mod command_parser;
-mod command_processor;
-mod config;
-mod contact_groups;
-// Temporarily commenting out problematic parsers to get the build working
-// mod deepseek_parser;
-// mod deepseek_reasoning;
-mod env_debug;
-mod event_search;
-mod file_search;
-// mod grok_parser;
-mod notes;
-// mod openai_parser;
-mod parser_trait; // Adding parser_trait directly to main for terminal mode
-mod reminders;
-mod state;
-mod todo;
-mod zoom;
+use ducktape::command_processor::{CommandArgs, CommandProcessor, preprocess_input, resolve_contacts};
+use ducktape::cli;
+use ducktape::api_server;
+use ducktape::app::Application;
+use ducktape::config::Config;
+use ducktape::env_manager;
+use ducktape::env_debug;
 
-use crate::command_processor::{CommandArgs, CommandProcessor, preprocess_input, resolve_contacts};
-use anyhow::Result;
-use app::Application;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use config::Config;
 use std::env;
 
 /// Name of the application used in help and version output
@@ -83,14 +64,61 @@ fn process_command(input: &str, mode: Mode) -> Result<()> {
 
     match mode {
         Mode::Terminal => {
-            // Directly execute the command
-            let args = CommandArgs::parse(&preprocessed)?;
-            let processor = CommandProcessor::new();
-            tokio::runtime::Runtime::new()?.block_on(processor.execute(args))
+            // Format the input into argv style for clap
+            let args = shell_words::split(&preprocessed)
+                .map_err(|e| anyhow!("Failed to parse command: {}", e))?;
+
+            // Check if we have any arguments
+            if args.is_empty() {
+                return Err(anyhow!("Empty command"));
+            }
+
+            // Try using Clap to parse the command
+            match cli::Cli::try_parse_from(&args) {
+                Ok(cli) => {
+                    // Convert from Clap command to CommandArgs
+                    if let Some(command_args) = cli::convert_to_command_args(&cli) {
+                        let processor = CommandProcessor::new();
+                        tokio::runtime::Runtime::new()?.block_on(processor.execute(command_args))
+                    } else {
+                        // If there's no command, just return Ok
+                        Ok(())
+                    }
+                }
+                Err(_) => {
+                    // Fall back to legacy parser if Clap fails
+                    // This is useful for backward compatibility
+                    let args = CommandArgs::parse(&preprocessed)?;
+                    let processor = CommandProcessor::new();
+                    tokio::runtime::Runtime::new()?.block_on(processor.execute(args))
+                }
+            }
         }
         Mode::NaturalLanguage => {
             // Translate natural language to structured command
             let translated_command = translate_to_command(&preprocessed)?;
+
+            // Try parsing with Clap first
+            let args = shell_words::split(&translated_command)
+                .map_err(|e| anyhow!("Failed to parse translated command: {}", e))?;
+
+            if !args.is_empty() {
+                match cli::Cli::try_parse_from(&args) {
+                    Ok(cli) => {
+                        // Convert from Clap command to CommandArgs
+                        if let Some(command_args) = cli::convert_to_command_args(&cli) {
+                            let processor = CommandProcessor::new();
+                            return tokio::runtime::Runtime::new()?
+                                .block_on(processor.execute(command_args));
+                        }
+                    }
+                    Err(_) => {
+                        // Fall back to legacy parser
+                    }
+                }
+            }
+
+            // Fall back to legacy parser
             let args = CommandArgs::parse(&translated_command)?;
             let processor = CommandProcessor::new();
             tokio::runtime::Runtime::new()?.block_on(processor.execute(args))

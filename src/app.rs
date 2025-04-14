@@ -1,6 +1,8 @@
 use crate::command_processor::{CommandArgs, CommandProcessor};
 use crate::config::{Config, LLMProvider};
+use crate::{cli, deepseek_parser, grok_parser, openai_parser};
 use anyhow::{Result, anyhow};
+use clap::Parser;
 use rustyline::DefaultEditor;
 
 pub struct Application {
@@ -151,7 +153,16 @@ impl Application {
 
         if Config::load()?.language_model.provider.is_none() {
             log::info!("Terminal Mode: Direct command processing only");
-            return self.command_processor.execute(CommandArgs::parse(&preprocessed_input)?).await;
+            // Try to parse with Clap first
+            let command_args = match self.parse_command_string(&preprocessed_input) {
+                Ok(args) => args,
+                Err(_) => {
+                    // Fall back to the legacy parser if Clap parsing fails
+                    // This is useful for backward compatibility
+                    CommandArgs::parse(&preprocessed_input)?
+                }
+            };
+            return self.command_processor.execute(command_args).await;
         }
 
         // Add "ducktape" prefix if missing for consistency
@@ -203,9 +214,16 @@ impl Application {
             || processed_input.contains("calendar add")
         {
             // Check if it has a start time but no end time
-            let parts = match CommandArgs::parse(&processed_input) {
-                Ok(parsed_args) => parsed_args.args,
-                Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
+            // Try to use Clap parser first, fall back to legacy parser if needed
+            let parts = match self.parse_command_string(&processed_input) {
+                Ok(args) => args.args,
+                Err(_) => {
+                    // Fall back to legacy parser
+                    match CommandArgs::parse(&processed_input) {
+                        Ok(parsed_args) => parsed_args.args,
+                        Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
+                    }
+                }
             };
 
             let mut has_start_time = false;
@@ -245,10 +263,17 @@ impl Application {
                         new_parts.insert(start_time_index + 1, end_time);
                         let fixed_command = new_parts.join(" ");
                         log::info!("Added missing end time. Fixed command: {}", fixed_command);
-                        return self
-                            .command_processor
-                            .execute(CommandArgs::parse(&fixed_command)?)
-                            .await;
+
+                        // Try to parse with Clap first
+                        let command_args = match self.parse_command_string(&fixed_command) {
+                            Ok(args) => args,
+                            Err(_) => {
+                                // Fall back to legacy parser
+                                CommandArgs::parse(&fixed_command)?
+                            }
+                        };
+
+                        return self.command_processor.execute(command_args).await;
                     }
                 }
             }
@@ -259,10 +284,19 @@ impl Application {
         };
 
         // Parse the processed command into arguments
-        match CommandArgs::parse(&final_command) {
-            Ok(args) => self.command_processor.execute(args).await,
-            Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
-        }
+        // First try with Clap parser
+        let command_args = match self.parse_command_string(&final_command) {
+            Ok(args) => args,
+            Err(_) => {
+                // Fall back to legacy parser
+                match CommandArgs::parse(&final_command) {
+                    Ok(args) => args,
+                    Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
+                }
+            }
+        };
+
+        self.command_processor.execute(command_args).await
     }
 
     async fn process_natural_language(&self, input: &str) -> Result<()> {
@@ -281,18 +315,27 @@ impl Application {
 
                 // Check if the generated command starts with ducktape
                 if sanitized_command.starts_with("ducktape") {
-                    // Parse the command into arguments and handle quotes properly
-                    let mut args = CommandArgs::parse(&sanitized_command)?;
+                    // Try to use the Clap parser first
+                    match self.parse_command_string(&sanitized_command) {
+                        Ok(args) => {
+                            log::debug!("Final parsed arguments: {:?}", args);
+                            self.command_processor.execute(args).await
+                        }
+                        Err(_) => {
+                            // Fall back to legacy parser if Clap fails
+                            let mut args = CommandArgs::parse(&sanitized_command)?;
 
-                    // Further sanitize individual arguments to remove any remaining quotes
-                    args.args = args
-                        .args
-                        .into_iter()
-                        .map(|arg| arg.trim_matches('"').to_string())
-                        .collect();
+                            // Further sanitize individual arguments to remove any remaining quotes
+                            args.args = args
+                                .args
+                                .into_iter()
+                                .map(|arg| arg.trim_matches('"').to_string())
+                                .collect();
 
-                    log::debug!("Final parsed arguments: {:?}", args);
-                    self.command_processor.execute(args).await
+                            log::debug!("Final parsed arguments (legacy): {:?}", args);
+                            self.command_processor.execute(args).await
+                        }
+                    }
                 } else {
                     println!(
                         "Generated command doesn't start with 'ducktape': {}",
@@ -322,6 +365,31 @@ impl Application {
             })
             .collect::<Vec<_>>()
             .join(" ")
+    }
+
+    /// Helper method to parse a command string using Clap instead of the deprecated CommandArgs::parse
+    fn parse_command_string(&self, input: &str) -> Result<CommandArgs> {
+        // Format the input into argv style for clap
+        let args =
+            shell_words::split(input).map_err(|e| anyhow!("Failed to parse command: {}", e))?;
+
+        // Check if we have any arguments
+        if args.is_empty() {
+            return Err(anyhow!("Empty command"));
+        }
+
+        // Parse using Clap
+        let cli = match crate::cli::Cli::try_parse_from(&args) {
+            Ok(cli) => cli,
+            Err(e) => {
+                // This is likely not a structured command but a natural language input
+                return Err(anyhow!("Not a structured command: {}", e));
+            }
+        };
+
+        // Convert from Clap command to CommandArgs
+        crate::cli::convert_to_command_args(&cli)
+            .ok_or_else(|| anyhow!("Failed to convert parsed command to CommandArgs"))
     }
 }
 

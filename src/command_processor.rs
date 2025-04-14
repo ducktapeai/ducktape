@@ -1043,15 +1043,18 @@ pub fn print_help() -> Result<()> {
 /// Helper function to properly process contact names from command string
 /// Handles both comma-separated lists and multi-word contact names
 fn process_contact_string(contacts_str: &str) -> Vec<&str> {
-    // Check if the contact string contains spaces but no commas
-    // This handles the case where a single contact name has multiple words
-    if !contacts_str.contains(',') && contacts_str.contains(' ') {
-        // Treat the entire string as one contact name if it has spaces but no commas
-        vec![contacts_str.trim()]
-    } else {
-        // Otherwise, split by comma as usual for multiple contacts
-        contacts_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect()
-    }
+    debug!("Processing contact string: '{}'", contacts_str);
+
+    // First trim any surrounding quotes that might have been preserved
+    let trimmed = contacts_str.trim_matches('"').trim_matches('\'').trim();
+    debug!("After trimming quotes: '{}'", trimmed);
+
+    // Split by commas, handling both single contact and multiple contacts
+    let contacts: Vec<&str> =
+        trimmed.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+
+    debug!("Detected contacts: {:?}", contacts);
+    contacts
 }
 
 // Command processor that manages handlers and executes commands
@@ -1107,23 +1110,6 @@ impl CommandProcessor {
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
     }
-}
-
-/// Helper function to properly process contact names from command string
-/// Handles both comma-separated lists and multi-word contact names
-fn process_contact_string(contacts_str: &str) -> Vec<&str> {
-    debug!("Processing contact string: '{}'", contacts_str);
-
-    // First trim any surrounding quotes that might have been preserved
-    let trimmed = contacts_str.trim_matches('"').trim_matches('\'').trim();
-    debug!("After trimming quotes: '{}'", trimmed);
-
-    // Split by commas, handling both single contact and multiple contacts
-    let contacts: Vec<&str> =
-        trimmed.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-
-    debug!("Detected contacts: {:?}", contacts);
-    contacts
 }
 
 /// Centralized function to resolve contacts from input

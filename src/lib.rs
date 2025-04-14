@@ -2,7 +2,7 @@ pub mod api_server;
 pub mod app;
 pub mod calendar;
 pub mod calendar_legacy;
-// pub mod cli;  // Commented out if it doesn't exist
+pub mod cli; // Added cli module
 pub mod command_parser;
 pub mod command_processor; // New command processor module
 // pub mod commands; // Removed commands module
@@ -11,6 +11,7 @@ pub mod contact_groups;
 // pub mod contacts;  // Commented out if it doesn't exist
 pub mod deepseek_parser;
 pub mod deepseek_reasoning;
+pub mod env_debug; // Add this line to expose the env_debug module
 pub mod env_loader; // Add this line
 pub mod env_store; // Add this line
 pub mod event_search;
