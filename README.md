@@ -79,7 +79,7 @@ echo "export DEEPSEEK_API_KEY='your-deepseek-api-key-here'" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### Running in Natural Language Mode
+#### Running in Natural Language Mode. (API Key Required)
 
 1. Open your terminal.
 2. Type Ducktape and click enter. This will place you in the interactive Natural Language terminal.
