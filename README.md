@@ -2,7 +2,28 @@
 
 DuckTape is an AI-powered command-line interface that simplifies managing your Apple Calendar, Reminders, and Notes. With DuckTape, you can use two distinct approaches: **Natural Language Mode** and **Terminal Mode**.
 
-> **Note**: DuckTape currently only works on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
+> **Note**: DuckTape currently### Advanced Features
+
+### Zoom Integration
+DuckTape can create Zoom meetings directly from both Terminal Mode and Natural Language Mode. To enable this feature, set the following environment variables:
+
+```bash
+export ZOOM_ACCOUNT_ID='your-zoom-account-id'
+export ZOOM_CLIENT_ID='your-zoom-client-id'
+export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
+```
+
+#### Creating Zoom Meetings
+
+Using Terminal Mode:
+```bash
+ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
+```
+
+Using Natural Language Mode:
+```
+🦆 ducktape "create a zoom meeting called Team Meeting with Joe Bloggs for this coming Tuesday"
+```s on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
 > DuckTape will use your native Apple capabilities, for example Apple Contacts, Apple Todo and so forth. Please ensure these Applications are properly setup and configured as outlined above.
 
 ---
@@ -79,37 +100,47 @@ echo "export DEEPSEEK_API_KEY='your-deepseek-api-key-here'" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### Running in Natural Language Mode. (API Key Required)
+#### Running in Natural Language Mode (API Key Required)
 
 1. Open your terminal.
-2. Type Ducktape and click enter. This will place you in the interactive Natural Language terminal.
+2. Type `ducktape` and press enter. This will place you in the interactive Natural Language terminal:
    ```bash
-   Ducktape
+   ducktape
    ```
-3. Then type in what you want to do with natural language commands:
-   ```bash
-   create an event roadtrip with Joe Blogs for this coming Tuesday
+3. You'll see a welcome message. Then type your request using natural language:
    ```
+   🦆 ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"
+   ```
+4. DuckTape will process your natural language request and execute the appropriate command:
+   ```
+   Processing natural language: 'ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"'
+   Translated to command: ducktape calendar create "Team Meeting" 2025-04-22 11:00 12:00 "Work" --contacts "Joe Bloggs"
+   ```
+
+The power of the Natural Language Mode is that it automatically interprets dates, times, and contacts, saving you time and effort.
 ----
 ### Example Commands
 
 ### Natural Language Examples
-- "schedule a meeting with John tomorrow at 2pm"
-- "create a weekly team meeting every Tuesday at 10am"
-- "schedule a Zoom meeting with the team tomorrow at 3pm"
-- "create an event for my dentist appointment next Friday at 2pm"   
+- `ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"`
+- `ducktape "create a zoom meeting called Team Meeting with Joe Bloggs for this coming Tuesday"`
+- `ducktape "schedule a meeting with Joe Bloggs tomorrow at 2pm about project review"`
+- `ducktape "create a weekly team meeting every Tuesday at 10am"`
+- `ducktape "add a reminder to buy groceries next Monday morning"`
 
 ### 2. Terminal Mode (No API Key Required)
 
-In this mode, DuckTape operates as a traditional command-line interface (CLI) where you can directly execute commands without requiring any API keys.
+In this mode, DuckTape operates as a traditional command-line interface (CLI) where you directly execute structured commands without requiring any API keys.
 
 #### Running in Terminal Mode
 
 1. Open your terminal.
-2. Use explicit commands to interact with DuckTape:
+2. Use explicit commands with the appropriate syntax to interact with DuckTape:
    ```bash
-   ducktape calendar create "Team-Meeting" 2025-04-15 10:00 11:00 "Work"
+   ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
    ```
+   
+This command explicitly specifies all parameters: event title, date, start time, end time, calendar name, contacts, and the zoom flag to create a meeting link.
 
 ---
 ### Terminal Command Examples
@@ -125,11 +156,11 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
   ```
 - Add attendees by email:
   ```bash
-  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "john@example.com,jane@example.com"
+  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "joe.bloggs@example.com,jane.doe@example.com"
   ```
-- Create an event with a Zoom meeting:
+- Create an event with a Zoom meeting and contacts:
   ```bash
-  ducktape calendar create "Team Meeting" 2025-04-15 10:00 11:00 "Work" --zoom
+  ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
   ```
 - Create a recurring event:
   ```bash
