@@ -1027,6 +1027,23 @@ impl CommandHandler for HelpHandler {
     }
 }
 
+// Exit handler
+#[derive(Debug)]
+pub struct ExitHandler;
+
+impl CommandHandler for ExitHandler {
+    fn execute(&self, _args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
+        Box::pin(async move {
+            println!("Exiting DuckTape...");
+            std::process::exit(0);
+        })
+    }
+
+    fn can_handle(&self, command: &str) -> bool {
+        command == "exit" || command == "quit"
+    }
+}
+
 // Print help information
 pub fn print_help() -> Result<()> {
     println!("DuckTape - A tool for interacting with Apple Calendar, Notes, and Reminders");
@@ -1043,6 +1060,7 @@ pub fn print_help() -> Result<()> {
     println!("  utils     Utility commands");
     println!("  help      Show this help message");
     println!("  version   Show version information");
+    println!("  exit      Exit the application");
     println!();
     println!("For more information on a specific command, run:");
     println!("  ducktape [COMMAND] --help");
@@ -1089,6 +1107,7 @@ impl CommandProcessor {
             Box::new(ContactGroupsHandler),
             Box::new(VersionHandler),
             Box::new(HelpHandler),
+            Box::new(ExitHandler),
         ];
         Self { handlers }
     }
