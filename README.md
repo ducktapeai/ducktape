@@ -17,12 +17,12 @@ export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
 
 Using Terminal Mode:
 ```bash
-ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
+ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
 ```
 
 Using Natural Language Mode:
 ```
-🦆 ducktape "create a zoom meeting called Team Meeting with Joe Bloggs for this coming Tuesday"
+🦆 ducktape "create a zoom meeting called Team Meeting with Joe Duck for this coming Tuesday"
 ```s on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
 > DuckTape will use your native Apple capabilities, for example Apple Contacts, Apple Todo and so forth. Please ensure these Applications are properly setup and configured as outlined above.
 
@@ -109,12 +109,12 @@ source ~/.zshrc
    ```
 3. You'll see a welcome message. Then type your request using natural language:
    ```
-   🦆 ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"
+   🦆 ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"
    ```
 4. DuckTape will process your natural language request and execute the appropriate command:
    ```
-   Processing natural language: 'ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"'
-   Translated to command: ducktape calendar create "Team Meeting" 2025-04-22 11:00 12:00 "Work" --contacts "Joe Bloggs"
+   Processing natural language: 'ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"'
+   Translated to command: ducktape calendar create "Team Meeting" 2025-04-22 11:00 12:00 "Work" --contacts "Joe Duck"
    ```
 
 The power of the Natural Language Mode is that it automatically interprets dates, times, and contacts, saving you time and effort.
@@ -122,9 +122,9 @@ The power of the Natural Language Mode is that it automatically interprets dates
 ### Example Commands
 
 ### Natural Language Examples
-- `ducktape "create an event Team Meeting with Joe Bloggs for this coming Tuesday"`
-- `ducktape "create a zoom meeting called Team Meeting with Joe Bloggs for this coming Tuesday"`
-- `ducktape "schedule a meeting with Joe Bloggs tomorrow at 2pm about project review"`
+- `ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"`
+- `ducktape "create a zoom meeting called Team Meeting with Joe Duck for this coming Tuesday"`
+- `ducktape "schedule a meeting with Joe Duck tomorrow at 2pm about project review"`
 - `ducktape "create a weekly team meeting every Tuesday at 10am"`
 - `ducktape "add a reminder to buy groceries next Monday morning"`
 
@@ -137,7 +137,7 @@ In this mode, DuckTape operates as a traditional command-line interface (CLI) wh
 1. Open your terminal.
 2. Use explicit commands with the appropriate syntax to interact with DuckTape:
    ```bash
-   ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
+   ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
    ```
    
 This command explicitly specifies all parameters: event title, date, start time, end time, calendar name, contacts, and the zoom flag to create a meeting link.
@@ -156,11 +156,11 @@ This command explicitly specifies all parameters: event title, date, start time,
   ```
 - Add attendees by email:
   ```bash
-  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "joe.bloggs@example.com,jane.doe@example.com"
+  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "joe.Duck@example.com,jane.doe@example.com"
   ```
 - Create an event with a Zoom meeting and contacts:
   ```bash
-  ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Bloggs" --zoom
+  ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
   ```
 - Create a recurring event:
   ```bash
