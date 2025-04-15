@@ -1,0 +1,63 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ducktape
+        uses: actions/checkout@v3
+        with:
+          path: ducktape
+
+      - name: Get release details
+        id: release
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          
+      - name: Checkout homebrew-ducktape
+        uses: actions/checkout@v3
+        with:
+          repository: ducktapeai/homebrew-ducktape
+          path: homebrew-ducktape
+          token: ${{ secrets.HOMEBREW_REPO_TOKEN }}
+
+      - name: Download release artifact and compute SHA256
+        id: sha
+        run: |
+          # Get the tarball URL for the current release
+          TARBALL_URL="https://github.com/ducktapeai/ducktape/archive/v${{ steps.release.outputs.version }}.tar.gz"
+          
+          # Download the tarball and compute SHA256
+          curl -L -o release.tar.gz $TARBALL_URL
+          SHA256=$(sha256sum release.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "Tarball URL: $TARBALL_URL"
+          echo "SHA256: $SHA256"
+      
+      - name: Update formula
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          SHA="${{ steps.sha.outputs.sha256 }}"
+          FORMULA_PATH="homebrew-ducktape/Formula/ducktape.rb"
+          
+          # Update version and sha256 in the formula
+          sed -i "s|  url \".*\"|  url \"https://github.com/ducktapeai/ducktape/archive/v${VERSION}.tar.gz\"|" $FORMULA_PATH
+          sed -i "s|  sha256 \".*\"|  sha256 \"${SHA}\"|" $FORMULA_PATH
+          sed -i "s|  version \".*\"|  version \"${VERSION}\"|" $FORMULA_PATH
+          
+          cat $FORMULA_PATH
+      
+      - name: Commit and push changes
+        run: |
+          cd homebrew-ducktape
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add Formula/ducktape.rb
+          git commit -m "Update formula to v${{ steps.release.outputs.version }}"
+          git push
