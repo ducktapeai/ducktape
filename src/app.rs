@@ -129,16 +129,20 @@ impl Application {
 
     async fn process_input(&self, input: &str, use_natural_language: bool) -> Result<()> {
         log::debug!("Inside process_input: use_natural_language = {}", use_natural_language);
-        
+
         // Check for direct exit command regardless of mode
         let preprocessed = crate::command_processor::preprocess_input(input);
-        if preprocessed == "exit" || preprocessed == "quit" || preprocessed == "ducktape exit" || preprocessed == "ducktape quit" {
+        if preprocessed == "exit"
+            || preprocessed == "quit"
+            || preprocessed == "ducktape exit"
+            || preprocessed == "ducktape quit"
+        {
             log::info!("Exit command detected, bypassing language processing");
             // Create command args for exit command
             let command_args = crate::command_processor::CommandArgs::new(
-                "exit".to_string(), 
-                vec![], 
-                std::collections::HashMap::new()
+                "exit".to_string(),
+                vec![],
+                std::collections::HashMap::new(),
             );
             return self.command_processor.execute(command_args).await;
         }
