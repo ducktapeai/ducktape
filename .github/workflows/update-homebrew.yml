@@ -3,6 +3,12 @@ name: Update Homebrew Formula
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update (without the v prefix)'
+        required: true
+        default: '0.12.1'
 
 jobs:
   update-homebrew:
