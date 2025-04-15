@@ -454,29 +454,28 @@ Rules:
                 }
 
                 // Improved calendar selection logic
-                let requested_calendar =
-                    if input.to_lowercase().contains("my calendar")
-                        || input.to_lowercase().contains("in calendar")
-                    {
-                        &default_calendar
-                    } else if input.to_lowercase().contains("kids calendar")
-                        || input.to_lowercase().contains("kids calander")
-                        || input.to_lowercase().contains("children")
-                        || input.to_lowercase().contains("to my kids")
-                    {
-                        "KIDS"
-                    } else if input.to_lowercase().contains("work calendar")
-                        || input.to_lowercase().contains("work calander")
-                    {
-                        "Work"
-                    } else if input.to_lowercase().contains("home calendar")
-                        || input.to_lowercase().contains("home calander")
-                    {
-                        "Home"
-                    } else {
-                        // Always default to user's primary calendar
-                        &default_calendar
-                    };
+                let requested_calendar = if input.to_lowercase().contains("my calendar")
+                    || input.to_lowercase().contains("in calendar")
+                {
+                    &default_calendar
+                } else if input.to_lowercase().contains("kids calendar")
+                    || input.to_lowercase().contains("kids calander")
+                    || input.to_lowercase().contains("children")
+                    || input.to_lowercase().contains("to my kids")
+                {
+                    "KIDS"
+                } else if input.to_lowercase().contains("work calendar")
+                    || input.to_lowercase().contains("work calander")
+                {
+                    "Work"
+                } else if input.to_lowercase().contains("home calendar")
+                    || input.to_lowercase().contains("home calander")
+                {
+                    "Home"
+                } else {
+                    // Always default to user's primary calendar
+                    &default_calendar
+                };
 
                 if rest.len() >= 3 {
                     let mut command = format!(

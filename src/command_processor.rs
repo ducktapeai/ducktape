@@ -1137,11 +1137,7 @@ pub fn resolve_contacts(input: &str) -> Vec<String> {
     let name_to_emails = vec![
         (
             "Shaun Stuart",
-            vec![
-                "joe.duck@gmail.com",
-                "joe.duck@live.com",
-                "joe@ducktapeai.com",
-            ],
+            vec!["joe.duck@gmail.com", "joe.duck@live.com", "joe@ducktapeai.com"],
         ),
         (
             "Joe Bloggs",
