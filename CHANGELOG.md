@@ -1,4 +1,4 @@
-## [0.12.0] - 2025-04-16
+## [0.12.1] - 2025-04-16
 ### Added
 - Added exit command handler to terminate the application properly
 - Exit commands now work in both Terminal Mode and Natural Language Mode
