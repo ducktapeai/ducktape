@@ -1,19 +1,3 @@
-## [0.12.0] - 2025-04-15
-### Added
-- Automated Homebrew formula updates via GitHub Actions
-- Improved documentation for installation process
-- Added support for sharing reminders across devices
-
-### Changed
-- Refactored calendar event processing for better performance
-- Updated dependency versions for improved security
-- Enhanced error handling throughout the application
-
-### Fixed
-- Resolved issues with timezone handling in recurring events
-- Fixed race condition in WebSocket server initialization
-- Improved error messages for configuration issues
-
 ## [0.11.20] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
@@ -279,8 +263,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.12.0...HEAD
-[0.12.0]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...v0.12.0
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...HEAD
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducktapeai/ducktape/compare/v0.1.9...v0.10.0
 [0.1.9]: https://github.com/ducktapeai/ducktape/compare/v0.1.8...v0.1.9
