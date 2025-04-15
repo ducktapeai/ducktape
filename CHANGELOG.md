@@ -1,3 +1,13 @@
+## [0.12.0] - 2025-04-16
+### Added
+- Added exit command handler to terminate the application properly
+- Exit commands now work in both Terminal Mode and Natural Language Mode
+- Added "exit" to help documentation for better discoverability
+
+### Changed
+- Modified app.rs to detect exit/quit commands early in the processing pipeline
+- Improved terminal experience by ensuring exit commands work even if LLM API calls fail
+
 ## [0.11.20] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
