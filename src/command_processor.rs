@@ -1138,10 +1138,9 @@ pub fn resolve_contacts(input: &str) -> Vec<String> {
         (
             "Shaun Stuart",
             vec![
-                "shaun.stuart@gmail.com",
-                "shaun.stuart@hashicorp.com",
-                "shaun.stuart@live.com",
-                "shaun@surfergolfer.com",
+                "joe.duck@gmail.com",
+                "joe.duck@live.com",
+                "joe@ducktapeai.com",
             ],
         ),
         (

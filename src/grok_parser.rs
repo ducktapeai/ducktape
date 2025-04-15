@@ -119,8 +119,7 @@ Rules:
 6. If a calendar is specified in input, use that exact calendar name.
 7. If input mentions "kids" or "children", use the "KIDS" calendar.
 8. If input mentions "work", use the "Work" calendar.
-9. If input mentions "shaun.stuart@hashicorp.com", use that as the calendar.
-10. If no calendar is specified, use the default calendar.
+9. If no calendar is specified, use the default calendar.
 11. If contact names are mentioned in the input and no --contacts flag is provided, automatically include a --contacts flag with the detected names.
 12. If input mentions scheduling "with" someone, add their name to --contacts.
 13. If input mentions inviting, sending to, or emailing someone@domain.com, add it with --email.

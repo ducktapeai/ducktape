@@ -455,11 +455,10 @@ Rules:
 
                 // Improved calendar selection logic
                 let requested_calendar =
-                    if input.to_lowercase().contains("shaun.stuart@hashicorp.com")
-                        || input.to_lowercase().contains("my calendar")
+                    if input.to_lowercase().contains("my calendar")
                         || input.to_lowercase().contains("in calendar")
                     {
-                        "shaun.stuart@hashicorp.com"
+                        &default_calendar
                     } else if input.to_lowercase().contains("kids calendar")
                         || input.to_lowercase().contains("kids calander")
                         || input.to_lowercase().contains("children")
@@ -476,7 +475,7 @@ Rules:
                         "Home"
                     } else {
                         // Always default to user's primary calendar
-                        "shaun.stuart@hashicorp.com"
+                        &default_calendar
                     };
 
                 if rest.len() >= 3 {
