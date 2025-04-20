@@ -1,3 +1,11 @@
+## [0.13.0] - 2025-04-20
+### Changed
+- Major refactoring of calendar module into separate components
+- Consolidated calendar functionality into specialized files
+- Enhanced email validation in calendar operations
+- Improved contact lookup logic for calendar events
+- Restructured calendar code for better maintainability
+
 ## [0.12.1] - 2025-04-16
 ### Added
 - Added exit command handler to terminate the application properly
@@ -9,6 +17,11 @@
 - Improved terminal experience by ensuring exit commands work even if LLM API calls fail
 
 ## [0.11.20] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
@@ -273,7 +286,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...HEAD
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
+[0.12.1]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...v0.12.1
+[0.11.20]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.20
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ducktapeai/ducktape/compare/v0.1.9...v0.10.0
 [0.1.9]: https://github.com/ducktapeai/ducktape/compare/v0.1.8...v0.1.9
