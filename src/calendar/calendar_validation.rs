@@ -36,14 +36,18 @@ pub fn validate_time_format(time: &str) -> bool {
 
 /// Enhanced email validation to handle edge cases and improve error reporting
 pub fn validate_email(email: &str) -> bool {
-    // Fixed regex: removed unsupported atomic group (?>...) and replaced with (?:...)
-    let re = Regex::new(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,125}\.[A-Za-z]{2,63}$").unwrap();
+    // Simplified regex that matches standard email formats without being overly strict
+    let re = Regex::new(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$").unwrap();
+
     if !re.is_match(email) {
         return false;
     }
+
+    // Check for dangerous characters that could cause script injection
     if contains_dangerous_characters(email) {
         return false;
     }
+
     true
 }
 

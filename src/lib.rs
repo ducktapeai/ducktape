@@ -1,10 +1,10 @@
 pub mod api_server;
 pub mod app;
 pub mod calendar;
-pub mod calendar_legacy;
-pub mod cli; // Added cli module
+// Removed calendar_legacy module reference as it was moved to calendar directory
+pub mod cli;
 pub mod command_parser;
-pub mod command_processor; // New command processor module
+pub mod command_processor;
 // pub mod commands; // Removed commands module
 pub mod config;
 pub mod contact_groups;
