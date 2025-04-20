@@ -2,16 +2,16 @@
 //
 // This module provides functions to look up contacts and their emails.
 
-use anyhow::{anyhow, Result};
-use log::{debug, error, info};
 use crate::calendar::calendar_types::EventConfig;
 use crate::calendar::calendar_validation::validate_email;
+use anyhow::{Result, anyhow};
+use log::{debug, error, info};
 
 /// Lookup a contact by name and return their email addresses
 pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     debug!("Looking up contact by name: '{}'", name);
     let clean_name = name.trim().to_lowercase();
-    
+
     // Try exact match first (highest priority)
     let exact_script = format!(
         r#"tell application "Contacts"
@@ -50,7 +50,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
         if !stderr.is_empty() {
             debug!("AppleScript stderr (exact match): '{}'", stderr);
         }
-        
+
         let email_list: Vec<String> = emails
             .trim_matches('{')
             .trim_matches('}')
@@ -72,11 +72,11 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     // Try to search by full name with both first name AND last name (second priority)
     debug!("Getting contacts with full name matching '{}'", name);
     let name_parts: Vec<&str> = name.split_whitespace().collect();
-    
+
     if name_parts.len() >= 2 {
         let first_name = name_parts[0];
         let last_name = name_parts[name_parts.len() - 1];
-        
+
         // Look for contacts with BOTH first AND last name match
         let combined_script = format!(
             r#"tell application "Contacts"
@@ -102,18 +102,18 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             first_name.replace("\"", "\\\""),
             last_name.replace("\"", "\\\"")
         );
-        
+
         let output = tokio::process::Command::new("osascript")
             .arg("-e")
             .arg(&combined_script)
             .output()
             .await
             .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
-            
+
         if output.status.success() {
             let emails = String::from_utf8_lossy(&output.stdout);
             debug!("Raw contact lookup output (first+last name match): '{}'", emails);
-            
+
             let email_list: Vec<String> = emails
                 .trim_matches('{')
                 .trim_matches('}')
@@ -122,7 +122,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
                 .map(|s| s.trim_matches('"').trim().to_string())
                 .filter(|email| validate_email(email))
                 .collect();
-                
+
             if !email_list.is_empty() {
                 info!(
                     "Found {} email(s) for '{}' with first+last name match: {:?}",
@@ -173,14 +173,14 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
         .map_err(|e| anyhow!("Failed to execute AppleScript: {}", e))?;
 
     let mut email_list = Vec::new();
-    
+
     if output.status.success() {
         let emails = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.is_empty() {
             debug!("AppleScript stderr (contains match): '{}'", stderr);
         }
-        
+
         email_list = emails
             .trim_matches('{')
             .trim_matches('}')
@@ -205,18 +205,18 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
         let error = String::from_utf8_lossy(&output.stderr);
         error!("Contact lookup error (contains match): {}", error);
     }
-    
+
     if email_list.is_empty() {
         info!("No emails found for contact '{}' after all search attempts", name);
     }
-    
+
     Ok(email_list)
 }
 
 /// Helper to search by a specific part of the name (first or last)
 async fn lookup_by_name_part(name_part: &str, part_type: &str) -> Result<Vec<String>> {
     debug!("Looking up contacts by {} name: '{}'", part_type, name_part);
-    
+
     let script = format!(
         r#"tell application "Contacts"
             set the_emails to {{}}
@@ -247,18 +247,20 @@ async fn lookup_by_name_part(name_part: &str, part_type: &str) -> Result<Vec<Str
         part_type,
         part_type
     );
-    
+
     let output = tokio::process::Command::new("osascript")
         .arg("-e")
         .arg(&script)
         .output()
         .await
-        .map_err(|e| anyhow!("Failed to execute AppleScript for {} name search: {}", part_type, e))?;
-        
+        .map_err(|e| {
+            anyhow!("Failed to execute AppleScript for {} name search: {}", part_type, e)
+        })?;
+
     if output.status.success() {
         let emails = String::from_utf8_lossy(&output.stdout);
         debug!("Raw contact lookup output ({} name search): '{}'", part_type, emails);
-        
+
         let email_list: Vec<String> = emails
             .trim_matches('{')
             .trim_matches('}')
@@ -267,7 +269,7 @@ async fn lookup_by_name_part(name_part: &str, part_type: &str) -> Result<Vec<Str
             .map(|s| s.trim_matches('"').trim().to_string())
             .filter(|email| validate_email(email))
             .collect();
-            
+
         Ok(email_list)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);

@@ -15,19 +15,19 @@ use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
 
-mod calendar_types;
-mod calendar_validation;
 mod calendar_applescript;
-mod calendar_import;
 mod calendar_contacts;
+mod calendar_import;
 #[cfg(test)]
 mod calendar_tests;
+mod calendar_types;
+mod calendar_validation;
 
+pub use calendar_applescript::*;
+pub use calendar_contacts::*;
+pub use calendar_import::*;
 pub use calendar_types::*;
 pub use calendar_validation::*;
-pub use calendar_applescript::*;
-pub use calendar_import::*;
-pub use calendar_contacts::*;
 
 /// Custom error type for calendar operations
 #[derive(Debug, thiserror::Error)]
@@ -627,12 +627,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
         if email_list.is_empty() {
             debug!("No emails found for contact '{}'", name);
         } else {
-            debug!(
-                "Found {} email(s) for '{}': {:?}",
-                email_list.len(),
-                name,
-                email_list
-            );
+            debug!("Found {} email(s) for '{}': {:?}", email_list.len(), name, email_list);
         }
         Ok(email_list)
     } else {

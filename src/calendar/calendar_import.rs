@@ -2,9 +2,9 @@
 //
 // This module provides functions to import events from CSV and ICS files.
 
+use crate::calendar::calendar_types::RecurrencePattern;
 use anyhow::Result;
 use std::path::Path;
-use crate::calendar::calendar_types::RecurrencePattern;
 
 /// Import events from a CSV file
 pub async fn import_csv_events(file_path: &Path, target_calendar: Option<String>) -> Result<()> {

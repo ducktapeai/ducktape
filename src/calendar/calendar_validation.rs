@@ -2,8 +2,8 @@
 //
 // This module provides validation helpers for dates, times, emails, and script safety.
 
-use regex::Regex;
 use chrono::Datelike;
+use regex::Regex;
 
 /// Validate date string has format YYYY-MM-DD
 pub fn validate_date_format(date: &str) -> bool {
@@ -64,18 +64,24 @@ pub fn contains_dangerous_chars_for_script(input: &str) -> bool {
 
 /// Validate an EventConfig for correctness and safety.
 /// Returns an error if any field is invalid or unsafe for AppleScript.
-pub fn validate_event_config(config: &crate::calendar::calendar_types::EventConfig) -> anyhow::Result<()> {
-    use crate::calendar::calendar_validation::{validate_date_format, validate_time_format, validate_email, contains_dangerous_characters, contains_dangerous_chars_for_script};
+pub fn validate_event_config(
+    config: &crate::calendar::calendar_types::EventConfig,
+) -> anyhow::Result<()> {
     use crate::calendar::calendar_types::CalendarError;
-    use log::debug;
+    use crate::calendar::calendar_validation::{
+        contains_dangerous_characters, contains_dangerous_chars_for_script, validate_date_format,
+        validate_email, validate_time_format,
+    };
     use anyhow::anyhow;
+    use log::debug;
 
     // Validate date format (YYYY-MM-DD)
     if !validate_date_format(&config.start_date) {
         return Err(CalendarError::InvalidDateTime(format!(
             "Invalid date format: {}",
             config.start_date
-        )).into());
+        ))
+        .into());
     }
 
     // Validate time format (HH:MM)
@@ -83,7 +89,8 @@ pub fn validate_event_config(config: &crate::calendar::calendar_types::EventConf
         return Err(CalendarError::InvalidDateTime(format!(
             "Invalid time format: {}",
             config.start_time
-        )).into());
+        ))
+        .into());
     }
 
     // Validate end time if specified
@@ -92,7 +99,8 @@ pub fn validate_event_config(config: &crate::calendar::calendar_types::EventConf
             return Err(CalendarError::InvalidDateTime(format!(
                 "Invalid end time format: {}",
                 end_time
-            )).into());
+            ))
+            .into());
         }
     }
 
