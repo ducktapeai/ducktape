@@ -37,3 +37,5 @@ v0.11.1.tar.gz.
 # Test scripts
 test_ducktape.sh
 ducktape-0.12.1.tar.gz
+cleanup-calendar-files.sh
+files-to-remove.txt

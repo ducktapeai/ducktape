@@ -1,1 +1,8 @@
 .env
+src/calendar_applescript.rs
+src/calendar_contacts.rs
+src/calendar_types.rs
+src/calendar_validation.rs
+src/calendar_import.rs
+src/calendar_tests.rs
+src/calendar_legacy.rs
