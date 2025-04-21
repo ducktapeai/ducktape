@@ -482,32 +482,41 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     let script = format!(
         r#"tell application "Calendar"
             try
-                if not (exists calendar "{calendar_name}") then
-                    error "Calendar '{calendar_name}' not found"
+                set calFound to false
+                repeat with cal in calendars
+                    if name of cal is "{calendar_name}" then
+                        set calFound to true
+                        tell cal
+                            set startDate to current date
+                            set year of startDate to {start_year}
+                            set month of startDate to {start_month}
+                            set day of startDate to {start_day}
+                            set hours of startDate to {start_hours}
+                            set minutes of startDate to {start_minutes}
+                            set seconds of startDate to 0
+                            
+                            set endDate to current date
+                            set year of endDate to {end_year}
+                            set month of endDate to {end_month}
+                            set day of endDate to {end_day}
+                            set hours of endDate to {end_hours}
+                            set minutes of endDate to {end_minutes}
+                            set seconds of endDate to 0
+                            
+                            set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
+                            {all_day_code}
+                            {reminder_code}
+                            {recurrence_code}
+                            {attendees_block}
+                        end tell
+                        exit repeat
+                    end if
+                end repeat
+                
+                if not calFound then
+                    error "Calendar '{calendar_name}' not found in available calendars"
                 end if
-                tell calendar "{calendar_name}"
-                    set startDate to current date
-                    set year of startDate to {start_year}
-                    set month of startDate to {start_month}
-                    set day of startDate to {start_day}
-                    set hours of startDate to {start_hours}
-                    set minutes of startDate to {start_minutes}
-                    set seconds of startDate to 0
-                    set endDate to current date
-                    set year of endDate to {end_year}
-                    set month of endDate to {end_month}
-                    set day of endDate to {end_day}
-                    set hours of endDate to {end_hours}
-                    set minutes of endDate to {end_minutes}
-                    set seconds of endDate to 0
-                    set newEvent to make new event with properties {{summary:"{title}", start date:startDate, end date:endDate, description:"{description}"{extra}}}
-                    {all_day_code}
-                    {reminder_code}
-                    {recurrence_code}
-                    {attendees_block}
-                    save
-                end tell
-                reload calendars
+                
                 return "Success: Event created"
             on error errMsg
                 log errMsg
