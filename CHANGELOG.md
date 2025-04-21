@@ -1,3 +1,13 @@
+## [0.13.3] - 2025-04-22
+### Changed
+- Refactored todo functionality to use reminder terminology for Apple compatibility
+- Maintained backward compatibility with previous todo commands
+- Improved module structure following project standards
+
+### Fixed
+- Fixed incorrect AppleScript syntax for reminder creation with due dates
+- Resolved calendar event creation issues with improved calendar lookup
+
 ## [0.13.2] - 2025-04-21
 ### Fixed
 - Fixed calendar event creation bug where end times incorrectly included dates
