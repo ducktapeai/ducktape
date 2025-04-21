@@ -37,6 +37,132 @@ async fn get_available_calendars() -> Result<Vec<String>> {
         .collect())
 }
 
+/// Sanitize user input to prevent injection or other security issues
+fn sanitize_user_input(input: &str) -> String {
+    // Filter out control characters except for newlines and tabs
+    input
+        .chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
+}
+
+/// Enhance command with recurrence information
+fn enhance_recurrence_command(command: &str) -> String {
+    // If not a calendar command, return unchanged
+    if !command.contains("calendar create") {
+        return command.to_string();
+    }
+
+    let mut enhanced = command.to_string();
+
+    // Handle "every day/week/month/year" and variants
+    if command.contains(" every day") || command.contains(" daily") {
+        if (!enhanced.contains("--repeat")) {
+            enhanced = enhanced.trim().to_string() + " --repeat daily";
+        }
+    } else if command.contains(" every week") || command.contains(" weekly") {
+        if (!enhanced.contains("--repeat")) {
+            enhanced = enhanced.trim().to_string() + " --repeat weekly";
+        }
+    } else if command.contains(" every month") || command.contains(" monthly") {
+        if (!enhanced.contains("--repeat")) {
+            enhanced = enhanced.trim().to_string() + " --repeat monthly";
+        }
+    } else if command.contains(" every year")
+        || command.contains(" yearly")
+        || command.contains(" annually")
+    {
+        if (!enhanced.contains("--repeat")) {
+            enhanced = enhanced.trim().to_string() + " --repeat yearly";
+        }
+    }
+
+    // Handle "every X days/weeks/months/years" with regex
+    let re_interval = regex::Regex::new(r"every (\d+) (day|week|month|year)s?").unwrap();
+    if let Some(caps) = re_interval.captures(command) {
+        let interval = caps.get(1).map_or("", |m| m.as_str());
+        let unit = caps.get(2).map_or("", |m| m.as_str());
+
+        if !interval.is_empty() && !unit.is_empty() {
+            // Add frequency if not already present
+            if !enhanced.contains("--repeat") {
+                enhanced = match unit {
+                    "day" => enhanced.trim().to_string() + " --repeat daily",
+                    "week" => enhanced.trim().to_string() + " --repeat weekly",
+                    "month" => enhanced.trim().to_string() + " --repeat monthly",
+                    "year" => enhanced.trim().to_string() + " --repeat yearly",
+                    _ => enhanced,
+                };
+            }
+
+            // Add interval if not already present
+            if !enhanced.contains("--interval") {
+                enhanced = enhanced.trim().to_string() + &format!(" --interval {}", interval);
+            }
+        }
+    }
+
+    enhanced
+}
+
+/// Enhance command with zoom flag based on input
+fn enhance_command_with_zoom(command: &str, input: &str) -> String {
+    // If not a calendar command or already has zoom flag, return unchanged
+    if !command.contains("calendar create") || command.contains("--zoom") {
+        return command.to_string();
+    }
+
+    let input_lower = input.to_lowercase();
+    let zoom_keywords = [
+        "zoom",
+        "video call",
+        "video meeting",
+        "virtual meeting",
+        "online meeting",
+        "teams meeting",
+        "google meet",
+    ];
+
+    if zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword)) {
+        let enhanced = command.trim().to_string() + " --zoom";
+        debug!("Added zoom flag based on input keywords: {}", enhanced);
+        return enhanced;
+    }
+
+    command.to_string()
+}
+
+/// Validate calendar command for security
+fn validate_calendar_command(command: &str) -> Result<()> {
+    // Security checks
+    if command.contains("&&")
+        || command.contains("|")
+        || command.contains(";")
+        || command.contains("`")
+    {
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
+    }
+
+    // Only check calendar commands
+    if command.contains("calendar create") {
+        // Check for reasonably sized intervals for recurring events
+        if command.contains("--interval") {
+            let re = regex::Regex::new(r"--interval (\d+)").unwrap();
+            if let Some(caps) = re.captures(command) {
+                if let Some(interval_match) = caps.get(1) {
+                    if let Ok(interval) = interval_match.as_str().parse::<i32>() {
+                        if interval > 100 {
+                            return Err(anyhow!("Unreasonable interval value: {}", interval));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Input validation
     if input.is_empty() {
@@ -50,6 +176,14 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     // Sanitize input by removing any potentially harmful characters
     let sanitized_input = sanitize_user_input(input);
     debug!("Sanitized input: {}", sanitized_input);
+
+    // Check if this is explicitly about creating a todo (reminder) vs a calendar event
+    let input_lower = sanitized_input.to_lowercase();
+    let is_todo_request = input_lower.contains("todo")
+        || input_lower.contains("reminder")
+        || input_lower.contains("task")
+        || (input_lower.contains("remind") && !input_lower.contains("meeting"))
+        || input_lower.contains("checklist");
 
     // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")
@@ -94,8 +228,33 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     let current_hour = current_date.hour();
 
     // Build system prompt similar to OpenAI but adapted for Grok
-    let system_prompt = format!(
-        r#"You are a command line interface parser that converts natural language into ducktape commands.
+    let system_prompt = if is_todo_request {
+        // For todo/reminder requests
+        format!(
+            r#"You are a command line interface parser that converts natural language into ducktape commands.
+Current time is: {current_time}
+Available reminder lists: Reminders, Work, Personal, Urgent
+
+For todo/reminder items, use the format:
+ducktape todo create "<title>" [list1] [list2] [--remind "<YYYY-MM-DD HH:MM>"] [--notes "<additional details>"]
+
+Rules:
+1. If no specific time is mentioned, do not add the --remind flag.
+2. If a time is specified, use --remind with format "YYYY-MM-DD HH:MM".
+3. If today or tomorrow is mentioned, use the actual date ({today} or {tomorrow}).
+4. If no list is specified, use just one argument: the title.
+5. If notes or details are provided, add them with --notes flag.
+6. If input mentions "work", add the "Work" list.
+7. If input mentions "personal", add the "Personal" list.
+8. If input mentions "urgent" or "important", add the "Urgent" list."#,
+            current_time = current_date.format("%Y-%m-%d %H:%M"),
+            today = current_date.format("%Y-%m-%d"),
+            tomorrow = (current_date + chrono::Duration::days(1)).format("%Y-%m-%d")
+        )
+    } else {
+        // For calendar events (existing system prompt)
+        format!(
+            r#"You are a command line interface parser that converts natural language into ducktape commands.
 Current time is: {current_time}
 Available calendars: {calendars}
 Default calendar: {default_cal}
@@ -134,12 +293,13 @@ Rules:
     - If specific end date is mentioned (e.g., "until March 15"), add --until YYYY-MM-DD
     - If occurrence count is mentioned (e.g., "for 10 weeks"), add --count 10
 17. If the input mentions "zoom", "video call", "video meeting", or "virtual meeting", add the --zoom flag to create a Zoom meeting automatically."#,
-        current_time = current_date.format("%Y-%m-%d %H:%M"),
-        calendars = available_calendars.join(", "),
-        default_cal = default_calendar,
-        today = current_date.format("%Y-%m-%d"),
-        next_hour = (current_hour + 1).min(23)
-    );
+            current_time = current_date.format("%Y-%m-%d %H:%M"),
+            calendars = available_calendars.join(", "),
+            default_cal = default_calendar,
+            today = current_date.format("%Y-%m-%d"),
+            next_hour = (current_hour + 1).min(23)
+        )
+    };
 
     let context = format!("Current date and time: {}", Local::now().format("%Y-%m-%d %H:%M"));
     let prompt = format!("{}\n\n{}", context, sanitized_input);
@@ -239,143 +399,6 @@ Rules:
             Err(e)
         }
     }
-}
-
-// Helper function to enhance Zoom recognition
-fn enhance_command_with_zoom(command: &str, input: &str) -> String {
-    if !command.contains("calendar create") {
-        return command.to_string();
-    }
-
-    let input_lower = input.to_lowercase();
-    let zoom_keywords =
-        ["zoom", "video call", "video meeting", "virtual meeting", "video conference"];
-
-    let has_zoom_keyword = zoom_keywords.iter().any(|&keyword| input_lower.contains(keyword));
-
-    if has_zoom_keyword && !command.contains("--zoom") {
-        debug!("Adding --zoom flag to command based on input keywords");
-        return format!("{} --zoom", command);
-    }
-
-    command.to_string()
-}
-
-// Helper function to enhance recurrence commands
-fn enhance_recurrence_command(command: &str) -> String {
-    if !command.contains("calendar create") {
-        return command.to_string();
-    }
-
-    let mut enhanced = command.to_string();
-
-    // Check for recurring event keywords in the input but missing flags
-    let has_recurring_keyword = command.to_lowercase().contains("every day")
-        || command.to_lowercase().contains("every week")
-        || command.to_lowercase().contains("every month")
-        || command.to_lowercase().contains("every year")
-        || command.to_lowercase().contains("daily")
-        || command.to_lowercase().contains("weekly")
-        || command.to_lowercase().contains("monthly")
-        || command.to_lowercase().contains("yearly")
-        || command.to_lowercase().contains("annually");
-
-    // If recurring keywords found but no --repeat flag, add it
-    if has_recurring_keyword && !command.contains("--repeat") && !command.contains("--recurring") {
-        if command.contains("every day") || command.contains("daily") {
-            debug!("Adding daily recurrence to command");
-            enhanced = format!("{} --repeat daily", enhanced);
-        } else if command.contains("every week") || command.contains("weekly") {
-            debug!("Adding weekly recurrence to command");
-            enhanced = format!("{} --repeat weekly", enhanced);
-        } else if command.contains("every month") || command.contains("monthly") {
-            debug!("Adding monthly recurrence to command");
-            enhanced = format!("{} --repeat monthly", enhanced);
-        } else if command.contains("every year")
-            || command.contains("yearly")
-            || command.contains("annually")
-        {
-            debug!("Adding yearly recurrence to command");
-            enhanced = format!("{} --repeat yearly", enhanced);
-        }
-    }
-
-    // Look for interval patterns like "every 2 weeks" and add --interval
-    let re_interval =
-        regex::Regex::new(r"every (\d+) (day|days|week|weeks|month|months|year|years)").unwrap();
-    if let Some(caps) = re_interval.captures(&command.to_lowercase()) {
-        if let Some(interval_str) = caps.get(1) {
-            if let Ok(interval) = interval_str.as_str().parse::<u32>() {
-                if interval > 0 && interval < 100 && // Reasonable limit
-                   !command.contains("--interval")
-                {
-                    debug!("Adding interval {} to command", interval);
-                    enhanced = format!("{} --interval {}", enhanced, interval);
-                }
-            }
-        }
-    }
-
-    enhanced
-}
-
-/// Sanitize user input to prevent injection or other security issues
-fn sanitize_user_input(input: &str) -> String {
-    // Remove any control characters
-    input
-        .chars()
-        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
-        .collect::<String>()
-}
-
-/// Validate returned calendar command for security
-fn validate_calendar_command(command: &str) -> Result<()> {
-    // Check for suspicious patterns
-    if command.contains("&&")
-        || command.contains("|")
-        || command.contains(";")
-        || command.contains("`")
-    {
-        return Err(anyhow!("Generated command contains potentially unsafe characters"));
-    }
-
-    // Validate interval values are reasonable if present
-    if let Some(interval_idx) = command.find("--interval") {
-        let interval_part = &command[interval_idx + 10..]; // Skip past "--interval "
-
-        // Extract the interval value - look for the first number after "--interval "
-        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
-        if let Some(caps) = re.captures(interval_part) {
-            if let Some(interval_match) = caps.get(1) {
-                let interval_str = interval_match.as_str();
-                if let Ok(interval) = interval_str.parse::<u32>() {
-                    if interval > 100 {
-                        return Err(anyhow!("Unreasonably large interval value: {}", interval));
-                    }
-                }
-            }
-        }
-    }
-
-    // Validate count values are reasonable if present
-    if let Some(count_idx) = command.find("--count") {
-        let count_part = &command[count_idx + 7..]; // Skip past "--count "
-
-        // Extract the count value using regex for more reliable parsing
-        let re = regex::Regex::new(r"^\s*(\d+)").unwrap();
-        if let Some(caps) = re.captures(count_part) {
-            if let Some(count_match) = caps.get(1) {
-                let count_str = count_match.as_str();
-                if let Ok(count) = count_str.parse::<u32>() {
-                    if count > 500 {
-                        return Err(anyhow!("Unreasonably large count value: {}", count));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

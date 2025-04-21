@@ -551,23 +551,66 @@ impl CommandHandler for TodoHandler {
 
                     // Set lists if provided in arguments (args[2] and beyond are list names)
                     if args.args.len() > 2 {
-                        let list_names: Vec<&str> =
-                            args.args[2..].iter().map(|s| s.as_str()).collect();
-                        config.lists = list_names;
+                        // Only collect lists that don't start with "--" (those are flags)
+                        let list_names: Vec<&str> = args.args[2..]
+                            .iter()
+                            .map(|s| s.as_str())
+                            .filter(|s| !s.starts_with("--"))
+                            .collect();
+                        
+                        if !list_names.is_empty() {
+                            config.lists = list_names;
+                        }
                     }
 
-                    // Set reminder time if provided via --remind flag
-                    if let Some(Some(reminder_time)) = args.flags.get("--remind") {
-                        config.reminder_time = Some(reminder_time);
+                    // Process standard flags (like --remind)
+                    // Look for --remind flag in both formats: as key in flags HashMap or as commandline arg
+                    let reminder_time = if let Some(Some(time)) = args.flags.get("remind") {
+                        // Found in the flags HashMap
+                        debug!("Found reminder time in flags HashMap: {}", time);
+                        Some(time.as_str())
+                    } else if let Some(remind_idx) = args.args.iter().position(|arg| arg == "--remind") {
+                        // Found as a commandline arg
+                        if remind_idx + 1 < args.args.len() {
+                            let time = &args.args[remind_idx + 1];
+                            debug!("Found reminder time as arg: {}", time);
+                            Some(time.trim_matches('"').trim_matches('\''))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    
+                    if let Some(time_str) = reminder_time {
+                        debug!("Setting reminder time: {}", time_str);
+                        config.reminder_time = Some(time_str);
                     }
 
-                    // Set notes if provided via --notes flag
-                    if let Some(Some(notes)) = args.flags.get("--notes") {
-                        config.notes = Some(notes.clone());
+                    // Set notes if provided via --notes flag (similar approach as reminder time)
+                    let notes = if let Some(Some(note_text)) = args.flags.get("notes") {
+                        // Found in the flags HashMap
+                        Some(note_text.clone())
+                    } else if let Some(notes_idx) = args.args.iter().position(|arg| arg == "--notes") {
+                        // Found as a commandline arg
+                        if notes_idx + 1 < args.args.len() {
+                            Some(args.args[notes_idx + 1].clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    
+                    if let Some(note_text) = notes {
+                        debug!("Setting notes: {}", note_text);
+                        config.notes = Some(note_text.trim_matches('"').trim_matches('\'').to_string());
                     }
 
-                    // Note: create_todo is synchronous, so don't await it
-                    match crate::todo::create_todo(config) {
+                    debug!("Final todo config: {:?}", config);
+
+                    // Use await with the async create_todo function
+                    match crate::todo::create_todo(config).await {
                         Ok(_) => {
                             println!("Todo '{}' created successfully", title);
                             Ok(())
@@ -579,12 +622,12 @@ impl CommandHandler for TodoHandler {
                     }
                 }
                 Some("list") => {
-                    // Implementation for listing todos would go here
+                    // Implementation for listing todos would go here using async/await
                     println!("Listing todos... (not implemented yet)");
                     Ok(())
                 }
                 Some("delete") => {
-                    // Implementation for deleting todos would go here
+                    // Implementation for deleting todos would go here using async/await
                     println!("Deleting todo... (not implemented yet)");
                     Ok(())
                 }
@@ -1044,6 +1087,121 @@ impl CommandHandler for ExitHandler {
     }
 }
 
+// Reminder handler (using Apple's terminology "Reminders" for the app)
+#[derive(Debug)]
+pub struct ReminderHandler;
+
+impl CommandHandler for ReminderHandler {
+    fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
+        Box::pin(async move {
+            match args.args.get(0).map(|s| s.as_str()) {
+                Some("create") | Some("add") => {
+                    if args.args.len() < 2 {
+                        println!("Not enough arguments for reminder create command");
+                        println!("Usage: ducktape reminder create <title> [list1] [list2] ...");
+                        return Ok(());
+                    }
+
+                    let title = &args.args[1];
+
+                    // Create a new ReminderConfig with the title
+                    let mut config = crate::reminder::ReminderConfig::new(title);
+
+                    // Set lists if provided in arguments (args[2] and beyond are list names)
+                    if args.args.len() > 2 {
+                        // Only collect lists that don't start with "--" (those are flags)
+                        let list_names: Vec<&str> = args.args[2..]
+                            .iter()
+                            .map(|s| s.as_str())
+                            .filter(|s| !s.starts_with("--"))
+                            .collect();
+                        
+                        if !list_names.is_empty() {
+                            config.lists = list_names;
+                        }
+                    }
+
+                    // Process standard flags (like --remind)
+                    // Look for --remind flag in both formats: as key in flags HashMap or as commandline arg
+                    let reminder_time = if let Some(Some(time)) = args.flags.get("remind") {
+                        // Found in the flags HashMap
+                        debug!("Found reminder time in flags HashMap: {}", time);
+                        Some(time.as_str())
+                    } else if let Some(remind_idx) = args.args.iter().position(|arg| arg == "--remind") {
+                        // Found as a commandline arg
+                        if remind_idx + 1 < args.args.len() {
+                            let time = &args.args[remind_idx + 1];
+                            debug!("Found reminder time as arg: {}", time);
+                            Some(time.trim_matches('"').trim_matches('\''))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    
+                    if let Some(time_str) = reminder_time {
+                        debug!("Setting reminder time: {}", time_str);
+                        config.reminder_time = Some(time_str);
+                    }
+
+                    // Set notes if provided via --notes flag (similar approach as reminder time)
+                    let notes = if let Some(Some(note_text)) = args.flags.get("notes") {
+                        // Found in the flags HashMap
+                        Some(note_text.clone())
+                    } else if let Some(notes_idx) = args.args.iter().position(|arg| arg == "--notes") {
+                        // Found as a commandline arg
+                        if notes_idx + 1 < args.args.len() {
+                            Some(args.args[notes_idx + 1].clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    
+                    if let Some(note_text) = notes {
+                        debug!("Setting notes: {}", note_text);
+                        config.notes = Some(note_text.trim_matches('"').trim_matches('\'').to_string());
+                    }
+
+                    debug!("Final reminder config: {:?}", config);
+
+                    // Use await with the async create_reminder function
+                    match crate::reminder::create_reminder(config).await {
+                        Ok(_) => {
+                            println!("Reminder '{}' created successfully", title);
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to create reminder: {}", e);
+                            Err(anyhow!("Failed to create reminder: {}", e))
+                        }
+                    }
+                }
+                Some("list") => {
+                    // Implementation for listing reminders would go here using async/await
+                    println!("Listing reminders... (not implemented yet)");
+                    Ok(())
+                }
+                Some("delete") => {
+                    // Implementation for deleting reminders would go here using async/await
+                    println!("Deleting reminder... (not implemented yet)");
+                    Ok(())
+                }
+                _ => {
+                    println!("Unknown reminder command. Available commands: create/add, list, delete");
+                    Ok(())
+                }
+            }
+        })
+    }
+
+    fn can_handle(&self, command: &str) -> bool {
+        command == "reminder" || command == "reminders"
+    }
+}
+
 // Print help information
 pub fn print_help() -> Result<()> {
     println!("DuckTape - A tool for interacting with Apple Calendar, Notes, and Reminders");
@@ -1108,6 +1266,7 @@ impl CommandProcessor {
             Box::new(VersionHandler),
             Box::new(HelpHandler),
             Box::new(ExitHandler),
+            Box::new(ReminderHandler),
         ];
         Self { handlers }
     }

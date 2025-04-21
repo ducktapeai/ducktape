@@ -22,11 +22,12 @@ pub mod openai_parser;
 pub mod parser_trait; // Make sure the parser trait is included
 // pub mod parsing_utils;  // Commented out if it doesn't exist
 pub mod env_manager;
+pub mod reminder; // New module for Apple Reminders functionality
 pub mod reminders;
 pub mod state;
 pub mod storage; // Add storage module
 pub mod terminal_parser; // Add our new terminal parser
-pub mod todo;
+pub mod todo; // Kept for backward compatibility
 pub mod utils;
 pub mod validation;
 pub mod zoom; // New module
