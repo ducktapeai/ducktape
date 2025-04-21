@@ -1,3 +1,8 @@
+## [0.13.1] - 2025-04-21
+### Fixed
+- Restored validation.rs file to fix build issues in main branch
+- Fixed dependency inconsistency between branches
+
 ## [0.13.0] - 2025-04-20
 ### Changed
 - Major refactoring of calendar module into separate components
@@ -61,25 +66,24 @@
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
 
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
 ## [0.11.18] - 2025-04-14
 ### Changed
 - Started new development cycle with minor version bump
-- Preparing for new feature additions
-
-## [0.11.17] - 2025-04-14
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-
-## [0.11.16] - 2025-04-14
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-
-## [0.11.15] - 2025-04-12
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
 
 ## [0.11.14] - 2025-04-11
 ### Changed
