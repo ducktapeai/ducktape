@@ -1,3 +1,9 @@
+## [0.13.2] - 2025-04-21
+### Fixed
+- Fixed calendar event creation bug where end times incorrectly included dates
+- Added post-processing step to ensure proper time format in generated commands
+- Improved natural language parsing for calendar events
+
 ## [0.13.1] - 2025-04-21
 ### Fixed
 - Restored validation.rs file to fix build issues in main branch
@@ -22,6 +28,11 @@
 - Improved terminal experience by ensuring exit commands work even if LLM API calls fail
 
 ## [0.11.20] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
