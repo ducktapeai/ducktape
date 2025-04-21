@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../homebrew-ducktape"
+		},
+		{
+			"path": "../../ducktapeai.github.io"
 		}
 	],
 	"settings": {}
