@@ -1,4 +1,4 @@
-# DuckTape 🦆
+# DuckTape 🦆 ...
 
 DuckTape is an AI-powered command-line interface that simplifies managing your Apple Calendar, Reminders, and Notes. With DuckTape, you can use two distinct approaches: **Natural Language Mode** and **Terminal Mode**.
 
