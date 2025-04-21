@@ -68,7 +68,10 @@ fn enhance_recurrence_command(command: &str) -> String {
         if (!enhanced.contains("--repeat")) {
             enhanced = enhanced.trim().to_string() + " --repeat monthly";
         }
-    } else if command.contains(" every year") || command.contains(" yearly") || command.contains(" annually") {
+    } else if command.contains(" every year")
+        || command.contains(" yearly")
+        || command.contains(" annually")
+    {
         if (!enhanced.contains("--repeat")) {
             enhanced = enhanced.trim().to_string() + " --repeat yearly";
         }
@@ -79,7 +82,7 @@ fn enhance_recurrence_command(command: &str) -> String {
     if let Some(caps) = re_interval.captures(command) {
         let interval = caps.get(1).map_or("", |m| m.as_str());
         let unit = caps.get(2).map_or("", |m| m.as_str());
-        
+
         if !interval.is_empty() && !unit.is_empty() {
             // Add frequency if not already present
             if !enhanced.contains("--repeat") {
@@ -91,7 +94,7 @@ fn enhance_recurrence_command(command: &str) -> String {
                     _ => enhanced,
                 };
             }
-            
+
             // Add interval if not already present
             if !enhanced.contains("--interval") {
                 enhanced = enhanced.trim().to_string() + &format!(" --interval {}", interval);
@@ -176,11 +179,11 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
 
     // Check if this is explicitly about creating a todo (reminder) vs a calendar event
     let input_lower = sanitized_input.to_lowercase();
-    let is_todo_request = input_lower.contains("todo") || 
-                         input_lower.contains("reminder") || 
-                         input_lower.contains("task") || 
-                         (input_lower.contains("remind") && !input_lower.contains("meeting")) ||
-                         input_lower.contains("checklist");
+    let is_todo_request = input_lower.contains("todo")
+        || input_lower.contains("reminder")
+        || input_lower.contains("task")
+        || (input_lower.contains("remind") && !input_lower.contains("meeting"))
+        || input_lower.contains("checklist");
 
     // Load API key without showing it in error messages
     let api_key = env::var("XAI_API_KEY")

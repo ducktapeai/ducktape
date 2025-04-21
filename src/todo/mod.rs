@@ -4,13 +4,13 @@
 
 use anyhow::Result;
 
-mod todo_types;
 mod todo_applescript;
-mod todo_validation;
+mod todo_types;
 mod todo_util;
+mod todo_validation;
 
-pub use todo_types::*;
 pub use todo_applescript::*;
+pub use todo_types::*;
 pub use todo_validation::*;
 
 /// Create a new todo/reminder
