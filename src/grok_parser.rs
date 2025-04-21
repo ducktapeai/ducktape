@@ -548,19 +548,26 @@ mod tests {
     #[test]
     fn test_fix_calendar_end_time_format() {
         // Test fixing end time with date
-        let command = "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 2025-04-22 00:00 \"Work\"";
+        let command =
+            "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 2025-04-22 00:00 \"Work\"";
         let fixed = fix_calendar_end_time_format(command);
-        assert_eq!(fixed, "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 00:00 \"Work\"");
-        
+        assert_eq!(
+            fixed,
+            "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 00:00 \"Work\""
+        );
+
         // Test command that's already correct
         let command = "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 00:00 \"Work\"";
         let fixed = fix_calendar_end_time_format(command);
         assert_eq!(fixed, command);
-        
+
         // Test with additional flags
         let command = "ducktape calendar create \"Team Meeting\" 2025-04-22 14:30 2025-04-22 15:30 \"Work\" --contacts \"John Smith\" --zoom";
         let fixed = fix_calendar_end_time_format(command);
-        assert_eq!(fixed, "ducktape calendar create \"Team Meeting\" 2025-04-22 14:30 15:30 \"Work\" --contacts \"John Smith\" --zoom");
+        assert_eq!(
+            fixed,
+            "ducktape calendar create \"Team Meeting\" 2025-04-22 14:30 15:30 \"Work\" --contacts \"John Smith\" --zoom"
+        );
     }
 }
 
@@ -784,38 +791,42 @@ fn fix_calendar_end_time_format(command: &str) -> String {
     }
 
     debug!("Checking calendar command for end time format: {}", command);
-    
+
     // Regex to match the calendar create command format with potential date in end time
     // Using raw string (r#"..."#) to avoid escaping issues
     let re = regex::Regex::new(r#"calendar create\s+"([^"]+)"\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s+(\d{4}-\d{2}-\d{2}\s+)?(\d{1,2}:\d{2})"#).unwrap();
-    
+
     if let Some(caps) = re.captures(command) {
         // If we have a match, construct the corrected command with proper end time format
         let title = caps.get(1).map_or("", |m| m.as_str());
         let date = caps.get(2).map_or("", |m| m.as_str());
         let start_time = caps.get(3).map_or("", |m| m.as_str());
         let end_time = caps.get(5).map_or("", |m| m.as_str());
-        
+
         // Check if there was a date part before the end time that needs to be removed
         if caps.get(4).is_some() {
             debug!("Found end time with date, removing date part");
-            
+
             // Extract the part after the end time (flags, etc.)
             let after_end_time = if let Some(end_pos) = command.find(end_time) {
                 &command[end_pos + end_time.len()..]
             } else {
                 ""
             };
-            
+
             let fixed_command = format!(
                 r#"ducktape calendar create "{}" {} {} {} {}"#,
-                title, date, start_time, end_time, after_end_time.trim()
+                title,
+                date,
+                start_time,
+                end_time,
+                after_end_time.trim()
             );
-            
+
             debug!("Fixed command: {}", fixed_command);
             return fixed_command;
         }
     }
-    
+
     command.to_string()
 }
