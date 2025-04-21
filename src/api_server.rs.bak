@@ -5,7 +5,7 @@ use axum::{
         State, WebSocketUpgrade,
         ws::{Message, WebSocket},
     },
-    http::StatusCode,
+    http::{HeaderName, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
 };
@@ -16,7 +16,7 @@ use serde_json::Value;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 use crate::calendar::{
@@ -29,15 +29,17 @@ use crate::notes::{NoteConfig, create_note};
 use crate::todo::{TodoConfig, create_todo};
 use crate::{cli, grok_parser};
 use std::path::Path;
+use std::time::Duration;
 
 // API state that will be shared across handlers
 pub struct ApiState {
-    #[allow(dead_code)] // This field is kept for future use
     pub config: Config,
+    pub version: String,
+    pub start_time: chrono::DateTime<chrono::Utc>,
 }
 
 // Request and response types for calendar events
-#[derive(Debug, Deserialize)] // Added Debug trait
+#[derive(Debug, Deserialize)] 
 pub struct CreateEventRequest {
     pub title: String,
     pub date: String,
@@ -51,7 +53,7 @@ pub struct CreateEventRequest {
     pub create_zoom_meeting: Option<bool>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct CalendarResponse {
     pub success: bool,
     pub message: String,
@@ -59,7 +61,7 @@ pub struct CalendarResponse {
 }
 
 // Request and response types for todos
-#[derive(Debug, Deserialize)] // Added Debug trait
+#[derive(Debug, Deserialize)]
 pub struct CreateTodoRequest {
     pub title: String,
     pub lists: Option<Vec<String>>,
@@ -67,36 +69,51 @@ pub struct CreateTodoRequest {
     pub notes: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TodoResponse {
     pub success: bool,
     pub message: String,
 }
 
 // Request and response types for notes
-#[derive(Debug, Deserialize)] // Added Debug trait
+#[derive(Debug, Deserialize)]
 pub struct CreateNoteRequest {
     pub title: String,
     pub content: String,
     pub folder: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct NoteResponse {
     pub success: bool,
     pub message: String,
 }
 
 // General API response
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ApiResponse {
     pub success: bool,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<Value>,
+}
+
+// System status response for the /status endpoint
+#[derive(Debug, Serialize)]
+pub struct StatusResponse {
+    pub version: String,
+    pub uptime: String,
+    pub status: String,
+    pub calendars_available: bool,
 }
 
 // Create an event handler
+/// Create a new calendar event
+///
+/// Create a new calendar event with the specified parameters.
+/// Returns a success response or an error with details.
 async fn create_event_handler(
-    State(_state): State<Arc<ApiState>>,
+    State(state): State<Arc<ApiState>>,
     Json(request): Json<CreateEventRequest>,
 ) -> Result<Json<ApiResponse>, (StatusCode, Json<ApiResponse>)> {
     // Convert request to EventConfig
@@ -127,6 +144,7 @@ async fn create_event_handler(
                     Json(ApiResponse {
                         success: false,
                         message: format!("Invalid email format: {}", email),
+                        data: None,
                     }),
                 ));
             }
@@ -147,15 +165,22 @@ async fn create_event_handler(
         Ok(_) => Ok(Json(ApiResponse {
             success: true,
             message: "Event created successfully".to_string(),
+            data: None,
         })),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse { success: false, message: format!("Failed to create event: {}", e) }),
+            Json(ApiResponse { 
+                success: false, 
+                message: format!("Failed to create event: {}", e),
+                data: None,
+            }),
         )),
     }
 }
 
-// List available calendars
+/// List available calendars
+///
+/// Retrieve a list of all available calendars from the system.
 async fn list_calendars_handler()
 -> Result<Json<CalendarResponse>, (StatusCode, Json<CalendarResponse>)> {
     match get_available_calendars().await {
@@ -175,7 +200,9 @@ async fn list_calendars_handler()
     }
 }
 
-// Create a todo handler
+/// Create a new todo item
+///
+/// Create a new todo/reminder with the specified parameters.
 async fn create_todo_handler(
     Json(request): Json<CreateTodoRequest>,
 ) -> Result<Json<TodoResponse>, (StatusCode, Json<TodoResponse>)> {
@@ -207,7 +234,9 @@ async fn create_todo_handler(
     }
 }
 
-// Create a note handler
+/// Create a new note
+///
+/// Create a new note with the specified title, content, and optional folder.
 async fn create_note_handler(
     Json(request): Json<CreateNoteRequest>,
 ) -> Result<Json<NoteResponse>, (StatusCode, Json<NoteResponse>)> {
@@ -229,12 +258,150 @@ async fn create_note_handler(
     }
 }
 
-// Health check endpoint
+/// API status endpoint
+///
+/// Returns information about the API server status and uptime.
+async fn status_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<StatusResponse>, (StatusCode, Json<ApiResponse>)> {
+    // Check if calendars are available as a basic health check
+    let calendars_available = match get_available_calendars().await {
+        Ok(_) => true,
+        Err(_) => false,
+    };
+    
+    // Calculate uptime
+    let now = chrono::Utc::now();
+    let uptime_duration = now.signed_duration_since(state.start_time);
+    let uptime = format!(
+        "{}d {}h {}m {}s",
+        uptime_duration.num_days(),
+        uptime_duration.num_hours() % 24,
+        uptime_duration.num_minutes() % 60,
+        uptime_duration.num_seconds() % 60
+    );
+    
+    Ok(Json(StatusResponse {
+        version: state.version.clone(),
+        uptime,
+        status: "online".to_string(),
+        calendars_available,
+    }))
+}
+
+/// Health check endpoint
+///
+/// Simple endpoint to check if the API is running.
 async fn health_check() -> &'static str {
     "DuckTape API is running"
 }
 
-// WebSocket handler for chat
+// OpenAPI documentation endpoint
+async fn api_docs() -> impl IntoResponse {
+    // Note: In a real implementation, you would generate this from your API definitions
+    // or use a proper OpenAPI crate. This is a simplified example.
+    let docs = r#"{
+        "openapi": "3.0.0",
+        "info": {
+            "title": "DuckTape API",
+            "version": "1.0.0",
+            "description": "API for DuckTape calendar, todo, and notes functionality"
+        },
+        "paths": {
+            "/health": {
+                "get": {
+                    "summary": "Health check",
+                    "responses": {
+                        "200": {
+                            "description": "API is running"
+                        }
+                    }
+                }
+            },
+            "/status": {
+                "get": {
+                    "summary": "Get API status",
+                    "responses": {
+                        "200": {
+                            "description": "Status information"
+                        }
+                    }
+                }
+            },
+            "/calendars": {
+                "get": {
+                    "summary": "List available calendars",
+                    "responses": {
+                        "200": {
+                            "description": "List of calendars"
+                        }
+                    }
+                }
+            },
+            "/calendar/event": {
+                "post": {
+                    "summary": "Create a calendar event",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string"},
+                                        "date": {"type": "string"},
+                                        "start_time": {"type": "string"},
+                                        "end_time": {"type": "string"}
+                                    },
+                                    "required": ["title", "date", "start_time"]
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Event created successfully"
+                        }
+                    }
+                }
+            },
+            "/todo": {
+                "post": {
+                    "summary": "Create a todo item",
+                    "responses": {
+                        "200": {
+                            "description": "Todo created successfully"
+                        }
+                    }
+                }
+            },
+            "/note": {
+                "post": {
+                    "summary": "Create a note",
+                    "responses": {
+                        "200": {
+                            "description": "Note created successfully"
+                        }
+                    }
+                }
+            },
+            "/chat": {
+                "get": {
+                    "summary": "WebSocket connection for real-time commands",
+                    "responses": {
+                        "101": {
+                            "description": "WebSocket connection established"
+                        }
+                    }
+                }
+            }
+        }
+    }"#;
+    
+    (StatusCode::OK, [("content-type", "application/json")], docs)
+}
+
+/// WebSocket handler for chat
 async fn websocket_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
     info!("New WebSocket upgrade request received");
     ws.on_upgrade(handle_socket)
@@ -928,26 +1095,60 @@ async fn handle_websocket_command(connection_id: Uuid, args: CommandArgs, socket
 
 // Create and start the API server
 pub async fn start_api_server(config: Config) -> Result<()> {
-    // Create shared state
-    let state = Arc::new(ApiState { config });
+    // Create shared state with version information and start time
+    let state = Arc::new(ApiState { 
+        config, 
+        version: env!("CARGO_PKG_VERSION").to_string(), 
+        start_time: chrono::Utc::now(),
+    });
 
-    // Configure CORS
-    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
+    // Configure comprehensive CORS for frontend applications
+    let cors = CorsLayer::new()
+        // Allow requests from any frontend origin
+        .allow_origin(tower_http::cors::Any)
+        // Support common HTTP methods for REST APIs
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::PUT, Method::DELETE])
+        // Allow common headers like content-type
+        .allow_headers([
+            HeaderName::from_static("content-type"),
+            HeaderName::from_static("authorization"),
+            HeaderName::from_static("x-api-key"),
+        ])
+        // Allow credentials (cookies, authorization headers)
+        .allow_credentials(true)
+        // Set max age for preflight requests
+        .max_age(Duration::from_secs(3600));
 
     // Build our application with routes
     let app = Router::new()
+        // Core API functionality
         .route("/health", get(health_check))
+        .route("/status", get(status_handler))
+        
+        // OpenAPI documentation
+        .route("/docs", get(api_docs))
+        
+        // Calendar endpoints
         .route("/calendars", get(list_calendars_handler))
         .route("/calendar/event", post(create_event_handler))
+        
+        // Todo endpoints
         .route("/todo", post(create_todo_handler))
+        
+        // Note endpoints
         .route("/note", post(create_note_handler))
-        .route("/chat", get(websocket_handler)) // Add WebSocket endpoint
+        
+        // WebSocket endpoint
+        .route("/chat", get(websocket_handler))
+        
+        // Apply CORS and state
         .layer(cors)
         .with_state(state);
 
-    // Run our app with the correct syntax for axum 0.7
+    // Run our app
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     info!("API server starting on http://{}", addr);
+    info!("API documentation available at http://127.0.0.1:3000/docs");
     info!("WebSocket endpoint available at ws://127.0.0.1:3000/chat");
 
     // Create a TcpListener first, then pass it to serve

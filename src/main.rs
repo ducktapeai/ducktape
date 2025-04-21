@@ -7,6 +7,7 @@ use ducktape::env_debug;
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
+use log::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,7 +37,8 @@ async fn main() -> Result<()> {
     if cli.api_server {
         // Load config and start API server only
         let config = Config::load()?;
-        return api_server::start_api_server(config).await;
+        let address = "127.0.0.1:3000";
+        return api_server::start_api_server(config, &address).await;
     }
 
     if cli.full {
