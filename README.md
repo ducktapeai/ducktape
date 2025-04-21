@@ -1,30 +1,9 @@
-# DuckTape 🦆 ...
+# DuckTape 🦆
 
 DuckTape is an AI-powered command-line interface that simplifies managing your Apple Calendar, Reminders, and Notes. With DuckTape, you can use two distinct approaches: **Natural Language Mode** and **Terminal Mode**.
 
-> **Note**: DuckTape currently### Advanced Features
-
-### Zoom Integration
-DuckTape can create Zoom meetings directly from both Terminal Mode and Natural Language Mode. To enable this feature, set the following environment variables:
-
-```bash
-export ZOOM_ACCOUNT_ID='your-zoom-account-id'
-export ZOOM_CLIENT_ID='your-zoom-client-id'
-export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
-```
-
-#### Creating Zoom Meetings
-
-Using Terminal Mode:
-```bash
-ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
-```
-
-Using Natural Language Mode:
-```
-🦆 ducktape "create a zoom meeting called Team Meeting with Joe Duck for this coming Tuesday"
-```s on macOS and requires Apple Calendar to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
-> DuckTape will use your native Apple capabilities, for example Apple Contacts, Apple Todo and so forth. Please ensure these Applications are properly setup and configured as outlined above.
+> **Note**: DuckTape currently only works on macOS and requires Apple Calendar, Reminders, and Notes to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
+> DuckTape will use your native Apple capabilities, for example Apple Contacts, Apple Reminders and so forth. Please ensure these Applications are properly setup and configured as outlined above.
 
 ---
 
@@ -34,8 +13,9 @@ Using Natural Language Mode:
 - **Command-Line Interface**: Execute precise commands for advanced control.
 - **AI Model Support**: Integrates with OpenAI, Grok (X.AI), and DeepSeek for natural language understanding.
 - **Zoom Integration**: Schedule Zoom meetings directly from the terminal.
-- **Recurring Events**: Create daily, weekly, monthly, or yearly recurring events.
 - **Apple Contacts Integration**: Automatically add attendees to events using Apple Contacts.
+- **Reminder Management**: Create and manage reminders with due dates and notes.
+- **Recurring Events**: Create daily, weekly, monthly, or yearly recurring events.
 
 ---
 
@@ -50,7 +30,7 @@ brew install ducktapeai/ducktape/ducktape
 
 To update to the latest version:
 ```bash
-brew upgrade ducktape
+brew upgrade ducktapeai/ducktape/ducktape
 ```
 
 ### Manual Installation
@@ -109,24 +89,34 @@ source ~/.zshrc
    ```
 3. You'll see a welcome message. Then type your request using natural language:
    ```
-   🦆 ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"
+   🦆 create an event Team Meeting with Joe Duck for this coming Tuesday
    ```
 4. DuckTape will process your natural language request and execute the appropriate command:
    ```
-   Processing natural language: 'ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"'
+   Processing natural language: 'create an event Team Meeting with Joe Duck for this coming Tuesday'
    Translated to command: ducktape calendar create "Team Meeting" 2025-04-22 11:00 12:00 "Work" --contacts "Joe Duck"
    ```
 
 The power of the Natural Language Mode is that it automatically interprets dates, times, and contacts, saving you time and effort.
-----
-### Example Commands
 
+----
 ### Natural Language Examples
-- `ducktape "create an event Team Meeting with Joe Duck for this coming Tuesday"`
-- `ducktape "create a zoom meeting called Team Meeting with Joe Duck for this coming Tuesday"`
-- `ducktape "schedule a meeting with Joe Duck tomorrow at 2pm about project review"`
-- `ducktape "create a weekly team meeting every Tuesday at 10am"`
-- `ducktape "add a reminder to buy groceries next Monday morning"`
+
+#### Calendar Events
+- `create an event Team Meeting with Joe Duck for this coming Tuesday`
+- `create a zoom event today at 10am called Team Check in and invite Joe Duck`
+- `schedule a meeting with Joe Duck tomorrow at 2pm about project review`
+- `create a weekly team meeting every Tuesday at 10am`
+
+#### Reminders
+- `create a reminder today at 11pm called Check if Ducks are swimming`
+- `add a reminder to buy groceries next Monday morning`
+- `remind me to call Joe Duck on Friday at 3pm`
+- `set a reminder for tomorrow at noon to review documents`
+
+#### Notes
+- `create a note titled "Meeting Ideas" with content about product planning`
+- `add a note about the new marketing strategy`
 
 ### 2. Terminal Mode (No API Key Required)
 
@@ -156,7 +146,7 @@ This command explicitly specifies all parameters: event title, date, start time,
   ```
 - Add attendees by email:
   ```bash
-  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "joe.Duck@example.com,jane.doe@example.com"
+  ducktape calendar create "Team Sync" 2025-04-15 10:00 11:00 "Work" --email "joe.duck@example.com,jane.doe@example.com"
   ```
 - Create an event with a Zoom meeting and contacts:
   ```bash
@@ -167,19 +157,28 @@ This command explicitly specifies all parameters: event title, date, start time,
   ducktape calendar create "Weekly Standup" 2025-04-15 09:00 09:30 "Work" --repeat weekly
   ```
 
-#### Todo Commands
-- Create a todo:
+#### Reminder Commands
+- Create a reminder:
   ```bash
-  ducktape todo create "Buy groceries" "Reminders"
+  ducktape reminder create "Buy groceries" --remind "2025-04-22 18:00"
   ```
-- List todos:
+- Create a reminder in a specific list:
   ```bash
-  ducktape todo list
+  ducktape reminder create "Call Joe Duck" "Work" --remind "tomorrow at 3pm"
   ```
-- Delete a todo:
+- List reminders:
   ```bash
-  ducktape todo delete "Buy groceries"
+  ducktape reminder list
   ```
+- Delete a reminder:
+  ```bash
+  ducktape reminder delete "Buy groceries"
+  ```
+
+> **Note**: For backward compatibility, the `todo` command is also supported and maps to the reminder functionality:
+> ```bash
+> ducktape todo create "Buy groceries" --remind "2025-04-22 18:00"
+> ```
 
 #### Notes Commands
 - Create a note:
@@ -222,6 +221,10 @@ This command explicitly specifies all parameters: event title, date, start time,
   ```bash
   ducktape --help
   ```
+- Exit the application:
+  ```bash
+  exit
+  ```
 
 ---
 
@@ -232,14 +235,14 @@ DuckTape uses a `config.toml` file located in the root of the repository to mana
 ## Example Configuration
 ```toml
 [language_model]
-provider = "OpenAI"  # Options: "OpenAI", "Grok", "DeepSeek", or leave empty for Terminal Mode
+provider = "Grok"  # Options: "OpenAI", "Grok", "DeepSeek", or leave empty for Terminal Mode
 
 [calendar]
 default_calendar = "Work"
 default_reminder_minutes = 15
 default_duration_minutes = 60
 
-[todo]
+[reminder]
 default_list = "Reminders"
 default_reminder = true
 
@@ -248,45 +251,27 @@ default_folder = "Notes"
 ```
 
 ### Viewing and Editing Configuration
-- To view the current configuration, open the `config.toml` file in the root of the repository.
-- To change settings, edit the file and save your changes.
+- To view the current configuration:
+  ```bash
+  ducktape config show all
+  ```
+- To change settings via command line:
+  ```bash
+  ducktape config set language_model.provider "grok"
+  ```
 
 ### Key Settings
 - **Language Model Provider**: Set the `provider` field under `[language_model]` to enable natural language processing. Leave it empty to use Terminal Mode.
 - **Default Calendar**: Specify the default calendar for events under `[calendar]`.
-- **Default Todo List**: Set the default list for todos under `[todo]`.
+- **Default Reminder List**: Set the default list for reminders under `[reminder]`.
 - **Default Notes Folder**: Define the folder for notes under `[notes]`.
-
-For more details, refer to the documentation or examples in the `config.toml` file.
-
-### Default Settings
-You can configure default settings for DuckTape using the `config` command:
-
-- Set the default calendar:
-  ```bash
-  ducktape config set calendar.default "Work"
-  ```
-- Set the default reminder time (in minutes):
-  ```bash
-  ducktape config set calendar.reminder 30
-  ```
-- Set the default event duration (in minutes):
-  ```bash
-  ducktape config set calendar.duration 60
-  ```
-
-### Viewing Configuration
-To view your current configuration:
-```bash
-ducktape config show all
-```
 
 ---
 
 ## Advanced Features
 
 ### Zoom Integration
-DuckTape can create Zoom meetings directly from the terminal. To enable this feature, set the following environment variables:
+DuckTape can create Zoom meetings directly from both Terminal Mode and Natural Language Mode. To enable this feature, set the following environment variables:
 
 ```bash
 export ZOOM_ACCOUNT_ID='your-zoom-account-id'
@@ -294,10 +279,29 @@ export ZOOM_CLIENT_ID='your-zoom-client-id'
 export ZOOM_CLIENT_SECRET='your-zoom-client-secret'
 ```
 
-### Recurring Events
-Create recurring events with the `--repeat` flag:
+#### Creating Zoom Meetings
+
+Using Terminal Mode:
 ```bash
-ducktape calendar create "Weekly Standup" 2025-04-03 09:00 09:30 "Work" --repeat weekly
+ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
+```
+
+Using Natural Language Mode:
+```
+🦆 create a zoom event today at 10am called Team Check in and invite Joe Duck
+```
+
+### Contact Integration
+
+DuckTape integrates with Apple Contacts to automatically look up email addresses when you specify contact names:
+
+```bash
+ducktape calendar create "Project Discussion" 2025-04-23 14:00 15:00 "Work" --contacts "Joe Duck, Jane Doe"
+```
+
+Or in Natural Language Mode:
+```
+🦆 schedule a meeting with Joe Duck and Jane Doe tomorrow at 2pm
 ```
 
 ---
@@ -305,12 +309,18 @@ ducktape calendar create "Weekly Standup" 2025-04-03 09:00 09:30 "Work" --repeat
 ## Troubleshooting
 
 ### Common Issues
-- **Missing API Keys**: Ensure you have set the required environment variables.
-- **Invalid Calendar Name**: Use `ducktape calendars` to list available calendars.
-- **Permission Denied**: Ensure DuckTape has executable permissions:
-  ```bash
-  chmod +x ducktape
-  ```
+- **Missing API Keys**: Ensure you have set the required environment variables for your chosen language model provider.
+- **Invalid Calendar Name**: Use `ducktape calendar list` to see available calendars.
+- **Contact Not Found**: Verify that the contact exists in your Apple Contacts app.
+- **Zoom Integration Issues**: Check that your Zoom API credentials are correct and have the necessary permissions.
+
+### Logging
+DuckTape provides detailed logging information that can help diagnose issues:
+
+```
+[2025-04-21T20:04:10Z INFO ducktape::calendar] Creating Zoom meeting for event: Team Check in
+[2025-04-21T20:04:11Z INFO ducktape::zoom] Successfully created Zoom meeting: 84349352425
+```
 
 ---
 
