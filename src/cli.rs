@@ -253,13 +253,15 @@ pub enum NoteActions {
     #[command(aliases = ["add", "new"])]
     Create {
         /// Note title
-        #[arg(required = true)]
-        title: String,
+        #[arg(required = true, num_args = 1.., value_delimiter = ' ')]
+        title: Vec<String>,
 
         /// Note content
+        #[arg(long)]
         content: Option<String>,
 
         /// Folder name
+        #[arg(long)]
         folder: Option<String>,
     },
 
@@ -267,10 +269,11 @@ pub enum NoteActions {
     #[command(alias = "find")]
     Search {
         /// Search query
-        #[arg(required = true)]
-        query: String,
+        #[arg(required = true, num_args = 1.., value_delimiter = ' ')]
+        query: Vec<String>,
 
         /// Folder name
+        #[arg(long)]
         folder: Option<String>,
     },
 
@@ -278,10 +281,11 @@ pub enum NoteActions {
     #[command(alias = "remove")]
     Delete {
         /// Note title or ID
-        #[arg(required = true)]
-        note_id: String,
+        #[arg(required = true, num_args = 1.., value_delimiter = ' ')]
+        note_id: Vec<String>,
 
         /// Folder name
+        #[arg(long)]
         folder: Option<String>,
     },
 }
@@ -504,7 +508,7 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<crate::command_processor::Co
                 }
                 NoteActions::Create { title, content, folder } => {
                     args.push("create".to_string());
-                    args.push(title.clone());
+                    args.push(title.join(" "));
                     if let Some(content_text) = content {
                         args.push(content_text.clone());
                     }
@@ -514,14 +518,14 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<crate::command_processor::Co
                 }
                 NoteActions::Search { query, folder } => {
                     args.push("search".to_string());
-                    args.push(query.clone());
+                    args.push(query.join(" "));
                     if let Some(folder_name) = folder {
                         args.push(folder_name.clone());
                     }
                 }
                 NoteActions::Delete { note_id, folder } => {
                     args.push("delete".to_string());
-                    args.push(note_id.clone());
+                    args.push(note_id.join(" "));
                     if let Some(folder_name) = folder {
                         args.push(folder_name.clone());
                     }

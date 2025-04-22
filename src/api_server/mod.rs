@@ -3,8 +3,8 @@
 // This module provides a complete HTTP and WebSocket API for frontend applications
 // to interact with DuckTape's functionality.
 
-use anyhow::Result;
 use crate::config::Config;
+use anyhow::Result;
 
 mod handlers;
 mod models;

@@ -2,7 +2,7 @@
 //
 // This module provides functions to interact with the Reminders application via AppleScript
 
-use super::todo_types::{TodoConfig, TodoItem, TodoError};
+use super::todo_types::{TodoConfig, TodoError, TodoItem};
 use super::todo_util::escape_applescript_string;
 use anyhow::{Result, anyhow};
 use log::{debug, error, info};
@@ -17,23 +17,19 @@ pub async fn ensure_reminders_running() -> Result<()> {
         end if
         return "OK"
     end tell"#;
-    
+
     let output = Command::new("osascript").arg("-e").arg(check_script).output()?;
-    
-    if output.status.success() { 
-        Ok(()) 
-    } else { 
-        Err(anyhow!(TodoError::NotRunning)) 
-    }
+
+    if output.status.success() { Ok(()) } else { Err(anyhow!(TodoError::NotRunning)) }
 }
 
 /// Create a single todo in Reminders.app
 pub async fn create_single_todo(config: TodoConfig<'_>) -> Result<()> {
     debug!("Creating todo with config: {:?}", config);
-    
+
     // Make sure Reminders app is running
     ensure_reminders_running().await?;
-    
+
     let target_lists = if config.lists.is_empty() { vec!["Reminders"] } else { config.lists };
 
     // Format reminder time to AppleScript-friendly string if provided
@@ -93,7 +89,7 @@ end tell"#,
         let output = Command::new("osascript").arg("-e").arg(&script).output()?;
         let result = String::from_utf8_lossy(&output.stdout);
         let error_output = String::from_utf8_lossy(&output.stderr);
-        
+
         if !error_output.is_empty() {
             error!("AppleScript error: {}", error_output);
         }
@@ -121,7 +117,7 @@ end tell"#,
 pub async fn get_reminder_lists() -> Result<Vec<String>> {
     // Make sure Reminders app is running
     ensure_reminders_running().await?;
-    
+
     let script = r#"tell application "Reminders"
     set listNames to {}
     repeat with l in lists
@@ -132,9 +128,11 @@ end tell"#;
 
     let output = Command::new("osascript").arg("-e").arg(script).output()?;
     if !output.status.success() {
-        return Err(anyhow!(TodoError::ScriptError(String::from_utf8_lossy(&output.stderr).to_string())));
+        return Err(anyhow!(TodoError::ScriptError(
+            String::from_utf8_lossy(&output.stderr).to_string()
+        )));
     }
-    
+
     let lists_str = String::from_utf8_lossy(&output.stdout);
     let lists: Vec<String> = lists_str
         .trim_matches('{')
@@ -142,7 +140,7 @@ end tell"#;
         .split(", ")
         .map(|s| s.trim_matches('"').to_string())
         .collect();
-    
+
     debug!("Found {} reminder lists", lists.len());
     Ok(lists)
 }
@@ -151,7 +149,7 @@ end tell"#;
 pub async fn fetch_todos(list_name: Option<&str>) -> Result<Vec<TodoItem>> {
     // Make sure Reminders app is running
     ensure_reminders_running().await?;
-    
+
     let script = if let Some(list) = list_name {
         let escaped_list = escape_applescript_string(list);
         format!(
@@ -195,14 +193,16 @@ end tell"#
 
     let output = Command::new("osascript").arg("-e").arg(script).output()?;
     if !output.status.success() {
-        return Err(anyhow!(TodoError::ScriptError(String::from_utf8_lossy(&output.stderr).to_string())));
+        return Err(anyhow!(TodoError::ScriptError(
+            String::from_utf8_lossy(&output.stderr).to_string()
+        )));
     }
-    
+
     // Parse the AppleScript output into TodoItem structs
     let todos_output = String::from_utf8_lossy(&output.stdout);
     let mut todos = Vec::new();
-    
-    // Very basic parsing of AppleScript output - in a real implementation 
+
+    // Very basic parsing of AppleScript output - in a real implementation
     // you might want a more robust parser
     for line in todos_output.lines() {
         if line.contains("title:") && line.contains("notes:") {
@@ -211,33 +211,35 @@ end tell"#
             let mut notes = None;
             let mut completed = false;
             let mut list_name = String::new();
-            
+
             // Super simple parsing - you might want to improve this
             if let Some(title_start) = line.find("title:") {
                 if let Some(title_end) = line[title_start..].find(",") {
                     title = line[title_start + 6..title_start + title_end].trim().to_string();
                 }
             }
-            
+
             if let Some(notes_start) = line.find("notes:") {
                 if let Some(notes_end) = line[notes_start..].find(",") {
-                    let note_text = line[notes_start + 6..notes_start + notes_end].trim().to_string();
+                    let note_text =
+                        line[notes_start + 6..notes_start + notes_end].trim().to_string();
                     if !note_text.is_empty() {
                         notes = Some(note_text);
                     }
                 }
             }
-            
+
             if let Some(completed_start) = line.find("completed:") {
-                if let Some(completed_str) = line[completed_start + 10..].split_whitespace().next() {
+                if let Some(completed_str) = line[completed_start + 10..].split_whitespace().next()
+                {
                     completed = completed_str == "true";
                 }
             }
-            
+
             if let Some(list_start) = line.find("listName:") {
                 list_name = line[list_start + 9..].trim().to_string();
             }
-            
+
             todos.push(TodoItem {
                 title,
                 notes,
@@ -247,7 +249,7 @@ end tell"#
             });
         }
     }
-    
+
     debug!("Fetched {} todos", todos.len());
     Ok(todos)
 }
@@ -256,9 +258,9 @@ end tell"#
 pub async fn delete_todo(title: &str, list_name: Option<&str>) -> Result<()> {
     // Make sure Reminders app is running
     ensure_reminders_running().await?;
-    
+
     let escaped_title = escape_applescript_string(title);
-    
+
     let script = if let Some(list) = list_name {
         let escaped_list = escape_applescript_string(list);
         format!(
@@ -276,8 +278,7 @@ pub async fn delete_todo(title: &str, list_name: Option<&str>) -> Result<()> {
         return "Error: " & errMsg
     end try
 end tell"#,
-            escaped_list,
-            escaped_title
+            escaped_list, escaped_title
         )
     } else {
         format!(
@@ -314,7 +315,7 @@ end tell"#,
     } else {
         let error_msg = result.replace("Error: ", "");
         error!("Failed to delete todo: {}", error_msg);
-        
+
         if error_msg.contains("not found") {
             Err(anyhow!(TodoError::TodoNotFound(title.to_string())))
         } else {

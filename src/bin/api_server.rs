@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use ducktape::api_server;
 use ducktape::config::Config;
-use log::{info, error};
+use log::{error, info};
 use std::path::PathBuf;
 
 /// Command line arguments for the API server
@@ -29,11 +29,11 @@ async fn main() -> Result<()> {
 
     // Parse command line arguments
     let cli = Cli::parse();
-    
+
     // Construct server address
     let address = format!("{}:{}", cli.host, cli.port);
     info!("Starting API server on {}", address);
-    
+
     // Load configuration
     let config = match cli.config {
         Some(path) => {
@@ -47,11 +47,11 @@ async fn main() -> Result<()> {
             Config::load()?
         }
     };
-    
+
     // Start the API server
     if let Err(e) = api_server::start_api_server(config, &address).await {
         error!("API server error: {}", e);
     }
-    
+
     Ok(())
 }

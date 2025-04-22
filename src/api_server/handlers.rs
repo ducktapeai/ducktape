@@ -3,9 +3,9 @@
 // This module contains handler functions for API endpoints.
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
     response::IntoResponse,
 };
 use chrono::Utc;
@@ -16,9 +16,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::models::{
-    ApiResponse, ApiState, CalendarResponse, CreateEventRequest,
-    CreateNoteRequest, CreateTodoRequest, NoteResponse,
-    StatusResponse, TodoResponse,
+    ApiResponse, ApiState, CalendarResponse, CreateEventRequest, CreateNoteRequest,
+    CreateTodoRequest, NoteResponse, StatusResponse, TodoResponse,
 };
 
 /// Handle health check requests
@@ -39,19 +38,17 @@ pub async fn status(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
     let hours = duration.num_hours() % 24;
     let minutes = duration.num_minutes() % 60;
     let seconds = duration.num_seconds() % 60;
-    
-    let uptime = format!(
-        "{} days, {} hours, {} minutes, {} seconds",
-        days, hours, minutes, seconds
-    );
-    
+
+    let uptime =
+        format!("{} days, {} hours, {} minutes, {} seconds", days, hours, minutes, seconds);
+
     let response = StatusResponse {
         version: state.version.clone(),
         uptime,
         status: "online".to_string(),
         calendars_available: true,
     };
-    
+
     (StatusCode::OK, Json(response))
 }
 
@@ -83,43 +80,38 @@ pub async fn list_calendars() -> impl IntoResponse {
 /// Create a new calendar event
 ///
 /// Creates an event in macOS Calendar.app
-pub async fn create_calendar_event(
-    Json(payload): Json<CreateEventRequest>,
-) -> impl IntoResponse {
+pub async fn create_calendar_event(Json(payload): Json<CreateEventRequest>) -> impl IntoResponse {
     debug!("Create event request: {:?}", payload);
-    
+
     // Create an EventConfig from the request
-    let mut event_config = crate::calendar::EventConfig::new(
-        &payload.title,
-        &payload.date,
-        &payload.start_time,
-    );
-    
+    let mut event_config =
+        crate::calendar::EventConfig::new(&payload.title, &payload.date, &payload.start_time);
+
     // Apply optional fields if present
     if let Some(end_time) = &payload.end_time {
         event_config.end_time = Some(end_time.clone());
     }
-    
+
     if let Some(calendars) = &payload.calendars {
         event_config.calendars = calendars.clone();
     }
-    
+
     if let Some(location) = &payload.location {
         event_config.location = Some(location.clone());
     }
-    
+
     if let Some(description) = &payload.description {
         event_config.description = Some(description.clone());
     }
-    
+
     if let Some(emails) = &payload.emails {
         event_config.emails = emails.clone();
     }
-    
+
     if let Some(true) = payload.create_zoom_meeting {
         event_config.create_zoom_meeting = true;
     }
-    
+
     // Create the calendar event
     match crate::calendar::create_event(event_config).await {
         Ok(_) => {
@@ -145,34 +137,30 @@ pub async fn create_calendar_event(
 /// Create a new todo item
 ///
 /// Creates a todo in Reminders.app
-pub async fn create_todo(
-    Json(payload): Json<CreateTodoRequest>,
-) -> impl IntoResponse {
+pub async fn create_todo(Json(payload): Json<CreateTodoRequest>) -> impl IntoResponse {
     debug!("Create todo request: {:?}", payload);
-    
+
     // This is a stub - would connect to actual todo module
     let response = TodoResponse {
         success: true,
         message: format!("Todo '{}' created successfully", payload.title),
     };
-    
+
     (StatusCode::CREATED, Json(response))
 }
 
 /// Create a new note
 ///
 /// Creates a note in Notes.app
-pub async fn create_note(
-    Json(payload): Json<CreateNoteRequest>,
-) -> impl IntoResponse {
+pub async fn create_note(Json(payload): Json<CreateNoteRequest>) -> impl IntoResponse {
     debug!("Create note request: {:?}", payload);
-    
+
     // This is a stub - would connect to actual notes module
     let response = NoteResponse {
         success: true,
         message: format!("Note '{}' created successfully", payload.title),
     };
-    
+
     (StatusCode::CREATED, Json(response))
 }
 

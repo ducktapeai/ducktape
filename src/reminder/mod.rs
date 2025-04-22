@@ -4,13 +4,13 @@
 
 use anyhow::Result;
 
-mod reminder_types;
 mod reminder_applescript;
-mod reminder_validation;
+mod reminder_types;
 mod reminder_util;
+mod reminder_validation;
 
-pub use reminder_types::*;
 pub use reminder_applescript::*;
+pub use reminder_types::*;
 pub use reminder_validation::*;
 
 /// Create a new reminder
