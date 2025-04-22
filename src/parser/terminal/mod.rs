@@ -16,7 +16,7 @@ pub struct TerminalParser;
 impl Parser for TerminalParser {
     async fn parse_input(&self, input: &str) -> Result<ParseResult> {
         debug!("Terminal parser processing direct input: {}", input);
-        
+
         // Delegate to the command parser for structured command parsing
         let command_parser = command::CommandParser::new()?;
         command_parser.parse_input(input).await
@@ -35,12 +35,14 @@ pub fn create_terminal_parser() -> Result<Box<dyn Parser + Send + Sync>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_terminal_parser() -> Result<()> {
         let parser = TerminalParser;
-        let result = parser.parse_input("calendar create \"Test Meeting\" 2025-04-25 14:00 15:00 \"Work\"").await?;
-        
+        let result = parser
+            .parse_input("calendar create \"Test Meeting\" 2025-04-25 14:00 15:00 \"Work\"")
+            .await?;
+
         match result {
             ParseResult::CommandString(_) | ParseResult::StructuredCommand(_) => {
                 // Either result type is acceptable for terminal input

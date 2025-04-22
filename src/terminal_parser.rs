@@ -9,10 +9,7 @@ use log::debug;
 
 use crate::parser::traits::{ParseResult, Parser};
 
-#[deprecated(
-    since = "0.13.0",
-    note = "Use crate::parser::terminal::TerminalParser instead"
-)]
+#[deprecated(since = "0.13.0", note = "Use crate::parser::terminal::TerminalParser instead")]
 pub struct TerminalParser;
 
 #[async_trait]
@@ -36,4 +33,3 @@ pub fn create_terminal_parser() -> Result<Box<dyn Parser + Send + Sync>> {
     // Delegate to the new implementation
     crate::parser::terminal::create_terminal_parser()
 }
-

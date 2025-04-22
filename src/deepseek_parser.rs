@@ -2,13 +2,12 @@
 ///
 /// This module is kept for backward compatibility and redirects to the new modular structure.
 /// Use the `crate::parser::deepseek` module instead.
-
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use log::debug;
 use reqwest::Client;
 use serde_json::json;
-use std::env;  // Added missing import
+use std::env; // Added missing import
 
 use crate::parser_trait::{ParseResult, Parser};
 
@@ -19,10 +18,7 @@ pub use crate::parser::deepseek::DeepSeekParser as NewDeepSeekParser;
 /// DeepSeek model parser implementation (deprecated)
 ///
 /// Deprecated: Use `crate::parser::deepseek::DeepSeekParser` instead
-#[deprecated(
-    since = "0.13.0",
-    note = "Use crate::parser::deepseek::DeepSeekParser instead"
-)]
+#[deprecated(since = "0.13.0", note = "Use crate::parser::deepseek::DeepSeekParser instead")]
 pub struct DeepSeekParser;
 
 #[async_trait]
@@ -40,7 +36,7 @@ impl Parser for DeepSeekParser {
 }
 
 /// Re-export of the parse_natural_language function for backward compatibility
-/// 
+///
 /// Deprecated: Use `crate::parser::deepseek::parse_natural_language` instead
 #[deprecated(
     since = "0.13.0",

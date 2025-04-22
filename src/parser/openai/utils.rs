@@ -2,10 +2,10 @@
 //!
 //! This module contains shared utility functions used by the OpenAI parser
 
-use anyhow::{anyhow, Result};
+use crate::calendar::validate_email;
+use anyhow::{Result, anyhow};
 use log::debug;
 use regex::Regex;
-use crate::calendar::validate_email;
 
 /// Helper function to clean up NLP-generated commands
 /// Removes unnecessary quotes and normalizes spacing
@@ -265,8 +265,7 @@ pub fn extract_contact_names(input: &str) -> Vec<String> {
         debug!("Text to parse for contacts: '{}'", after_word);
 
         // Pattern to detect email addresses (simple version)
-        let email_pattern =
-            Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
+        let email_pattern = Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
 
         for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
             let name_part = name_part.trim();
@@ -424,7 +423,7 @@ mod tests {
         let input = "ducktape calendar create \"\"Meeting\"\"";
         let sanitized = sanitize_nlp_command(input);
         assert_eq!(sanitized, "ducktape calendar create \"Meeting\"");
-        
+
         // Test non-ducktape command
         let input = "not a ducktape command";
         let sanitized = sanitize_nlp_command(input);

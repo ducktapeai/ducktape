@@ -22,7 +22,7 @@ impl Parser for DeepSeekParser {
     async fn parse_input(&self, input: &str) -> Result<ParseResult> {
         // Temporarily use OpenAI parser as a fallback until DeepSeek implementation is completed
         debug!("DeepSeek parser: Using OpenAI parser as fallback for input: {}", input);
-        
+
         // Forward to OpenAI parser
         let openai_parser = crate::parser::openai::OpenAIParser::new()?;
         openai_parser.parse_input(input).await

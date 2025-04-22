@@ -6,7 +6,7 @@
 
 use crate::command_processor::CommandArgs;
 use crate::parser::traits::{ParseResult, Parser};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::Parser as ClapParser;
 use log::debug;
@@ -45,7 +45,7 @@ impl CommandParser {
 }
 
 /// Parse command line arguments using the Clap parser
-/// 
+///
 /// This function takes a slice of strings and parses them using the Clap parser.
 /// It returns a ParseResult with the parsed command and arguments.
 pub fn parse_with_clap<I, T>(args: I) -> Result<ParseResult>
@@ -59,18 +59,16 @@ where
 
     // Use try_parse_from instead of parse_from to get Result<Cli, Error>
     let cli_result = Cli::try_parse_from(os_args);
-    
+
     match cli_result {
         Ok(cli) => {
             let cmd_args = cli::convert_to_command_args(&cli);
             match cmd_args {
                 Some(args) => Ok(ParseResult::StructuredCommand(args)),
-                None => Ok(ParseResult::CommandString("help".to_string()))
+                None => Ok(ParseResult::CommandString("help".to_string())),
             }
         }
-        Err(e) => {
-            Err(anyhow!("Failed to parse command: {}", e))
-        }
+        Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
     }
 }
 
@@ -82,10 +80,10 @@ impl Parser for CommandParser {
             Ok(words) => words,
             Err(e) => return Err(anyhow!("Failed to parse input: {}", e)),
         };
-        
+
         parse_with_clap(args)
     }
-    
+
     fn new() -> Result<Self> {
         Ok(Self)
     }
@@ -95,12 +93,10 @@ impl Parser for CommandParser {
 #[deprecated(since = "0.13.0", note = "Use the Clap-based command line parser instead")]
 pub fn parse_command(cmd: &str) -> Result<CommandArgs> {
     match shell_words::split(cmd) {
-        Ok(args) => {
-            match parse_with_clap(args) {
-                Ok(ParseResult::StructuredCommand(cmd_args)) => Ok(cmd_args),
-                Ok(ParseResult::CommandString(_)) => Err(anyhow!("Unexpected parse result type")),
-                Err(e) => Err(e),
-            }
+        Ok(args) => match parse_with_clap(args) {
+            Ok(ParseResult::StructuredCommand(cmd_args)) => Ok(cmd_args),
+            Ok(ParseResult::CommandString(_)) => Err(anyhow!("Unexpected parse result type")),
+            Err(e) => Err(e),
         },
         Err(e) => Err(anyhow!("Failed to parse command: {}", e)),
     }
@@ -141,7 +137,7 @@ fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parse_calendar_command() {
         let input = vec![
@@ -153,10 +149,10 @@ mod tests {
             "15:00".to_string(),
             "Work".to_string(),
         ];
-        
+
         let result = parse_with_clap(input);
         assert!(result.is_ok());
-        
+
         if let Ok(ParseResult::StructuredCommand(cmd_args)) = result {
             assert_eq!(cmd_args.command, "calendar");
             assert!(cmd_args.args.contains(&"create".to_string()));
@@ -164,13 +160,11 @@ mod tests {
             panic!("Expected StructuredCommand parse result");
         }
     }
-    
+
     #[test]
     fn test_parse_invalid_command() {
-        let input = vec![
-            "invalid_command".to_string(),
-        ];
-        
+        let input = vec!["invalid_command".to_string()];
+
         let result = parse_with_clap(input);
         assert!(result.is_err());
     }
