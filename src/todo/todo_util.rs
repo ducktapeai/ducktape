@@ -26,16 +26,14 @@ pub fn format_reminder_time(time_str: &str) -> Result<String> {
             let formatted = naive_dt.format("%m/%d/%Y %I:%M:%S %p").to_string();
             Ok(formatted)
         }
-        Err(e) => {
-            Err(anyhow::anyhow!("Invalid reminder time format: {}", e))
-        }
+        Err(e) => Err(anyhow::anyhow!("Invalid reminder time format: {}", e)),
     }
 }
 
 /// Calculate a relative date (e.g., "tomorrow", "next week") into a specific date
 pub fn resolve_relative_date(date_str: &str) -> Result<DateTime<Local>> {
     let now = Local::now();
-    
+
     match date_str.to_lowercase().as_str() {
         "today" => Ok(now),
         "tomorrow" => Ok(now + chrono::Duration::days(1)),
@@ -52,27 +50,27 @@ pub fn resolve_relative_date(date_str: &str) -> Result<DateTime<Local>> {
 /// Parse a list of todo items returned from AppleScript
 pub fn parse_todo_list_output(output: &str) -> Vec<super::TodoItem> {
     let mut todos = Vec::new();
-    
+
     // This is a placeholder for a more sophisticated parser
     // In a production system, you would want to use a proper parser for AppleScript output
-    
+
     todos
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_escape_applescript_string() {
         assert_eq!(escape_applescript_string("Hello"), "Hello");
         assert_eq!(escape_applescript_string("Hello\"World"), "Hello\"\"World");
         assert_eq!(escape_applescript_string("Line 1\nLine 2"), "Line 1\nLine 2");
-        
+
         // Test with control characters
         assert_eq!(escape_applescript_string("Test\u{0007}"), "Test");
     }
-    
+
     #[test]
     fn test_format_reminder_time() {
         let result = format_reminder_time("2025-04-22 15:30").unwrap();
@@ -80,14 +78,14 @@ mod tests {
         assert!(result.contains("04/22/2025"));
         assert!(result.contains("03:30:00") || result.contains("3:30:00"));
     }
-    
+
     #[test]
     fn test_resolve_relative_date() {
         let now = Local::now();
-        
+
         let tomorrow = resolve_relative_date("tomorrow").unwrap();
         assert_eq!(tomorrow.date_naive(), (now + chrono::Duration::days(1)).date_naive());
-        
+
         let next_week = resolve_relative_date("next week").unwrap();
         assert_eq!(next_week.date_naive(), (now + chrono::Duration::days(7)).date_naive());
     }

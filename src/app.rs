@@ -44,7 +44,9 @@ impl Application {
         log::info!("Starting API server on port 3000");
         let config_clone = config.clone();
         let api_handle = tokio::spawn(async move {
-            if let Err(e) = crate::api_server::start_api_server(config_clone, "127.0.0.1:3000").await {
+            if let Err(e) =
+                crate::api_server::start_api_server(config_clone, "127.0.0.1:3000").await
+            {
                 log::error!("API server error: {:?}", e);
             }
         });

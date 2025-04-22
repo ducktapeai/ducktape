@@ -19,26 +19,21 @@ pub struct ReminderConfig<'a> {
 impl<'a> ReminderConfig<'a> {
     /// Create a new ReminderConfig with just a title
     pub fn new(title: &'a str) -> Self {
-        Self {
-            title,
-            lists: Vec::new(),
-            reminder_time: None,
-            notes: None,
-        }
+        Self { title, lists: Vec::new(), reminder_time: None, notes: None }
     }
-    
+
     /// Set the lists for this reminder
     pub fn with_lists(mut self, lists: Vec<&'a str>) -> Self {
         self.lists = lists;
         self
     }
-    
+
     /// Set notes for this reminder
     pub fn with_notes(mut self, notes: String) -> Self {
         self.notes = Some(notes);
         self
     }
-    
+
     /// Set reminder time for this reminder
     pub fn with_reminder(mut self, time: &'a str) -> Self {
         self.reminder_time = Some(time);
@@ -67,23 +62,23 @@ pub enum ReminderError {
     /// Error when Reminders app is not available
     #[error("Reminders application is not running")]
     NotRunning,
-    
+
     /// Error when a specific list cannot be found
     #[error("List not found: {0}")]
     ListNotFound(String),
-    
+
     /// Error when a reminder item cannot be found
     #[error("Reminder not found: {0}")]
     ReminderNotFound(String),
-    
+
     /// Error when invalid input is provided
     #[error("Invalid input: {0}")]
     InvalidInput(String),
-    
+
     /// Error when executing an AppleScript
     #[error("AppleScript execution error: {0}")]
     ScriptError(String),
-    
+
     /// General error
     #[error("General reminder error: {0}")]
     General(String),

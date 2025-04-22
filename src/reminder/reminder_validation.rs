@@ -11,13 +11,15 @@ use regex::Regex;
 /// Validate a reminder title
 pub fn validate_title(title: &str) -> Result<()> {
     if title.is_empty() {
-        return Err(anyhow!(ReminderError::InvalidInput("Reminder title cannot be empty".to_string())));
+        return Err(anyhow!(ReminderError::InvalidInput(
+            "Reminder title cannot be empty".to_string()
+        )));
     }
-    
+
     if title.len() > 250 {
         warn!("Reminder title is very long: {} characters", title.len());
     }
-    
+
     Ok(())
 }
 
@@ -26,13 +28,14 @@ pub fn validate_reminder_time(time: &str) -> Result<()> {
     // Check if the time string is in a valid format
     // Simple check for ISO-like format: YYYY-MM-DD HH:MM
     if !time.contains('-') || !time.contains(':') || time.len() < 10 {
-        return Err(anyhow!(ReminderError::InvalidInput(
-            format!("Invalid reminder time format: '{}'. Expected format: YYYY-MM-DD HH:MM", time)
-        )));
+        return Err(anyhow!(ReminderError::InvalidInput(format!(
+            "Invalid reminder time format: '{}'. Expected format: YYYY-MM-DD HH:MM",
+            time
+        ))));
     }
-    
+
     // More sophisticated validation could be added here
-    
+
     Ok(())
 }
 
@@ -41,10 +44,10 @@ pub fn validate_list_name(name: &str) -> Result<()> {
     if name.is_empty() {
         return Err(anyhow!(ReminderError::InvalidInput("List name cannot be empty".to_string())));
     }
-    
+
     // Check if list exists or can be created
     // In practice, we might want to check against the actual lists in the system
-    
+
     Ok(())
 }
 
@@ -52,35 +55,35 @@ pub fn validate_list_name(name: &str) -> Result<()> {
 pub fn validate_reminder_config<'a>(config: &super::ReminderConfig<'a>) -> Result<()> {
     // Validate title
     validate_title(config.title)?;
-    
+
     // Validate reminder time if provided
     if let Some(time_str) = config.reminder_time {
         validate_reminder_time(time_str)?;
     }
-    
+
     // Validate list names
     for list in &config.lists {
         validate_list_name(list)?;
     }
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_validate_title() {
         assert!(validate_title("Buy groceries").is_ok());
         assert!(validate_title("").is_err());
         assert!(validate_title("    ").is_err());
-        
+
         // Test title with max length
         let long_title = "a".repeat(256);
         assert!(validate_title(&long_title).is_err());
     }
-    
+
     #[test]
     fn test_validate_reminder_time() {
         assert!(validate_reminder_time("2025-04-15 14:30").is_ok());
@@ -89,7 +92,7 @@ mod tests {
         assert!(validate_reminder_time("not a date").is_err());
         assert!(validate_reminder_time("2025/04/15 14:30").is_err()); // wrong format
     }
-    
+
     #[test]
     fn test_validate_list_name() {
         assert!(validate_list_name("Work").is_ok());

@@ -20,26 +20,21 @@ pub struct TodoConfig<'a> {
 impl<'a> TodoConfig<'a> {
     /// Create a new TodoConfig with just a title
     pub fn new(title: &'a str) -> Self {
-        Self {
-            title,
-            notes: None,
-            lists: Vec::new(),
-            reminder_time: None,
-        }
+        Self { title, notes: None, lists: Vec::new(), reminder_time: None }
     }
-    
+
     /// Set the lists for this todo
     pub fn with_lists(mut self, lists: Vec<&'a str>) -> Self {
         self.lists = lists;
         self
     }
-    
+
     /// Set notes for this todo
     pub fn with_notes(mut self, notes: String) -> Self {
         self.notes = Some(notes);
         self
     }
-    
+
     /// Set reminder time for this todo
     pub fn with_reminder(mut self, time: &'a str) -> Self {
         self.reminder_time = Some(time);
@@ -68,19 +63,19 @@ pub enum TodoError {
     /// Error when Reminders app is not available
     #[error("Reminders application is not running")]
     NotRunning,
-    
+
     /// Error when a specific list cannot be found
     #[error("Reminder list '{0}' not found")]
     ListNotFound(String),
-    
+
     /// Error when a todo item cannot be found
     #[error("Todo item '{0}' not found")]
     TodoNotFound(String),
-    
+
     /// Error when executing an AppleScript
     #[error("AppleScript execution error: {0}")]
     ScriptError(String),
-    
+
     /// General error
     #[error("Todo error: {0}")]
     General(String),

@@ -1,16 +1,16 @@
 //! Notes management functionality.
-//! 
+//!
 //! This module provides integration with macOS Notes.app.
 
 use anyhow::Result;
 
-mod notes_types;
 mod notes_applescript;
-mod notes_validation;
+mod notes_types;
 mod notes_util;
+mod notes_validation;
 
-pub use notes_types::*;
 pub use notes_applescript::*;
+pub use notes_types::*;
 pub use notes_validation::*;
 
 /// Create a new note in Apple Notes

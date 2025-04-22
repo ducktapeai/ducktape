@@ -18,7 +18,7 @@ impl<'a> NoteConfig<'a> {
     pub fn new(title: &'a str, content: &'a str) -> Self {
         Self { title, content, folder: None }
     }
-    
+
     /// Create a new note configuration with a specified folder
     pub fn with_folder(title: &'a str, content: &'a str, folder: &'a str) -> Self {
         Self { title, content, folder: Some(folder) }
@@ -43,16 +43,16 @@ pub struct NoteItem {
 pub enum NotesError {
     #[error("Notes application is not running")]
     NotRunning,
-    
+
     #[error("Note '{0}' not found")]
     NoteNotFound(String),
-    
+
     #[error("Folder '{0}' not found")]
     FolderNotFound(String),
-    
+
     #[error("AppleScript execution failed: {0}")]
     ScriptError(String),
-    
+
     #[error("Failed to parse AppleScript output: {0}")]
     ParseError(String),
 }

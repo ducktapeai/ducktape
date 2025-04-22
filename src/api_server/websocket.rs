@@ -5,33 +5,24 @@
 
 use axum::{
     extract::WebSocketUpgrade,
-    response::IntoResponse,
     extract::ws::{Message, WebSocket},
+    response::IntoResponse,
 };
-use clap::Parser;  // Add this missing import for try_parse_from
+use clap::Parser; // Add this missing import for try_parse_from
 use log::{debug, error, info};
 use serde::Serialize;
 use std::time::Duration;
 use tokio::time::interval;
 use uuid::Uuid;
 
-use crate::calendar::{
-    create_event, 
-    import_csv_events, 
-    import_ics_events, 
-    EventConfig
-};
+use crate::calendar::{EventConfig, create_event, import_csv_events, import_ics_events};
+use crate::cli;
 use crate::command_processor::CommandArgs;
 use crate::grok_parser;
-use crate::cli;
 use std::path::Path;
 
 use super::models::{
-    SwiftMessage,
-    SwiftEventData,
-    SwiftChatMessage,
-    SwiftEventResponse,
-    SwiftErrorResponse,
+    SwiftChatMessage, SwiftErrorResponse, SwiftEventData, SwiftEventResponse, SwiftMessage,
 };
 
 /// WebSocket handler for chat interface
@@ -202,21 +193,19 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
 }
 
 /// Handle event creation from structured WebSocket messages
-async fn handle_event_creation(connection_id: Uuid, data: serde_json::Value, socket: &mut WebSocket) {
+async fn handle_event_creation(
+    connection_id: Uuid,
+    data: serde_json::Value,
+    socket: &mut WebSocket,
+) {
     info!("WebSocket[{}]: Received event creation request", connection_id);
     match serde_json::from_value::<SwiftEventData>(data) {
         Ok(event_data) => {
-            info!(
-                "WebSocket[{}]: Creating event: {}",
-                connection_id, event_data.title
-            );
+            info!("WebSocket[{}]: Creating event: {}", connection_id, event_data.title);
 
             // Create EventConfig
-            let mut event_config = EventConfig::new(
-                &event_data.title,
-                &event_data.date,
-                &event_data.start_time,
-            );
+            let mut event_config =
+                EventConfig::new(&event_data.title, &event_data.date, &event_data.start_time);
 
             event_config.end_time = Some(event_data.end_time);
 
@@ -231,10 +220,7 @@ async fn handle_event_creation(connection_id: Uuid, data: serde_json::Value, soc
             // Create the event
             match create_event(event_config).await {
                 Ok(_) => {
-                    info!(
-                        "WebSocket[{}]: Event created successfully",
-                        connection_id
-                    );
+                    info!("WebSocket[{}]: Event created successfully", connection_id);
                     let response = SwiftEventResponse {
                         message_type: "event".to_string(),
                         status: "success".to_string(),
@@ -244,10 +230,7 @@ async fn handle_event_creation(connection_id: Uuid, data: serde_json::Value, soc
                     send_response(socket, response).await;
                 }
                 Err(e) => {
-                    error!(
-                        "WebSocket[{}]: Failed to create event: {}",
-                        connection_id, e
-                    );
+                    error!("WebSocket[{}]: Failed to create event: {}", connection_id, e);
                     let response = SwiftEventResponse {
                         message_type: "event".to_string(),
                         status: "error".to_string(),
@@ -259,15 +242,8 @@ async fn handle_event_creation(connection_id: Uuid, data: serde_json::Value, soc
             }
         }
         Err(e) => {
-            error!(
-                "WebSocket[{}]: Failed to parse event data: {}",
-                connection_id, e
-            );
-            send_error_response(
-                socket,
-                &format!("Invalid event data format: {}", e),
-            )
-            .await;
+            error!("WebSocket[{}]: Failed to parse event data: {}", connection_id, e);
+            send_error_response(socket, &format!("Invalid event data format: {}", e)).await;
         }
     }
 }
@@ -298,7 +274,8 @@ async fn handle_parsed_command(connection_id: Uuid, command: String, socket: &mu
                 }
                 Err(e) => {
                     error!(
-                        "WebSocket[{}]: Failed to parse command arguments: {}", connection_id, e
+                        "WebSocket[{}]: Failed to parse command arguments: {}",
+                        connection_id, e
                     );
                     let response = SwiftChatMessage {
                         sender: "ducktape".to_string(),
@@ -320,10 +297,30 @@ async fn handle_parsed_command(connection_id: Uuid, command: String, socket: &mu
 fn is_command_message(message: &str) -> bool {
     // Simple heuristic: any message with action words is a command
     let command_words = [
-        "create", "add", "schedule", "set", "make", "remind", "note",
-        "meeting", "event", "calendar", "todo", "zoom", "invite",
-        "tomorrow", "today", "monday", "tuesday", "wednesday", 
-        "thursday", "friday", "saturday", "sunday", "am", "pm",
+        "create",
+        "add",
+        "schedule",
+        "set",
+        "make",
+        "remind",
+        "note",
+        "meeting",
+        "event",
+        "calendar",
+        "todo",
+        "zoom",
+        "invite",
+        "tomorrow",
+        "today",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "am",
+        "pm",
     ];
 
     for word in &command_words {
@@ -359,10 +356,8 @@ async fn send_response<T: Serialize>(socket: &mut WebSocket, response: T) {
 
 /// Send an error response to the WebSocket client
 async fn send_error_response(socket: &mut WebSocket, message: &str) {
-    let error_response = SwiftErrorResponse { 
-        message_type: "error".to_string(), 
-        message: message.to_string() 
-    };
+    let error_response =
+        SwiftErrorResponse { message_type: "error".to_string(), message: message.to_string() };
 
     match serde_json::to_string(&error_response) {
         Ok(json) => {
@@ -487,16 +482,11 @@ async fn handle_calendar_create(connection_id: Uuid, args: CommandArgs, socket: 
 
         // Handle the email flag
         if let Some(Some(emails_str)) = args.flags.get("email") {
-            let emails: Vec<String> = emails_str
-                .split(',')
-                .map(|e| e.trim().trim_matches('"').to_string())
-                .collect();
+            let emails: Vec<String> =
+                emails_str.split(',').map(|e| e.trim().trim_matches('"').to_string()).collect();
 
             if !emails.is_empty() {
-                info!(
-                    "WebSocket[{}]: Adding email attendees: {:?}",
-                    connection_id, emails
-                );
+                info!("WebSocket[{}]: Adding email attendees: {:?}", connection_id, emails);
                 config.emails = emails;
             }
         }
@@ -536,10 +526,7 @@ async fn handle_calendar_create(connection_id: Uuid, args: CommandArgs, socket: 
             }
         }
     } else {
-        error!(
-            "WebSocket[{}]: Invalid command format - not enough arguments",
-            connection_id
-        );
+        error!("WebSocket[{}]: Invalid command format - not enough arguments", connection_id);
         let response = SwiftChatMessage {
             sender: "ducktape".to_string(),
             content: "❌ Invalid command format".to_string(),
@@ -572,8 +559,7 @@ async fn handle_calendar_import(connection_id: Uuid, args: CommandArgs, socket: 
     // Expand tilde to home directory
     if file_path_str.starts_with('~') {
         if let Some(home_dir) = dirs::home_dir() {
-            file_path_str =
-                file_path_str.replacen("~", home_dir.to_string_lossy().as_ref(), 1);
+            file_path_str = file_path_str.replacen("~", home_dir.to_string_lossy().as_ref(), 1);
         }
     }
 
@@ -601,8 +587,7 @@ async fn handle_calendar_import(connection_id: Uuid, args: CommandArgs, socket: 
     if !["csv", "ics"].contains(&format.as_str()) {
         let response = SwiftChatMessage {
             sender: "ducktape".to_string(),
-            content: "❌ Unsupported format. Use --format csv or --format ics"
-                .to_string(),
+            content: "❌ Unsupported format. Use --format csv or --format ics".to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(), // Fixed: removed .to
             message_type: "error".to_string(),
         };
@@ -633,10 +618,7 @@ async fn handle_calendar_import(connection_id: Uuid, args: CommandArgs, socket: 
         Ok(_) => {
             let response = SwiftChatMessage {
                 sender: "ducktape".to_string(),
-                content: format!(
-                    "✅ Successfully imported events from {}",
-                    file_path_str
-                ),
+                content: format!("✅ Successfully imported events from {}", file_path_str),
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 message_type: "chat".to_string(),
             };

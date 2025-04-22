@@ -13,15 +13,15 @@ use tokio::sync::mpsc;
 async fn main() -> Result<()> {
     // Initialize logger
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
-    
+
     info!("Starting WebSocket server");
-    
+
     // Load configuration
     let config = Config::load()?;
-    
+
     // Create a channel for communication between websocket and API server
     let (command_tx, mut command_rx) = mpsc::channel::<String>(100);
-    
+
     // Start the API server with websocket support
     let api_server_handle = {
         let config = config.clone();
@@ -33,15 +33,15 @@ async fn main() -> Result<()> {
             }
         })
     };
-    
+
     // Process incoming websocket commands
     while let Some(command) = command_rx.recv().await {
         info!("Received command: {}", command);
         // Process the command...
     }
-    
+
     // Wait for the API server to finish (which it shouldn't unless there's an error)
     api_server_handle.await?;
-    
+
     Ok(())
 }

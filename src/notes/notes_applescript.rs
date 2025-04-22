@@ -6,13 +6,15 @@ use tokio::process::Command;
 
 use crate::notes::notes_types::{NoteConfig, NoteItem, NotesError};
 use crate::notes::notes_util::{escape_applescript_string, parse_notes_list};
-use crate::notes::notes_validation::{validate_note_config, validate_note_title, validate_folder_name, validate_search_keyword};
+use crate::notes::notes_validation::{
+    validate_folder_name, validate_note_config, validate_note_title, validate_search_keyword,
+};
 
 /// Creates a new note in Apple Notes
 pub async fn create_note(config: NoteConfig<'_>) -> Result<()> {
     // Validate the note configuration
     validate_note_config(&config)?;
-    
+
     // First ensure Notes.app is running
     ensure_notes_running().await?;
 
@@ -64,7 +66,7 @@ pub async fn create_note(config: NoteConfig<'_>) -> Result<()> {
         .map_err(|e| NotesError::ScriptError(e.to_string()))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    
+
     if result.contains("Success") {
         info!("Note created: {}", config.title);
         Ok(())
@@ -79,7 +81,7 @@ pub async fn create_note(config: NoteConfig<'_>) -> Result<()> {
 pub async fn list_notes() -> Result<Vec<NoteItem>> {
     // First ensure Notes.app is running
     ensure_notes_running().await?;
-    
+
     let script = r#"tell application "Notes"
         try
             set notesList to {}
@@ -105,26 +107,26 @@ pub async fn list_notes() -> Result<Vec<NoteItem>> {
         .map_err(|e| NotesError::ScriptError(e.to_string()))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    
+
     if result.contains("Error") {
         error!("Failed to list notes: {}", result);
         return Err(anyhow!("Failed to list notes: {}", result));
     }
-    
+
     // Parse the notes list from the AppleScript output
     let notes_list = parse_notes_list(&result);
-    
+
     // Convert to our NoteItem struct
     let note_items: Vec<NoteItem> = notes_list
         .into_iter()
         .map(|(title, folder)| NoteItem {
             title,
             folder,
-            created: None,  // Apple Notes doesn't easily provide creation date via AppleScript
+            created: None, // Apple Notes doesn't easily provide creation date via AppleScript
             modified: None, // Apple Notes doesn't easily provide modification date via AppleScript
         })
         .collect();
-    
+
     Ok(note_items)
 }
 
@@ -132,7 +134,7 @@ pub async fn list_notes() -> Result<Vec<NoteItem>> {
 pub async fn get_note_folders() -> Result<Vec<String>> {
     // First ensure Notes.app is running
     ensure_notes_running().await?;
-    
+
     let script = r#"tell application "Notes"
         try
             set folderList to {}
@@ -153,12 +155,12 @@ pub async fn get_note_folders() -> Result<Vec<String>> {
         .map_err(|e| NotesError::ScriptError(e.to_string()))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    
+
     if result.contains("Error") {
         error!("Failed to get note folders: {}", result);
         return Err(anyhow!("Failed to get note folders: {}", result));
     }
-    
+
     let folders = result
         .trim_matches('{')
         .trim_matches('}')
@@ -166,7 +168,7 @@ pub async fn get_note_folders() -> Result<Vec<String>> {
         .filter(|s| !s.is_empty())
         .map(|s| s.trim_matches('"').to_string())
         .collect();
-    
+
     Ok(folders)
 }
 
@@ -177,19 +179,22 @@ pub async fn delete_note(title: &str, folder: Option<&str>) -> Result<()> {
     if let Some(folder_name) = folder {
         validate_folder_name(folder_name)?;
     }
-    
+
     // First ensure Notes.app is running
     ensure_notes_running().await?;
-    
+
     let escaped_title = escape_applescript_string(title);
-    
+
     let folder_condition = if let Some(folder_name) = folder {
         let escaped_folder = escape_applescript_string(folder_name);
-        format!("name of n is \"{}\" and name of container of n is \"{}\"", escaped_title, escaped_folder)
+        format!(
+            "name of n is \"{}\" and name of container of n is \"{}\"",
+            escaped_title, escaped_folder
+        )
     } else {
         format!("name of n is \"{}\"", escaped_title)
     };
-    
+
     let script = format!(
         r#"tell application "Notes"
             try
@@ -222,7 +227,7 @@ pub async fn delete_note(title: &str, folder: Option<&str>) -> Result<()> {
         .map_err(|e| NotesError::ScriptError(e.to_string()))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    
+
     if result.contains("Success") {
         info!("Note deleted: {}", title);
         Ok(())
@@ -241,12 +246,12 @@ pub async fn delete_note(title: &str, folder: Option<&str>) -> Result<()> {
 pub async fn search_notes(keyword: &str) -> Result<Vec<NoteItem>> {
     // Validate the search keyword
     validate_search_keyword(keyword)?;
-    
+
     // First ensure Notes.app is running
     ensure_notes_running().await?;
-    
+
     let escaped_keyword = escape_applescript_string(keyword);
-    
+
     let script = format!(
         r#"tell application "Notes"
             try
@@ -277,26 +282,21 @@ pub async fn search_notes(keyword: &str) -> Result<Vec<NoteItem>> {
         .map_err(|e| NotesError::ScriptError(e.to_string()))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    
+
     if result.contains("Error") {
         error!("Failed to search notes: {}", result);
         return Err(anyhow!("Failed to search notes: {}", result));
     }
-    
+
     // Parse the notes list from the AppleScript output
     let notes_list = parse_notes_list(&result);
-    
+
     // Convert to our NoteItem struct
     let note_items: Vec<NoteItem> = notes_list
         .into_iter()
-        .map(|(title, folder)| NoteItem {
-            title,
-            folder,
-            created: None,
-            modified: None,
-        })
+        .map(|(title, folder)| NoteItem { title, folder, created: None, modified: None })
         .collect();
-    
+
     Ok(note_items)
 }
 

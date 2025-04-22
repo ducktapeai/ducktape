@@ -21,30 +21,25 @@ use super::routes::create_routes;
 /// # Returns
 ///
 /// Result indicating success or error
-pub async fn start_api_server(
-    config: crate::config::Config,
-    address: &str,
-) -> anyhow::Result<()> {
+pub async fn start_api_server(config: crate::config::Config, address: &str) -> anyhow::Result<()> {
     // Parse the address
     let addr: SocketAddr = address.parse()?;
-    
+
     // Create the shared application state
     let state = Arc::new(ApiState {
         config,
         version: env!("CARGO_PKG_VERSION").to_string(),
         start_time: Utc::now(),
     });
-    
+
     // Create the application with routes
     let app = create_routes(state.clone());
-    
+
     info!("API server starting on {}", addr);
-    
+
     // Start the server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    serve(listener, app)
-        .await
-        .map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
-    
+    serve(listener, app).await.map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
+
     Ok(())
 }

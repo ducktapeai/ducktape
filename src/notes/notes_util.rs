@@ -15,23 +15,23 @@ pub fn escape_applescript_string(input: &str) -> String {
 /// Parse a notes list from AppleScript output
 pub fn parse_notes_list(output: &str) -> Vec<(String, String)> {
     let mut notes = Vec::new();
-    
+
     // Parse the output format which is expected to be a list of records
     // in the format {name:"Note Title", folder:"Folder Name"}, ...
     let output = output.trim_matches('{').trim_matches('}');
-    
+
     if output.is_empty() {
         return notes;
     }
-    
+
     // Split by record boundaries
     let records: Vec<&str> = output.split("}, {").collect();
-    
+
     for record in records {
         let clean_record = record.replace('{', "").replace('}', "");
         let mut title = String::new();
         let mut folder = String::new();
-        
+
         // Extract properties
         for prop in clean_record.split(", ") {
             if prop.starts_with("name:") {
@@ -40,12 +40,12 @@ pub fn parse_notes_list(output: &str) -> Vec<(String, String)> {
                 folder = prop.trim_start_matches("folder:").trim_matches('"').to_string();
             }
         }
-        
+
         if !title.is_empty() {
             notes.push((title, folder));
         }
     }
-    
+
     notes
 }
 
@@ -63,7 +63,7 @@ mod tests {
         let input = "Note with \"quotes\"";
         let escaped = escape_applescript_string(input);
         assert_eq!(escaped, "Note with \"\"quotes\"\"");
-        
+
         let input_with_control = "Note with \x07 bell";
         let escaped = escape_applescript_string(input_with_control);
         assert_eq!(escaped, "Note with  bell");
@@ -71,7 +71,8 @@ mod tests {
 
     #[test]
     fn test_parse_notes_list() {
-        let input = "{name:\"Note 1\", folder:\"Folder 1\"}, {name:\"Note 2\", folder:\"Folder 2\"}";
+        let input =
+            "{name:\"Note 1\", folder:\"Folder 1\"}, {name:\"Note 2\", folder:\"Folder 2\"}";
         let notes = parse_notes_list(input);
         assert_eq!(notes.len(), 2);
         assert_eq!(notes[0], ("Note 1".to_string(), "Folder 1".to_string()));

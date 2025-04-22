@@ -1,7 +1,7 @@
 //! Validation functions for notes operations.
 
-use anyhow::{Result, anyhow};
 use crate::notes::notes_types::NoteConfig;
+use anyhow::{Result, anyhow};
 use log::debug;
 
 /// Validates a note configuration before creating a note
@@ -10,27 +10,28 @@ pub fn validate_note_config(config: &NoteConfig) -> Result<()> {
     if config.title.is_empty() {
         return Err(anyhow!("Note title cannot be empty"));
     }
-    
+
     if config.title.len() > 255 {
         return Err(anyhow!("Note title is too long (max 255 characters)"));
     }
-    
+
     // Content validation - allow empty content
-    if config.content.len() > 1_000_000 {  // 1MB limit for content
+    if config.content.len() > 1_000_000 {
+        // 1MB limit for content
         return Err(anyhow!("Note content is too large (max 1MB)"));
     }
-    
+
     // Folder validation if provided
     if let Some(folder) = config.folder {
         if folder.is_empty() {
             return Err(anyhow!("Folder name cannot be empty"));
         }
-        
+
         if folder.len() > 255 {
             return Err(anyhow!("Folder name is too long (max 255 characters)"));
         }
     }
-    
+
     debug!("Note configuration validated successfully: {:?}", config);
     Ok(())
 }
@@ -40,11 +41,11 @@ pub fn validate_note_title(title: &str) -> Result<()> {
     if title.is_empty() {
         return Err(anyhow!("Note title cannot be empty"));
     }
-    
+
     if title.len() > 255 {
         return Err(anyhow!("Note title is too long (max 255 characters)"));
     }
-    
+
     Ok(())
 }
 
@@ -53,11 +54,11 @@ pub fn validate_folder_name(folder: &str) -> Result<()> {
     if folder.is_empty() {
         return Err(anyhow!("Folder name cannot be empty"));
     }
-    
+
     if folder.len() > 255 {
         return Err(anyhow!("Folder name is too long (max 255 characters)"));
     }
-    
+
     Ok(())
 }
 
@@ -66,15 +67,15 @@ pub fn validate_search_keyword(keyword: &str) -> Result<()> {
     if keyword.is_empty() {
         return Err(anyhow!("Search keyword cannot be empty"));
     }
-    
+
     if keyword.len() < 2 {
         return Err(anyhow!("Search keyword must be at least 2 characters"));
     }
-    
+
     if keyword.len() > 100 {
         return Err(anyhow!("Search keyword is too long (max 100 characters)"));
     }
-    
+
     Ok(())
 }
 
