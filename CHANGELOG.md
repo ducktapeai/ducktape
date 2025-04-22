@@ -1,3 +1,7 @@
+## [0.13.2] - 2025-04-23
+### Fixed
+- refactored the parser
+
 ## [0.13.4] - 2025-04-22
 ### Fixed
 - Fixed note creation commands with multi-word titles and arguments
