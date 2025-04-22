@@ -1,8 +1,8 @@
 use crate::command_processor::{CommandArgs, CommandProcessor};
 use crate::config::{Config, LLMProvider};
-use crate::{cli, deepseek_parser, grok_parser, openai_parser};
+use crate::parser::{Parser, ParserFactory};
 use anyhow::{Result, anyhow};
-use clap::Parser;
+use clap::Parser as ClapParser;
 use rustyline::DefaultEditor;
 
 pub struct Application {
@@ -184,151 +184,48 @@ impl Application {
             return self.command_processor.execute(command_args).await;
         }
 
-        // Add "ducktape" prefix if missing for consistency
-        let normalized_input = if !preprocessed_input.trim().starts_with("ducktape") {
-            format!("ducktape {}", preprocessed_input)
-        } else {
-            preprocessed_input
-        };
-        log::debug!("Normalized input: {}", normalized_input);
-
-        // Determine if this is a natural language command that needs AI processing
-        // or a direct command with parameters
-        let processed_input = if normalized_input.starts_with("ducktape calendar")
-            || normalized_input.starts_with("ducktape todo")
-            || normalized_input.starts_with("ducktape note")
-        {
-            normalized_input
-        } else {
-            // For natural language, we need to process via one of the AI models
-            match Config::load()?.language_model.provider {
-                Some(LLMProvider::OpenAI) => {
-                    match crate::openai_parser::parse_natural_language(&normalized_input).await {
-                        Ok(command) => command,
-                        Err(e) => return Err(anyhow!("OpenAI parser error: {}", e)),
-                    }
-                }
-                Some(LLMProvider::Grok) => {
-                    match crate::grok_parser::parse_natural_language(&normalized_input).await {
-                        Ok(command) => command,
-                        Err(e) => return Err(anyhow!("Grok parser error: {}", e)),
-                    }
-                }
-                Some(LLMProvider::DeepSeek) => {
-                    match crate::deepseek_parser::parse_natural_language(&normalized_input).await {
-                        Ok(command) => command,
-                        Err(e) => return Err(anyhow!("DeepSeek parser error: {}", e)),
-                    }
-                }
-                None => {
-                    return Err(anyhow!("No language model provider configured"));
-                }
-            }
-        };
-
-        log::info!("Processed command: {}", processed_input);
-
-        // Ensure calendar event commands have proper end times
-        let final_command = if processed_input.contains("calendar create")
-            || processed_input.contains("calendar add")
-        {
-            // Check if it has a start time but no end time
-            // Try to use Clap parser first, fall back to legacy parser if needed
-            let parts = match self.parse_command_string(&processed_input) {
-                Ok(args) => args.args,
-                Err(_) => {
-                    // Fall back to legacy parser
-                    match CommandArgs::parse(&processed_input) {
-                        Ok(parsed_args) => parsed_args.args,
-                        Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
-                    }
-                }
-            };
-
-            let mut has_start_time = false;
-            let mut has_end_time = false;
-            let mut start_time_index = 0;
-
-            // Find start time position and check if end time exists
-            for (i, part) in parts.iter().enumerate() {
-                if part.contains(':') && i > 2 {
-                    // Potential time format (avoid matching in command prefix)
-                    if !has_start_time {
-                        has_start_time = true;
-                        start_time_index = i;
-                    } else if i == start_time_index + 1 {
-                        has_end_time = true;
-                        break;
-                    }
-                }
-            }
-
-            // If there's a start time but no end time, add an end time 1 hour later
-            if has_start_time
-                && !has_end_time
-                && start_time_index > 0
-                && start_time_index < parts.len()
-            {
-                let start_time = &parts[start_time_index];
-                if let Some((hours_str, minutes_str)) = start_time.split_once(':') {
-                    if let (Ok(hours), Ok(_minutes)) =
-                        (hours_str.parse::<u32>(), minutes_str.parse::<u32>())
-                    {
-                        // Calculate end time one hour later
-                        let end_hours = (hours + 1) % 24;
-                        let end_time = format!("{}:{}", end_hours, minutes_str);
-
-                        let mut new_parts = parts.clone();
-                        new_parts.insert(start_time_index + 1, end_time);
-                        let fixed_command = new_parts.join(" ");
-                        log::info!("Added missing end time. Fixed command: {}", fixed_command);
-
-                        // Try to parse with Clap first
-                        let command_args = match self.parse_command_string(&fixed_command) {
-                            Ok(args) => args,
-                            Err(_) => {
-                                // Fall back to legacy parser
-                                CommandArgs::parse(&fixed_command)?
-                            }
-                        };
-
-                        return self.command_processor.execute(command_args).await;
-                    }
-                }
-            }
-
-            processed_input.clone()
-        } else {
-            processed_input.clone()
-        };
-
-        // Parse the processed command into arguments
-        // First try with Clap parser
-        let command_args = match self.parse_command_string(&final_command) {
-            Ok(args) => args,
-            Err(_) => {
-                // Fall back to legacy parser
-                match CommandArgs::parse(&final_command) {
+        // Create appropriate parser using factory
+        let parser = ParserFactory::create_parser()?;
+        
+        // Process input through parser
+        match parser.parse_input(&preprocessed_input).await? {
+            crate::parser::ParseResult::CommandString(cmd) => {
+                log::debug!("Processed command string: {}", cmd);
+                
+                // Try to parse with Clap first
+                let command_args = match self.parse_command_string(&cmd) {
                     Ok(args) => args,
-                    Err(e) => return Err(anyhow!("Failed to parse command: {}", e)),
-                }
+                    Err(_) => {
+                        // Fall back to legacy parser
+                        CommandArgs::parse(&cmd)?
+                    }
+                };
+                
+                // Execute the command
+                self.command_processor.execute(command_args).await
+            },
+            crate::parser::ParseResult::StructuredCommand(args) => {
+                log::debug!("Got pre-parsed command arguments: {:?}", args);
+                
+                // Execute directly with the structured command
+                self.command_processor.execute(args).await
             }
-        };
-
-        self.command_processor.execute(command_args).await
+        }
     }
 
     async fn process_natural_language(&self, input: &str) -> Result<()> {
-        use crate::grok_parser;
-
         println!("Processing natural language: '{}'", input);
 
-        match grok_parser::parse_natural_language(input).await {
-            Ok(command) => {
+        // Create appropriate parser using factory
+        let parser = ParserFactory::create_parser()?;
+        
+        // Process input through parser
+        match parser.parse_input(input).await {
+            Ok(crate::parser::ParseResult::CommandString(command)) => {
                 println!("Translated to command: {}", command);
 
                 // Sanitize the NLP-generated command to remove unnecessary quotes
-                let sanitized_command = self.sanitize_nlp_command(&command);
+                let sanitized_command = crate::parser::openai::sanitize_nlp_command(&command);
                 println!("Sanitized command: {}", sanitized_command);
                 log::debug!("Sanitized NLP command: {}", sanitized_command);
 
@@ -363,27 +260,19 @@ impl Application {
                     Ok(())
                 }
             }
+            Ok(crate::parser::ParseResult::StructuredCommand(args)) => {
+                log::debug!("Got pre-parsed structured command: {:?}", args);
+                println!("Processed command structure from natural language");
+                
+                // Execute directly with the structured command
+                self.command_processor.execute(args).await
+            }
             Err(e) => {
                 println!("Error processing natural language: {}", e);
                 println!("Type 'help' for a list of available commands or try rephrasing.");
                 Ok(())
             }
         }
-    }
-
-    /// Sanitize NLP-generated commands to remove unnecessary quotes
-    fn sanitize_nlp_command(&self, command: &str) -> String {
-        command
-            .split_whitespace()
-            .map(|arg| {
-                if arg.starts_with('"') && arg.ends_with('"') {
-                    arg.trim_matches('"') // Remove surrounding quotes
-                } else {
-                    arg
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
     }
 
     /// Helper method to parse a command string using Clap instead of the deprecated CommandArgs::parse

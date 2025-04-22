@@ -1,36 +1,60 @@
 pub mod api_server;
 pub mod app;
 pub mod calendar;
-// Removed calendar_legacy module reference as it was moved to calendar directory
 pub mod cli;
-pub mod command_parser;
 pub mod command_processor;
-// pub mod commands; // Removed commands module
 pub mod config;
 pub mod contact_groups;
-// pub mod contacts;  // Commented out if it doesn't exist
-pub mod deepseek_parser;
 pub mod deepseek_reasoning;
-pub mod env_debug; // Add this line to expose the env_debug module
-pub mod env_loader; // Add this line
-pub mod env_store; // Add this line
+pub mod env_debug;
+pub mod env_loader;
+pub mod env_store;
 pub mod event_search;
 pub mod file_search;
-pub mod grok_parser;
 pub mod notes;
-pub mod openai_parser;
-pub mod parser_trait; // Make sure the parser trait is included
-// pub mod parsing_utils;  // Commented out if it doesn't exist
+pub mod parser; // New modular parser module
+pub mod parser_reexport; // Re-exports from parser module for backward compatibility
 pub mod env_manager;
-pub mod reminder; // New module for Apple Reminders functionality
+pub mod reminder;
 pub mod reminders;
 pub mod state;
-pub mod storage; // Add storage module
-pub mod terminal_parser; // Add our new terminal parser
-pub mod todo; // Kept for backward compatibility
+pub mod storage;
+pub mod todo;
 pub mod utils;
 pub mod validation;
-pub mod zoom; // New module
+pub mod zoom;
+
+// Deprecated modules - will be removed after migration
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::command module instead"
+)]
+pub mod command_parser;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::terminal module instead"
+)]
+pub mod terminal_parser;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::traits module instead"
+)]
+pub mod parser_trait;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::openai module instead"
+)]
+pub mod openai_parser;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::grok module instead"
+)]
+pub mod grok_parser;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::deepseek module instead"
+)]
+pub mod deepseek_parser;
 
 use anyhow::Result;
 use log::*;
