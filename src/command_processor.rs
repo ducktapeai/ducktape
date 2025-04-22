@@ -391,7 +391,7 @@ impl CommandHandler for CalendarHandler {
                     // Validate calendar name
                     let available_calendars = crate::calendar::get_available_calendars().await?;
                     if let Some(cal) = &calendar {
-                        if !available_calendars.contains(cal) {
+                        if (!available_calendars.contains(cal)) {
                             warn!(
                                 "Specified calendar '{}' not found. Falling back to default calendar.",
                                 cal
@@ -655,30 +655,174 @@ impl CommandHandler for NotesHandler {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for note create command");
-                        println!("Usage: ducktape note create <title> [content] [folder]");
+                        println!("Usage: ducktape note create <title> [content] [--folder <folder_name>]");
                         return Ok(());
                     }
 
-                    let title = &args.args[1];
-                    let content = args.args.get(2).cloned().unwrap_or_default();
-                    let folder = args.args.get(3).cloned();
+                    // Combine all non-flag arguments after "create" into a single title if not quoted
+                    // This handles cases like "ducktape note create Project ideas for Q2"
+                    let mut title_parts = Vec::new();
+                    let mut i = 1;
+                    while i < args.args.len() && !args.args[i].starts_with("--") {
+                        title_parts.push(args.args[i].trim_matches('"'));
+                        i += 1;
+                    }
 
-                    // Create note config and pass to notes module
+                    // If we have multiple parts and the first doesn't contain spaces (which would indicate quotes were used)
+                    let title = if title_parts.len() > 1 && !args.args[1].contains(' ') {
+                        title_parts.join(" ")
+                    } else {
+                        args.args[1].trim_matches('"').to_string()
+                    };
+                    
+                    // Get content from --content flag or as the next positional argument after title
+                    let content = if let Some(Some(content_val)) = args.flags.get("content") {
+                        content_val.trim_matches('"')
+                    } else if args.args.len() > 2 && !args.args[2].starts_with("--") {
+                        args.args[2].trim_matches('"')
+                    } else {
+                        ""
+                    };
+                    
+                    // Get folder from --folder flag
+                    let folder = args.flags.get("folder").and_then(|f| f.as_deref());
+
+                    debug!("Creating note: title='{}', content_length={}, folder={:?}", 
+                        title, content.len(), folder);
+
+                    // Create note config using the new structure
                     let config = crate::notes::NoteConfig {
-                        title,
-                        content: &content,
-                        folder: folder.as_deref(),
+                        title: &title,
+                        content,
+                        folder,
                     };
 
-                    crate::notes::create_note(config)
+                    match crate::notes::create_note(config).await {
+                        Ok(_) => {
+                            println!("Note created successfully: {}", title);
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to create note: {}", e);
+                            Err(anyhow!("Failed to create note: {}", e))
+                        }
+                    }
                 }
                 Some("list") => {
-                    // TODO: Implement list notes functionality
-                    println!("List notes functionality is not implemented yet.");
-                    Ok(())
+                    match crate::notes::list_notes().await {
+                        Ok(notes) => {
+                            if notes.is_empty() {
+                                println!("No notes found");
+                            } else {
+                                println!("Notes:");
+                                for note in notes {
+                                    println!("  - {} (in folder: {})", note.title, note.folder);
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to list notes: {}", e);
+                            Err(e)
+                        }
+                    }
+                }
+                Some("folders") => {
+                    match crate::notes::get_note_folders().await {
+                        Ok(folders) => {
+                            if folders.is_empty() {
+                                println!("No note folders found");
+                            } else {
+                                println!("Note folders:");
+                                for folder in folders {
+                                    println!("  - {}", folder);
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to get note folders: {}", e);
+                            Err(e)
+                        }
+                    }
+                }
+                Some("delete") => {
+                    if args.args.len() < 2 {
+                        println!("Not enough arguments for note delete command");
+                        println!("Usage: ducktape note delete <title> [--folder <folder_name>]");
+                        return Ok(());
+                    }
+
+                    // Handle multi-word titles for delete command too
+                    let mut title_parts = Vec::new();
+                    let mut i = 1;
+                    while i < args.args.len() && !args.args[i].starts_with("--") {
+                        title_parts.push(args.args[i].trim_matches('"'));
+                        i += 1;
+                    }
+
+                    // If we have multiple parts and the first doesn't contain spaces (which would indicate quotes were used)
+                    let title = if title_parts.len() > 1 && !args.args[1].contains(' ') {
+                        title_parts.join(" ")
+                    } else {
+                        args.args[1].trim_matches('"').to_string()
+                    };
+                    
+                    let folder = args.flags.get("folder").and_then(|f| f.as_deref());
+                    
+                    match crate::notes::delete_note(&title, folder).await {
+                        Ok(_) => {
+                            println!("Note deleted successfully: {}", title);
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to delete note: {}", e);
+                            Err(e)
+                        }
+                    }
+                }
+                Some("search") => {
+                    if args.args.len() < 2 {
+                        println!("Not enough arguments for note search command");
+                        println!("Usage: ducktape note search <keyword>");
+                        return Ok(());
+                    }
+
+                    // Handle multi-word keywords for search command too
+                    let mut keyword_parts = Vec::new();
+                    let mut i = 1;
+                    while i < args.args.len() && !args.args[i].starts_with("--") {
+                        keyword_parts.push(args.args[i].trim_matches('"'));
+                        i += 1;
+                    }
+
+                    // If we have multiple parts and the first doesn't contain spaces (which would indicate quotes were used)
+                    let keyword = if keyword_parts.len() > 1 && !args.args[1].contains(' ') {
+                        keyword_parts.join(" ")
+                    } else {
+                        args.args[1].trim_matches('"').to_string()
+                    };
+                    
+                    match crate::notes::search_notes(&keyword).await {
+                        Ok(notes) => {
+                            if notes.is_empty() {
+                                println!("No notes found matching '{}'", keyword);
+                            } else {
+                                println!("Notes matching '{}':", keyword);
+                                for note in notes {
+                                    println!("  - {} (in folder: {})", note.title, note.folder);
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => {
+                            println!("Failed to search notes: {}", e);
+                            Err(e)
+                        }
+                    }
                 }
                 _ => {
-                    println!("Unknown notes command. Available commands: create/add, list");
+                    println!("Unknown notes command. Available commands: create/add, list, folders, delete, search");
                     Ok(())
                 }
             }
