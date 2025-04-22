@@ -1,5 +1,20 @@
-use regex::Regex;
-use serde::Serialize;
+//! Command parser compatibility module (Deprecated)
+//!
+//! This module is kept for backward compatibility and redirects to the new modular structure.
+//! Use the `crate::parser::command` module instead.
+
+use anyhow::Result;
+
+// Re-export the necessary types and functions for backward compatibility
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::command module instead"
+)]
+pub use crate::parser::command::parse_with_clap;
+
+// Re-export legacy types for backward compatibility
+pub use regex::Regex;
+pub use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct ParsedCommand {
@@ -26,49 +41,25 @@ pub struct CommandResponse {
     pub command_id: String,
 }
 
-#[allow(dead_code)]
+/// Use the new parser::command module internally
+/// 
+/// Converts between the new and old ParsedCommand types
+#[allow(deprecated)]
 pub fn parse_command(message: &str) -> Option<ParsedCommand> {
-    // Match schedule command: "schedule a <type> <what> with <who> <when> at <time>"
-    if let Some(schedule) = parse_schedule(message) {
-        return Some(ParsedCommand {
-            command_type: "schedule".to_string(),
-            details: serde_json::to_value(schedule).unwrap(),
-        });
+    // Delegate to the new parse_command_natural
+    if let Some(new_cmd) = crate::parser::command::parse_command_natural(message) {
+        // Convert between the two types
+        Some(ParsedCommand {
+            command_type: new_cmd.command_type,
+            details: new_cmd.details,
+        })
+    } else {
+        None
     }
-
-    None
 }
 
-#[derive(Debug, Serialize)]
-#[allow(dead_code)]
-struct ScheduleCommand {
-    event_type: String,
-    event_name: String,
-    person: String,
-    day: String,
-    time: String,
-}
-
-#[allow(dead_code)]
-fn parse_schedule(message: &str) -> Option<ScheduleCommand> {
-    // Use regex to parse the schedule command
-    let re =
-        Regex::new(r"schedule a (\w+) (\w+) with (\w+) (\w+) at (\d+(?::\d+)?(?:am|pm)?)").ok()?;
-
-    if let Some(caps) = re.captures(message) {
-        return Some(ScheduleCommand {
-            event_type: caps.get(1)?.as_str().to_string(),
-            event_name: caps.get(2)?.as_str().to_string(),
-            person: caps.get(3)?.as_str().to_string(),
-            day: caps.get(4)?.as_str().to_string(),
-            time: caps.get(5)?.as_str().to_string(),
-        });
-    }
-
-    None
-}
-
-#[allow(dead_code)]
+// Process command using new module internally
+#[allow(deprecated)]
 pub fn process_command(message: UserMessage) -> CommandResponse {
     let parsed = parse_command(&message.content);
 
