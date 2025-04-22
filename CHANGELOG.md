@@ -2,6 +2,10 @@
 ### Fixed
 - Fixed parser bugs and improved error handling
 
+## [0.13.6] - 2025-04-23
+### Fixed
+- Fixed parser bugs and improved error handling
+
 ## [0.13.5] - 2025-04-23
 ### Fixed
 - refactored the parser
@@ -376,7 +380,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project initialization
 
 [unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...HEAD
-[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
+[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0...v0.13.6[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...v0.12.1
 [0.11.20]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.20
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0
