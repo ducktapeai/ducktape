@@ -1,3 +1,9 @@
+## [0.13.3] - 2025-04-22
+### Fixed
+- Fixed note creation commands with multi-word titles and arguments
+- Improved CLI argument parsing to properly handle space-separated parameters
+- Enhanced input validation for note commands
+
 ## [0.13.2] - 2025-04-21
 ### Fixed
 - Fixed calendar event creation bug where end times incorrectly included dates
@@ -28,6 +34,11 @@
 - Improved terminal experience by ensuring exit commands work even if LLM API calls fail
 
 ## [0.11.20] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
