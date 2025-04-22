@@ -4,7 +4,7 @@
 //! using the Grok/X.AI API for parsing user input into structured commands.
 
 use crate::parser::traits::{ParseResult, Parser};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use log::debug;
 
@@ -22,7 +22,7 @@ impl Parser for GrokParser {
     async fn parse_input(&self, input: &str) -> Result<ParseResult> {
         // Temporarily use OpenAI parser as a fallback until Grok implementation is completed
         debug!("Grok parser: Using OpenAI parser as fallback for input: {}", input);
-        
+
         // Forward to OpenAI parser
         let openai_parser = crate::parser::openai::OpenAIParser::new()?;
         openai_parser.parse_input(input).await

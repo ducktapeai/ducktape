@@ -3,25 +3,21 @@
 //! This module contains the core implementation of the OpenAI-based parser
 
 use crate::parser::traits::{ParseResult, Parser};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::{Local, Timelike};
 use log::debug;
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
 
 use super::utils::{
-    enhance_command_with_contacts,
-    enhance_command_with_zoom, 
-    enhance_command_with_recurrence,
-    sanitize_nlp_command,
-    sanitize_user_input, 
-    validate_calendar_command
+    enhance_command_with_contacts, enhance_command_with_recurrence, enhance_command_with_zoom,
+    sanitize_nlp_command, sanitize_user_input, validate_calendar_command,
 };
 
 /// OpenAI parser for natural language processing
@@ -201,7 +197,7 @@ Rules:
             let enhanced = enhance_command_with_recurrence(trimmed);
             let enhanced = enhance_command_with_zoom(&enhanced, &sanitized_input);
             let enhanced = enhance_command_with_contacts(&enhanced, &sanitized_input);
-            
+
             // Validate before adding
             match validate_calendar_command(&enhanced) {
                 Ok(_) => results.push(enhanced),

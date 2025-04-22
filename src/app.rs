@@ -186,12 +186,12 @@ impl Application {
 
         // Create appropriate parser using factory
         let parser = ParserFactory::create_parser()?;
-        
+
         // Process input through parser
         match parser.parse_input(&preprocessed_input).await? {
             crate::parser::ParseResult::CommandString(cmd) => {
                 log::debug!("Processed command string: {}", cmd);
-                
+
                 // Try to parse with Clap first
                 let command_args = match self.parse_command_string(&cmd) {
                     Ok(args) => args,
@@ -200,13 +200,13 @@ impl Application {
                         CommandArgs::parse(&cmd)?
                     }
                 };
-                
+
                 // Execute the command
                 self.command_processor.execute(command_args).await
-            },
+            }
             crate::parser::ParseResult::StructuredCommand(args) => {
                 log::debug!("Got pre-parsed command arguments: {:?}", args);
-                
+
                 // Execute directly with the structured command
                 self.command_processor.execute(args).await
             }
@@ -218,7 +218,7 @@ impl Application {
 
         // Create appropriate parser using factory
         let parser = ParserFactory::create_parser()?;
-        
+
         // Process input through parser
         match parser.parse_input(input).await {
             Ok(crate::parser::ParseResult::CommandString(command)) => {
@@ -263,7 +263,7 @@ impl Application {
             Ok(crate::parser::ParseResult::StructuredCommand(args)) => {
                 log::debug!("Got pre-parsed structured command: {:?}", args);
                 println!("Processed command structure from natural language");
-                
+
                 // Execute directly with the structured command
                 self.command_processor.execute(args).await
             }

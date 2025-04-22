@@ -6,10 +6,7 @@
 use anyhow::Result;
 
 // Re-export the necessary types and functions for backward compatibility
-#[deprecated(
-    since = "0.13.0",
-    note = "Use crate::parser::command module instead"
-)]
+#[deprecated(since = "0.13.0", note = "Use crate::parser::command module instead")]
 pub use crate::parser::command::parse_with_clap;
 
 // Re-export legacy types for backward compatibility
@@ -42,17 +39,14 @@ pub struct CommandResponse {
 }
 
 /// Use the new parser::command module internally
-/// 
+///
 /// Converts between the new and old ParsedCommand types
 #[allow(deprecated)]
 pub fn parse_command(message: &str) -> Option<ParsedCommand> {
     // Delegate to the new parse_command_natural
     if let Some(new_cmd) = crate::parser::command::parse_command_natural(message) {
         // Convert between the two types
-        Some(ParsedCommand {
-            command_type: new_cmd.command_type,
-            details: new_cmd.details,
-        })
+        Some(ParsedCommand { command_type: new_cmd.command_type, details: new_cmd.details })
     } else {
         None
     }
