@@ -41,3 +41,4 @@ cleanup-calendar-files.sh
 files-to-remove.txt
 run-dev.sh
 update-version.sh
+install_local.sh
