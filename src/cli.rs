@@ -1,4 +1,11 @@
+//! CLI module for parsing command line arguments
+//!
+//! This module defines the command-line interface for the DuckTape application
+//! using the clap crate for argument parsing.
+
+use crate::command_processor::CommandArgs;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// DuckTape - AI-powered terminal tool for Apple Calendar, Reminders and Notes
@@ -347,239 +354,264 @@ pub enum UtilityActions {
     DateTime,
 }
 
-/// Convert a Clap command to a CommandArgs representation
-pub fn convert_to_command_args(cli: &Cli) -> Option<crate::command_processor::CommandArgs> {
-    use crate::command_processor::CommandArgs;
-    use std::collections::HashMap;
+/// Convert a Cli object to CommandArgs for use with the command processor
+///
+/// This function extracts relevant information from the Cli struct and
+/// converts it to a CommandArgs struct that can be used by the command processor.
+pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
+    match &cli.command {
+        Some(cmd) => match cmd {
+            Commands::Calendar { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
 
-    // If no command specified, return None to handle terminal mode
-    let command = match &cli.command {
-        Some(cmd) => cmd,
-        None => return None,
-    };
+                match action {
+                    CalendarActions::List => {
+                        args.push("list".to_string());
+                    }
+                    CalendarActions::Props => {
+                        args.push("props".to_string());
+                    }
+                    CalendarActions::Create {
+                        title,
+                        date,
+                        start_time,
+                        end_time,
+                        calendar,
+                        contacts,
+                        email,
+                        location,
+                        notes,
+                        zoom,
+                        repeat,
+                        interval,
+                        until,
+                        count,
+                        days,
+                    } => {
+                        args.push("create".to_string());
+                        args.push(title.clone());
+                        args.push(date.clone());
+                        args.push(start_time.clone());
+                        args.push(end_time.clone());
+                        args.push(calendar.clone());
 
-    let mut command_str = String::new();
-    let mut args = Vec::new();
-    let mut flags = HashMap::new();
+                        if let Some(loc) = location {
+                            flags.insert("location".to_string(), Some(loc.clone()));
+                        }
+                        if let Some(n) = notes {
+                            flags.insert("notes".to_string(), Some(n.clone()));
+                        }
+                        if *zoom {
+                            flags.insert("zoom".to_string(), Some("true".to_string()));
+                        }
+                        if let Some(r) = repeat {
+                            flags.insert("repeat".to_string(), Some(format!("{:?}", r)));
+                        }
+                        if let Some(i) = interval {
+                            flags.insert("interval".to_string(), Some(i.to_string()));
+                        }
+                        if let Some(u) = until {
+                            flags.insert("until".to_string(), Some(u.clone()));
+                        }
+                        if let Some(c) = count {
+                            flags.insert("count".to_string(), Some(c.to_string()));
+                        }
+                        if let Some(d) = days {
+                            let days_str = d
+                                .iter()
+                                .map(|&day| day.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",");
+                            flags.insert("days".to_string(), Some(days_str));
+                        }
+                        if let Some(c) = contacts {
+                            let contacts_str = c.join(",");
+                            flags.insert("contacts".to_string(), Some(contacts_str));
+                        }
+                        if let Some(e) = email {
+                            let email_str = e.join(",");
+                            flags.insert("email".to_string(), Some(email_str));
+                        }
+                    }
+                    CalendarActions::Delete { event_id, calendar } => {
+                        args.push("delete".to_string());
+                        args.push(event_id.clone());
+                        args.push(calendar.clone());
+                    }
+                    CalendarActions::Import { file, calendar, format } => {
+                        args.push("import".to_string());
+                        args.push(file.to_string_lossy().to_string());
+                        args.push(calendar.clone());
+                        flags.insert("format".to_string(), Some(format.clone()));
+                    }
+                    CalendarActions::SetDefault { calendar } => {
+                        args.push("set-default".to_string());
+                        args.push(calendar.clone());
+                    }
+                }
 
-    match command {
-        Commands::Calendar { action } => {
-            command_str = "calendar".to_string();
-            match action {
-                CalendarActions::List => {
-                    args.push("list".to_string());
-                }
-                CalendarActions::Props => {
-                    args.push("props".to_string());
-                }
-                CalendarActions::Create {
-                    title,
-                    date,
-                    start_time,
-                    end_time,
-                    calendar,
-                    contacts,
-                    email,
-                    location,
-                    notes,
-                    zoom,
-                    repeat,
-                    interval,
-                    until,
-                    count,
-                    days,
-                } => {
-                    args.push("create".to_string());
-                    args.push(title.clone());
-                    args.push(date.clone());
-                    args.push(start_time.clone());
-                    args.push(end_time.clone());
-                    args.push(calendar.clone());
+                Some(CommandArgs { command: "calendar".to_string(), args, flags })
+            }
+            Commands::Todo { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
 
-                    // Handle optional flags
-                    if let Some(contact_list) = contacts {
-                        flags.insert("contacts".to_string(), Some(contact_list.join(",")));
+                match action {
+                    TodoActions::Lists => {
+                        args.push("lists".to_string());
                     }
-                    if let Some(email_list) = email {
-                        flags.insert("email".to_string(), Some(email_list.join(",")));
+                    TodoActions::List { list } => {
+                        args.push("list".to_string());
+                        if let Some(l) = list {
+                            args.push(l.clone());
+                        }
                     }
-                    if let Some(loc) = location {
-                        flags.insert("location".to_string(), Some(loc.clone()));
+                    TodoActions::Create { title, lists, remind, notes } => {
+                        args.push("create".to_string());
+                        args.push(title.clone());
+                        for list in lists {
+                            args.push(list.clone());
+                        }
+                        if let Some(r) = remind {
+                            flags.insert("remind".to_string(), Some(r.clone()));
+                        }
+                        if let Some(n) = notes {
+                            flags.insert("notes".to_string(), Some(n.clone()));
+                        }
                     }
-                    if let Some(note) = notes {
-                        flags.insert("notes".to_string(), Some(note.clone()));
+                    TodoActions::Complete { reminder_id, list } => {
+                        args.push("complete".to_string());
+                        args.push(reminder_id.clone());
+                        if let Some(l) = list {
+                            args.push(l.clone());
+                        }
                     }
-                    if *zoom {
-                        flags.insert("zoom".to_string(), None);
+                    TodoActions::Delete { reminder_id, list } => {
+                        args.push("delete".to_string());
+                        args.push(reminder_id.clone());
+                        if let Some(l) = list {
+                            args.push(l.clone());
+                        }
                     }
-                    if let Some(repeat_val) = repeat {
-                        let repeat_str = match repeat_val {
-                            RecurrenceFreq::Daily => "daily",
-                            RecurrenceFreq::Weekly => "weekly",
-                            RecurrenceFreq::Monthly => "monthly",
-                            RecurrenceFreq::Yearly => "yearly",
-                        };
-                        flags.insert("repeat".to_string(), Some(repeat_str.to_string()));
-                    }
-                    if let Some(interval_val) = interval {
-                        flags.insert("interval".to_string(), Some(interval_val.to_string()));
-                    }
-                    if let Some(until_date) = until {
-                        flags.insert("until".to_string(), Some(until_date.clone()));
-                    }
-                    if let Some(count_val) = count {
-                        flags.insert("count".to_string(), Some(count_val.to_string()));
-                    }
-                    if let Some(day_list) = days {
-                        let days_str =
-                            day_list.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",");
-                        flags.insert("days".to_string(), Some(days_str));
-                    }
-                }
-                CalendarActions::Delete { event_id, calendar } => {
-                    args.push("delete".to_string());
-                    args.push(event_id.clone());
-                    args.push(calendar.clone());
-                }
-                CalendarActions::Import { file, calendar, format } => {
-                    args.push("import".to_string());
-                    args.push(file.to_string_lossy().to_string());
-                    args.push(calendar.clone());
-                    flags.insert("format".to_string(), Some(format.clone()));
-                }
-                CalendarActions::SetDefault { calendar } => {
-                    args.push("set-default".to_string());
-                    args.push(calendar.clone());
-                }
-            }
-        }
-        Commands::Todo { action } => {
-            command_str = "todo".to_string();
-            match action {
-                TodoActions::Lists => {
-                    args.push("lists".to_string());
-                }
-                TodoActions::List { list } => {
-                    args.push("list".to_string());
-                    if let Some(list_name) = list {
-                        args.push(list_name.clone());
+                    TodoActions::SetList { list } => {
+                        args.push("set-list".to_string());
+                        args.push(list.clone());
                     }
                 }
-                TodoActions::Create { title, lists, remind, notes } => {
-                    args.push("create".to_string());
-                    args.push(title.clone());
-                    args.extend(lists.iter().cloned());
 
-                    if let Some(remind_time) = remind {
-                        flags.insert("remind".to_string(), Some(remind_time.clone()));
-                    }
-                    if let Some(note_text) = notes {
-                        flags.insert("notes".to_string(), Some(note_text.clone()));
-                    }
-                }
-                TodoActions::Complete { reminder_id, list } => {
-                    args.push("complete".to_string());
-                    args.push(reminder_id.clone());
-                    if let Some(list_name) = list {
-                        args.push(list_name.clone());
-                    }
-                }
-                TodoActions::Delete { reminder_id, list } => {
-                    args.push("delete".to_string());
-                    args.push(reminder_id.clone());
-                    if let Some(list_name) = list {
-                        args.push(list_name.clone());
-                    }
-                }
-                TodoActions::SetList { list } => {
-                    args.push("set-list".to_string());
-                    args.push(list.clone());
-                }
+                Some(CommandArgs { command: "todo".to_string(), args, flags })
             }
-        }
-        Commands::Note { action } => {
-            command_str = "note".to_string();
-            match action {
-                NoteActions::List { folder } => {
-                    args.push("list".to_string());
-                    if let Some(folder_name) = folder {
-                        args.push(folder_name.clone());
+            Commands::Note { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
+
+                match action {
+                    NoteActions::List { folder } => {
+                        args.push("list".to_string());
+                        if let Some(f) = folder {
+                            args.push(f.clone());
+                        }
+                    }
+                    NoteActions::Create { title, content, folder } => {
+                        args.push("create".to_string());
+                        let title_str = title.join(" ");
+                        args.push(title_str);
+
+                        if let Some(folder_val) = folder {
+                            flags.insert("folder".to_string(), Some(folder_val.clone()));
+                        }
+                        if let Some(content_val) = content {
+                            flags.insert("content".to_string(), Some(content_val.clone()));
+                        }
+                    }
+                    NoteActions::Search { query, folder } => {
+                        args.push("search".to_string());
+                        let query_str = query.join(" ");
+                        args.push(query_str);
+
+                        if let Some(f) = folder {
+                            flags.insert("folder".to_string(), Some(f.clone()));
+                        }
+                    }
+                    NoteActions::Delete { note_id, folder } => {
+                        args.push("delete".to_string());
+                        let id_str = note_id.join(" ");
+                        args.push(id_str);
+
+                        if let Some(f) = folder {
+                            flags.insert("folder".to_string(), Some(f.clone()));
+                        }
                     }
                 }
-                NoteActions::Create { title, content, folder } => {
-                    args.push("create".to_string());
-                    args.push(title.join(" "));
-                    if let Some(content_text) = content {
-                        args.push(content_text.clone());
-                    }
-                    if let Some(folder_name) = folder {
-                        args.push(folder_name.clone());
-                    }
-                }
-                NoteActions::Search { query, folder } => {
-                    args.push("search".to_string());
-                    args.push(query.join(" "));
-                    if let Some(folder_name) = folder {
-                        args.push(folder_name.clone());
-                    }
-                }
-                NoteActions::Delete { note_id, folder } => {
-                    args.push("delete".to_string());
-                    args.push(note_id.join(" "));
-                    if let Some(folder_name) = folder {
-                        args.push(folder_name.clone());
-                    }
-                }
+
+                Some(CommandArgs { command: "note".to_string(), args, flags })
             }
-        }
-        Commands::Config { action } => {
-            command_str = "config".to_string();
-            match action {
-                ConfigActions::Show { key } => {
-                    args.push("show".to_string());
-                    if let Some(key_name) = key {
-                        args.push(key_name.clone());
+            Commands::Config { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
+
+                match action {
+                    ConfigActions::Show { key } => {
+                        args.push("show".to_string());
+                        if let Some(k) = key {
+                            args.push(k.clone());
+                        }
+                    }
+                    ConfigActions::Set { key, value } => {
+                        args.push("set".to_string());
+                        args.push(key.clone());
+                        args.push(value.clone());
                     }
                 }
-                ConfigActions::Set { key, value } => {
-                    args.push("set".to_string());
-                    args.push(key.clone());
-                    args.push(value.clone());
-                }
+
+                Some(CommandArgs { command: "config".to_string(), args, flags })
             }
-        }
-        Commands::Contact { action } => {
-            command_str = "contacts".to_string();
-            match action {
-                ContactActions::Create { group_name, emails } => {
-                    args.push("create".to_string());
-                    args.push(group_name.clone());
-                    args.extend(emails.iter().cloned());
+            Commands::Contact { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
+
+                match action {
+                    ContactActions::List => {
+                        args.push("list".to_string());
+                    }
+                    ContactActions::Create { group_name, emails } => {
+                        args.push("create".to_string());
+                        args.push(group_name.clone());
+                        for email in emails {
+                            args.push(email.clone());
+                        }
+                    }
+                    ContactActions::Show { group_name } => {
+                        args.push("show".to_string());
+                        args.push(group_name.clone());
+                    }
                 }
-                ContactActions::List => {
-                    args.push("list".to_string());
-                }
-                ContactActions::Show { group_name } => {
-                    args.push("show".to_string());
-                    args.push(group_name.clone());
-                }
+
+                Some(CommandArgs { command: "contact".to_string(), args, flags })
             }
-        }
-        Commands::Utility { action } => {
-            command_str = "utility".to_string();
-            match action {
-                UtilityActions::Date => {
-                    args.push("date".to_string());
+            Commands::Utility { action } => {
+                let mut args = Vec::new();
+                let mut flags = HashMap::new();
+
+                match action {
+                    UtilityActions::Date => {
+                        args.push("date".to_string());
+                    }
+                    UtilityActions::Time => {
+                        args.push("time".to_string());
+                    }
+                    UtilityActions::DateTime => {
+                        args.push("datetime".to_string());
+                    }
                 }
-                UtilityActions::Time => {
-                    args.push("time".to_string());
-                }
-                UtilityActions::DateTime => {
-                    args.push("datetime".to_string());
-                }
+
+                Some(CommandArgs { command: "utility".to_string(), args, flags })
             }
+        },
+        None => {
+            // No command specified, enter interactive mode
+            None
         }
     }
-
-    Some(CommandArgs { command: command_str, args, flags })
 }

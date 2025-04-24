@@ -1,3 +1,71 @@
+## [0.13.6] - 2025-04-23
+### Fixed
+- Fixed parser bugs and improved error handling
+
+## [0.13.6] - 2025-04-23
+### Fixed
+- Fixed parser bugs and improved error handling
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.5] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.2] - 2025-04-23
+### Fixed
+- refactored the parser
+
+## [0.13.4] - 2025-04-22
+### Fixed
+- Fixed note creation commands with multi-word titles and arguments
+- Improved CLI argument parsing to properly handle space-separated parameters
+- Enhanced input validation for note commands
+
+## [0.13.3] - 2025-04-22
+### Fixed
+- Fixed note creation commands with multi-word titles and arguments
+- Improved CLI argument parsing to properly handle space-separated parameters
+- Enhanced input validation for note commands
+
 ## [0.13.2] - 2025-04-21
 ### Fixed
 - Fixed calendar event creation bug where end times incorrectly included dates
@@ -28,6 +96,16 @@
 - Improved terminal experience by ensuring exit commands work even if LLM API calls fail
 
 ## [0.11.20] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
@@ -301,8 +379,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...HEAD
-[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...HEAD
+[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0...v0.13.6[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...v0.12.1
 [0.11.20]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.20
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0

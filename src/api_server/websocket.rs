@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::calendar::{EventConfig, create_event, import_csv_events, import_ics_events};
 use crate::cli;
 use crate::command_processor::CommandArgs;
-use crate::grok_parser;
+use crate::parser;
 use std::path::Path;
 
 use super::models::{
@@ -143,8 +143,8 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                 if is_command_message(&content) {
                     info!("WebSocket[{}]: Processing as DuckTape command", connection_id);
 
-                    // Use grok_parser directly
-                    match grok_parser::parse_natural_language(&content).await {
+                    // Use parser module instead of grok_parser
+                    match parser::openai::parse_natural_language(&content).await {
                         Ok(command) => {
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
                             handle_parsed_command(connection_id, command, socket).await;
