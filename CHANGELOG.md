@@ -1,3 +1,11 @@
+## [0.15.1] - 2025-04-25
+### Fixed
+- Enhanced natural language processing for calendar event creation
+- Improved command parsing in interactive mode
+- Better handling of event titles and contact information
+- Fixed pattern matching for time expressions in event creation
+- Added direct fallback for common natural language patterns
+
 ## [0.15.0] - 2025-04-25
 ### Changed
 - Completely removed OpenAI parser and all dependencies
@@ -400,7 +408,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.15.0...HEAD
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/ducktapeai/ducktape/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/ducktapeai/ducktape/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/ducktapeai/ducktape/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...v0.14.0
