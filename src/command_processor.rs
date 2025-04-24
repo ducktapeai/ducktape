@@ -1181,8 +1181,8 @@ pub struct VersionHandler;
 impl CommandHandler for VersionHandler {
     fn execute(&self, _args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            const VERSION: &str = env!("CARGO_PKG_VERSION");
-            println!("DuckTape v{}", VERSION);
+            // Use the official version module instead of hardcoding
+            println!("DuckTape v{}", crate::version::get_version());
             println!(
                 "A tool for interacting with Apple Calendar, Notes, and Reminders via the command line."
             );
