@@ -2,10 +2,13 @@ pub mod api_server;
 pub mod app;
 pub mod calendar;
 pub mod cli;
+#[deprecated(since = "0.14.0", note = "Use parser module instead")]
+pub mod command_parser;
 pub mod command_processor;
 pub mod config;
 pub mod contact_groups;
-pub mod deepseek_reasoning;
+// pub mod contacts;  // Commented out if it doesn't exist
+// Removed deepseek_reasoning module
 pub mod env_debug;
 pub mod env_loader;
 pub mod env_manager;
@@ -60,3 +63,6 @@ pub fn init_logger() {
 // Re-export commonly used types
 pub use config::Config;
 pub use state::{CalendarItem, TodoItem};
+
+// Re-export parser types for convenience
+pub use parser::traits::{ParseResult, Parser, ParserFactory};
