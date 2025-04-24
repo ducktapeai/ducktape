@@ -6,13 +6,13 @@
 pub mod command;
 pub mod deepseek;
 pub mod grok;
-pub mod openai;
 pub mod terminal;
 pub mod traits;
+pub mod utils;
 
 // Re-export core types for easier access
 pub use self::traits::{ParseResult, Parser, ParserFactory};
 
 // Re-export important utility functions
 pub use self::command::parse_with_clap;
-pub use self::openai::parse_natural_language;
+pub use self::utils::sanitize_nlp_command;

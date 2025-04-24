@@ -113,6 +113,12 @@ impl ContactGroups {
     }
 }
 
+impl Default for ContactGroups {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[allow(dead_code)]
 /// Create an event with a predefined contact group
 pub async fn create_event_with_group(config: EventConfig, group_id: &str) -> Result<()> {

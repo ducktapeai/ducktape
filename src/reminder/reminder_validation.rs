@@ -4,9 +4,7 @@
 
 use super::reminder_types::ReminderError;
 use anyhow::{Result, anyhow};
-use chrono::NaiveDateTime;
-use log::{error, warn};
-use regex::Regex;
+use log::warn;
 
 /// Validate a reminder title
 pub fn validate_title(title: &str) -> Result<()> {

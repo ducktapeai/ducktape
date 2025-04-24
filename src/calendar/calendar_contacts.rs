@@ -133,7 +133,6 @@ pub async fn create_event_with_contacts(
     mut config: EventConfig,
     contact_names: &[&str],
 ) -> anyhow::Result<()> {
-    use crate::calendar::calendar_validation::validate_email;
     use crate::calendar::create_event;
 
     info!("Creating event with {} contact names: {:?}", contact_names.len(), contact_names);

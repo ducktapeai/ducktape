@@ -66,7 +66,7 @@ pub fn resolve_relative_date(date_str: &str) -> Result<String> {
 
 /// Parse the output of the list command to extract reminder items
 pub fn parse_reminder_list_output(_output: &str) -> Vec<super::ReminderItem> {
-    let mut reminders = Vec::new();
+    let reminders = Vec::new();
 
     // In a real implementation, this would parse the output of the list command
     // For now, returning an empty vector

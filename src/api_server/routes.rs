@@ -5,7 +5,6 @@
 
 use axum::{
     Router,
-    extract::State,
     http::Method,
     routing::{get, post},
 };

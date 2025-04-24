@@ -49,7 +49,7 @@ pub fn resolve_relative_date(date_str: &str) -> Result<DateTime<Local>> {
 
 /// Parse a list of todo items returned from AppleScript
 pub fn parse_todo_list_output(output: &str) -> Vec<super::TodoItem> {
-    let mut todos = Vec::new();
+    let todos = Vec::new();
 
     // This is a placeholder for a more sophisticated parser
     // In a production system, you would want to use a proper parser for AppleScript output

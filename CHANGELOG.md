@@ -1,14 +1,35 @@
-## [0.13.6] - 2025-04-23
+## [0.15.0] - 2025-04-25
+### Changed
+- Completely removed OpenAI parser and all dependencies
+- Simplified LLM provider options to only Grok and DeepSeek
+- Updated code structure for more maintainable architecture
+- Improved error handling for better diagnostics
+
 ### Fixed
-- Fixed parser bugs and improved error handling
+- Fixed numerous code quality issues flagged by Clippy
+- Improved use of idiomatic Rust patterns throughout codebase
+- Fixed unnecessary parentheses in conditional statements
+- Added proper Default implementations for key structs
+
+## [0.14.1] - 2025-04-25
+### Fixed
+- Fixed GrokParser implementation to properly use X.AI API key
+- Removed fallback to OpenAI API in Grok parser module
+- Improved error handling for missing API keys
+
+## [0.14.0] - 2025-04-25
+### Changed
+- Refactored parser modules for cleaner structure
+- Removed unused DeepSeek modules to streamline codebase
+- Fixed duplicate module declarations in lib.rs
 
 ## [0.13.6] - 2025-04-23
 ### Fixed
 - Fixed parser bugs and improved error handling
 
-## [0.13.5] - 2025-04-23
+## [0.13.6] - 2025-04-23
 ### Fixed
-- refactored the parser
+- Fixed parser bugs and improved error handling
 
 ## [0.13.5] - 2025-04-23
 ### Fixed
@@ -379,8 +400,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...HEAD
-[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0...v0.13.6[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/ducktapeai/ducktape/compare/v0.14.1...v0.15.0
+[0.14.1]: https://github.com/ducktapeai/ducktape/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...v0.14.0
+[0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6
+[0.13.0]: https://github.com/ducktapeai/ducktape/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/ducktapeai/ducktape/compare/v0.11.20...v0.12.1
 [0.11.20]: https://github.com/ducktapeai/ducktape/compare/v0.11.19...v0.11.20
 [0.11.0]: https://github.com/ducktapeai/ducktape/compare/v0.10.0...v0.11.0

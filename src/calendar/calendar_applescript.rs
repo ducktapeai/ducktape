@@ -34,8 +34,9 @@ pub async fn list_event_properties() -> Result<()> {
     Ok(())
 }
 
-/// Delete an event by title and date
-pub async fn delete_event(title: &str, date: &str) -> Result<()> {
-    // ...implementation moved from calendar.rs...
+/// Delete an event by title and date (placeholder implementation)
+pub async fn delete_event(_title: &str, _date: &str) -> Result<()> {
+    // TODO: Implement event deletion
+    println!("Event deletion not yet implemented");
     Ok(())
 }

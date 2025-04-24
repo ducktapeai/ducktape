@@ -15,16 +15,10 @@ pub use crate::parser::traits::ParserFactory;
 pub use crate::parser::command::CommandParser;
 pub use crate::parser::deepseek::DeepSeekParser;
 pub use crate::parser::grok::GrokParser;
-pub use crate::parser::openai::OpenAIParser;
 pub use crate::parser::terminal::TerminalParser;
 
 // Re-export core functionality
 pub use crate::parser::command::parse_with_clap;
-pub use crate::parser::openai::parse_natural_language;
 
-// Re-export utility functions for backward compatibility
-pub use crate::parser::openai::{
-    enhance_command_with_contacts, enhance_command_with_recurrence, enhance_command_with_zoom,
-    extract_contact_names, extract_emails, sanitize_nlp_command, sanitize_user_input,
-    validate_calendar_command,
-};
+// OpenAI parser functionality has been removed
+// Utility functions removed

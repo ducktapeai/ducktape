@@ -50,11 +50,6 @@ impl ParserFactory {
         let config = Config::load()?;
 
         match config.language_model.provider {
-            Some(LLMProvider::OpenAI) => {
-                info!("Creating OpenAI parser");
-                let parser = crate::parser::openai::OpenAIParser::new()?;
-                Ok(Box::new(parser))
-            }
             Some(LLMProvider::Grok) => {
                 info!("Creating Grok parser");
                 let parser = crate::parser::grok::GrokParser::new()?;
@@ -78,10 +73,6 @@ impl ParserFactory {
     /// a parser that's different from what's in the config.
     pub fn create_parser_by_name(name: &str) -> Result<Box<dyn Parser + Send + Sync>> {
         match name.to_lowercase().as_str() {
-            "openai" => {
-                let parser = crate::parser::openai::OpenAIParser::new()?;
-                Ok(Box::new(parser))
-            }
             "grok" => {
                 let parser = crate::parser::grok::GrokParser::new()?;
                 Ok(Box::new(parser))
