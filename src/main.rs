@@ -7,7 +7,6 @@ use ducktape::env_debug;
 use anyhow::Result;
 use clap::Parser;
 use log::debug;
-use log::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {

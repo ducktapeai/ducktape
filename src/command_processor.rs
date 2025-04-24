@@ -285,7 +285,7 @@ pub struct CalendarHandler;
 impl CommandHandler for CalendarHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("create") => {
                     if args.args.len() < 5 {
                         println!("Not enough arguments for calendar create command");
@@ -391,7 +391,7 @@ impl CommandHandler for CalendarHandler {
                     // Validate calendar name
                     let available_calendars = crate::calendar::get_available_calendars().await?;
                     if let Some(cal) = &calendar {
-                        if (!available_calendars.contains(cal)) {
+                        if !available_calendars.contains(cal) {
                             warn!(
                                 "Specified calendar '{}' not found. Falling back to default calendar.",
                                 cal
@@ -536,7 +536,7 @@ pub struct TodoHandler;
 impl CommandHandler for TodoHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for todo create command");
@@ -656,7 +656,7 @@ pub struct NotesHandler;
 impl CommandHandler for NotesHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for note create command");
@@ -846,7 +846,7 @@ pub struct ConfigHandler;
 impl CommandHandler for ConfigHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("set") => {
                     if args.args.len() < 3 {
                         println!("Not enough arguments for config set command");
@@ -888,10 +888,6 @@ impl CommandHandler for ConfigHandler {
                             config.notes.default_folder = Some(value.clone());
                         }
                         "language_model.provider" => match value.to_lowercase().as_str() {
-                            "openai" => {
-                                config.language_model.provider =
-                                    Some(crate::config::LLMProvider::OpenAI);
-                            }
                             "grok" => {
                                 config.language_model.provider =
                                     Some(crate::config::LLMProvider::Grok);
@@ -902,7 +898,7 @@ impl CommandHandler for ConfigHandler {
                             }
                             _ => {
                                 println!("Invalid language model provider: {}", value);
-                                println!("Valid options are: openai, grok, deepseek");
+                                println!("Valid options are: grok, deepseek");
                                 return Ok(());
                             }
                         },
@@ -973,7 +969,6 @@ impl CommandHandler for ConfigHandler {
                         }
                         "language_model.provider" => {
                             let provider = match config.language_model.provider {
-                                Some(crate::config::LLMProvider::OpenAI) => "openai",
                                 Some(crate::config::LLMProvider::Grok) => "grok",
                                 Some(crate::config::LLMProvider::DeepSeek) => "deepseek",
                                 None => "none",
@@ -1016,7 +1011,6 @@ impl CommandHandler for ConfigHandler {
                                     .unwrap_or_else(|| "Not set".to_string())
                             );
                             let provider = match config.language_model.provider {
-                                Some(crate::config::LLMProvider::OpenAI) => "openai",
                                 Some(crate::config::LLMProvider::Grok) => "grok",
                                 Some(crate::config::LLMProvider::DeepSeek) => "deepseek",
                                 None => "none",
@@ -1049,7 +1043,7 @@ pub struct UtilitiesHandler;
 impl CommandHandler for UtilitiesHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("date") => {
                     println!("Current date: {}", chrono::Local::now().format("%Y-%m-%d"));
                     Ok(())
@@ -1085,7 +1079,7 @@ pub struct ContactGroupsHandler;
 impl CommandHandler for ContactGroupsHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("create") => {
                     if args.args.len() < 3 {
                         println!("Not enough arguments for contact group create command");
@@ -1243,7 +1237,7 @@ pub struct ReminderHandler;
 impl CommandHandler for ReminderHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
-            match args.args.get(0).map(|s| s.as_str()) {
+            match args.args.first().map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
                         println!("Not enough arguments for reminder create command");
@@ -1458,6 +1452,12 @@ impl CommandProcessor {
         warn!("Unrecognized command: {}", command_name);
         println!("Unrecognized command. Type 'help' for a list of available commands.");
         Ok(())
+    }
+}
+
+impl Default for CommandProcessor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

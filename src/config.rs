@@ -33,18 +33,12 @@ pub struct NotesConfig {
     pub default_folder: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LLMProvider {
-    OpenAI,
+    #[default]
     Grok,
     DeepSeek,
-}
-
-impl Default for LLMProvider {
-    fn default() -> Self {
-        LLMProvider::OpenAI
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -99,7 +93,7 @@ impl Config {
         // Check if the provider field is set to a valid value
         if let Some(provider) = &config.language_model.provider {
             match provider {
-                LLMProvider::OpenAI | LLMProvider::Grok | LLMProvider::DeepSeek => {
+                LLMProvider::Grok | LLMProvider::DeepSeek => {
                     log::info!("Natural Language Mode detected: provider is {:?}", provider);
                 }
             }

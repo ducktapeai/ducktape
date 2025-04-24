@@ -10,16 +10,17 @@ use regex::Regex;
 /// Helper function to clean up NLP-generated commands
 /// Removes unnecessary quotes and normalizes spacing
 pub fn sanitize_nlp_command(command: &str) -> String {
+    // Clean up the command
+    let cleaned = command
+        .replace("\u{a0}", " ") // Replace non-breaking spaces
+        .replace("\"\"", "\""); // Replace double quotes
+
     // Ensure the command starts with ducktape
-    if !command.starts_with("ducktape") {
-        return command.to_string();
+    if !cleaned.starts_with("ducktape") {
+        return format!("ducktape {}", cleaned);
     }
 
-    // Basic sanitization to fix common issues with NLP-generated commands
-    command
-        .replace("\u{a0}", " ") // Replace non-breaking spaces
-        .replace("\"\"", "\"") // Replace double quotes
-        .to_string()
+    cleaned
 }
 
 /// Sanitize user input to prevent injection or other security issues
@@ -424,10 +425,10 @@ mod tests {
         let sanitized = sanitize_nlp_command(input);
         assert_eq!(sanitized, "ducktape calendar create \"Meeting\"");
 
-        // Test non-ducktape command
-        let input = "not a ducktape command";
+        // Test non-ducktape command with prefix added
+        let input = "create a meeting tomorrow at 3pm";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, input);
+        assert_eq!(sanitized, "ducktape create a meeting tomorrow at 3pm");
     }
 
     #[test]

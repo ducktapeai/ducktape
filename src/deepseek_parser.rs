@@ -4,9 +4,7 @@
 /// Use the `crate::parser::deepseek` module instead.
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use log::debug;
 use reqwest::Client;
-use serde_json::json;
 use std::env; // Added missing import
 
 use crate::parser_trait::{ParseResult, Parser};
@@ -43,8 +41,14 @@ impl Parser for DeepSeekParser {
     note = "Use crate::parser::deepseek::parse_natural_language instead"
 )]
 pub async fn parse_natural_language(input: &str) -> Result<String> {
-    // Delegate to OpenAI implementation as DeepSeek currently uses OpenAI as fallback
-    crate::parser::openai::parse_natural_language(input).await
+    // OpenAI parser has been removed, use DeepSeek directly
+    let parser = crate::parser::deepseek::DeepSeekParser::new()?;
+    match parser.parse_input(input).await? {
+        ParseResult::CommandString(cmd) => Ok(cmd),
+        ParseResult::StructuredCommand(_) => {
+            Err(anyhow!("Expected command string but got structured command"))
+        }
+    }
 }
 
 /// Helper function to clean up NLP-generated commands

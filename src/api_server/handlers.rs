@@ -4,16 +4,14 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
 };
 use chrono::Utc;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::fs;
-use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use super::models::{
     ApiResponse, ApiState, CalendarResponse, CreateEventRequest, CreateNoteRequest,

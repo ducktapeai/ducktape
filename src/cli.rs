@@ -4,7 +4,7 @@
 //! using the clap crate for argument parsing.
 
 use crate::command_processor::CommandArgs;
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -549,7 +549,7 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
             }
             Commands::Config { action } => {
                 let mut args = Vec::new();
-                let mut flags = HashMap::new();
+                let flags = HashMap::new();
 
                 match action {
                     ConfigActions::Show { key } => {
@@ -569,7 +569,7 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
             }
             Commands::Contact { action } => {
                 let mut args = Vec::new();
-                let mut flags = HashMap::new();
+                let flags = HashMap::new();
 
                 match action {
                     ContactActions::List => {
@@ -592,7 +592,7 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
             }
             Commands::Utility { action } => {
                 let mut args = Vec::new();
-                let mut flags = HashMap::new();
+                let flags = HashMap::new();
 
                 match action {
                     UtilityActions::Date => {

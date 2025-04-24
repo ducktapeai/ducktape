@@ -9,13 +9,11 @@ use crate::parser::traits::{ParseResult, Parser};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use clap::Parser as ClapParser;
-use log::debug;
 use regex::Regex;
 use serde::Serialize;
-use std::collections::HashMap;
 
 // Import the Cli struct for parsing
-use crate::cli::{self, Cli, Commands};
+use crate::cli::{self, Cli};
 
 /// Modern command parser implementation
 pub struct CommandParser;

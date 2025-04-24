@@ -4,14 +4,7 @@ use crate::zoom::{ZoomClient, ZoomMeetingOptions, calculate_meeting_duration, fo
 use anyhow::{Result, anyhow};
 use chrono::{Datelike, Local, NaiveDateTime, TimeZone};
 use chrono_tz::Tz;
-use csv::ReaderBuilder;
-use ical::parser::ical::IcalParser;
-use ical::parser::ical::component::IcalEvent;
 use log::{debug, error, info};
-use regex::Regex;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
 

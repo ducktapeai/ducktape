@@ -1,3 +1,16 @@
+## [0.15.0] - 2025-04-25
+### Changed
+- Completely removed OpenAI parser and all dependencies
+- Simplified LLM provider options to only Grok and DeepSeek
+- Updated code structure for more maintainable architecture
+- Improved error handling for better diagnostics
+
+### Fixed
+- Fixed numerous code quality issues flagged by Clippy
+- Improved use of idiomatic Rust patterns throughout codebase
+- Fixed unnecessary parentheses in conditional statements
+- Added proper Default implementations for key structs
+
 ## [0.14.1] - 2025-04-25
 ### Fixed
 - Fixed GrokParser implementation to properly use X.AI API key
@@ -387,7 +400,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Project initialization
 
-[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.14.1...HEAD
+[unreleased]: https://github.com/ducktapeai/ducktape/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/ducktapeai/ducktape/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/ducktapeai/ducktape/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/ducktapeai/ducktape/compare/v0.13.6...v0.14.0
 [0.13.6]: https://github.com/ducktapeai/ducktape/compare/v0.13.0...v0.13.6

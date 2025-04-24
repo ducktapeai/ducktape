@@ -1,4 +1,3 @@
-use ducktape::command_processor::CommandArgs;
 
 /// Test function to validate our quoted string parsing solution
 fn parse_with_shell_words(input: &str) -> anyhow::Result<Vec<String>> {

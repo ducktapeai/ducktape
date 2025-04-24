@@ -13,7 +13,7 @@ pub fn validate_date_format(date: &str) -> bool {
     }
     if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
         let year = naive_date.year();
-        return year >= 2000 && year <= 2100;
+        return (2000..=2100).contains(&year);
     }
     false
 }
@@ -166,10 +166,8 @@ pub fn validate_event_config(
     }
 
     // If creating a Zoom meeting, validate needed fields
-    if config.create_zoom_meeting {
-        if config.end_time.is_none() {
-            return Err(anyhow!("End time is required for Zoom meetings"));
-        }
+    if config.create_zoom_meeting && config.end_time.is_none() {
+        return Err(anyhow!("End time is required for Zoom meetings"));
     }
 
     Ok(())

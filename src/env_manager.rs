@@ -5,14 +5,8 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 /// Required environment variables that the application needs
-pub const REQUIRED_ENV_VARS: &[&str] = &[
-    "XAI_API_KEY",
-    "OPENAI_API_KEY",
-    "DEEPSEEK_API_KEY",
-    "ZOOM_ACCOUNT_ID",
-    "ZOOM_CLIENT_ID",
-    "ZOOM_CLIENT_SECRET",
-];
+pub const REQUIRED_ENV_VARS: &[&str] =
+    &["XAI_API_KEY", "DEEPSEEK_API_KEY", "ZOOM_ACCOUNT_ID", "ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET"];
 
 /// Names of optional environment variables
 pub const OPTIONAL_ENV_VARS: &[&str] = &["DUCKTAPE_LOG_LEVEL", "DUCKTAPE_CONFIG_PATH"];

@@ -3,7 +3,6 @@
 //! This module provides natural language processing capabilities
 //! using the Grok/X.AI API for parsing user input into structured commands.
 
-use crate::command_processor::CommandArgs;
 use crate::parser::traits::{ParseResult, Parser};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;

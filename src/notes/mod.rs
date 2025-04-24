@@ -9,7 +9,6 @@ mod notes_types;
 mod notes_util;
 mod notes_validation;
 
-pub use notes_applescript::*;
 pub use notes_types::*;
 pub use notes_validation::*;
 

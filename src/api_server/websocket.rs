@@ -143,11 +143,31 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                 if is_command_message(&content) {
                     info!("WebSocket[{}]: Processing as DuckTape command", connection_id);
 
-                    // Use parser module instead of grok_parser
-                    match parser::openai::parse_natural_language(&content).await {
-                        Ok(command) => {
+                    // Create a parser using the factory instead of directly using OpenAI parser
+                    let parser = match parser::ParserFactory::create_parser() {
+                        Ok(parser) => parser,
+                        Err(e) => {
+                            error!("WebSocket[{}]: Failed to create parser: {}", connection_id, e);
+                            let response = SwiftChatMessage {
+                                sender: "ducktape".to_string(),
+                                content: format!("❌ Error: Failed to create parser: {}", e),
+                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                message_type: "error".to_string(),
+                            };
+                            send_response(socket, response).await;
+                            return;
+                        }
+                    };
+
+                    // Parse the input using the configured parser
+                    match parser.parse_input(&content).await {
+                        Ok(parser::ParseResult::CommandString(command)) => {
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
                             handle_parsed_command(connection_id, command, socket).await;
+                        }
+                        Ok(parser::ParseResult::StructuredCommand(args)) => {
+                            info!("WebSocket[{}]: Got structured command directly", connection_id);
+                            handle_websocket_command(connection_id, args, socket).await;
                         }
                         Err(e) => {
                             error!("WebSocket[{}]: Failed to parse command: {}", connection_id, e);
@@ -373,7 +393,7 @@ async fn send_error_response(socket: &mut WebSocket, message: &str) {
 
 /// Helper function to parse commands using Clap instead of deprecated CommandArgs::parse
 fn parse_command_string(input: &str) -> Result<CommandArgs, anyhow::Error> {
-    use anyhow::{Result, anyhow};
+    use anyhow::anyhow;
 
     // Format the input into argv style for clap
     let args = shell_words::split(input).map_err(|e| anyhow!("Failed to parse command: {}", e))?;

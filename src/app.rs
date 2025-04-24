@@ -26,9 +26,6 @@ impl Application {
         );
 
         match Config::load()?.language_model.provider {
-            Some(LLMProvider::OpenAI) => {
-                log::info!("Using OpenAI for natural language processing");
-            }
             Some(LLMProvider::Grok) => {
                 log::info!("Using Grok for natural language processing");
             }
@@ -225,7 +222,7 @@ impl Application {
                 println!("Translated to command: {}", command);
 
                 // Sanitize the NLP-generated command to remove unnecessary quotes
-                let sanitized_command = crate::parser::openai::sanitize_nlp_command(&command);
+                let sanitized_command = crate::parser::sanitize_nlp_command(&command);
                 println!("Sanitized command: {}", sanitized_command);
                 log::debug!("Sanitized NLP command: {}", sanitized_command);
 
