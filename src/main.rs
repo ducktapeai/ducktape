@@ -31,9 +31,14 @@ async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
 
     // Handle version flag explicitly with version module
-    if cli.version || input.trim().eq_ignore_ascii_case("--version") || input.trim().eq_ignore_ascii_case("-v") {
+    if cli.version
+        || input.trim().eq_ignore_ascii_case("--version")
+        || input.trim().eq_ignore_ascii_case("-v")
+    {
         println!("DuckTape v{}", version::get_version());
-        println!("A tool for interacting with Apple Calendar, Notes, and Reminders via the command line.");
+        println!(
+            "A tool for interacting with Apple Calendar, Notes, and Reminders via the command line."
+        );
         println!("© 2024-2025 DuckTape Team");
         return Ok(());
     }

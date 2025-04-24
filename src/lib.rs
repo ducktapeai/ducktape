@@ -24,6 +24,8 @@ pub mod storage;
 pub mod todo;
 pub mod utils;
 pub mod validation;
+pub mod version; // New version module
+pub mod version_display; // New version display module with static version reference
 pub mod zoom;
 
 // Deprecated modules - will be removed after migration

@@ -12,7 +12,8 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(name = "ducktape")]
 #[command(about = "AI-powered terminal tool for Apple Calendar, Reminders and Notes", long_about = None)]
-#[command(version)]
+// Disable automatic version from clap to ensure our custom handler is always used
+#[command(version = None)]
 pub struct Cli {
     /// Command to execute (if not specified, enters interactive terminal mode)
     #[command(subcommand)]
@@ -25,6 +26,10 @@ pub struct Cli {
     /// Start both terminal and API server
     #[arg(long = "full", conflicts_with = "api_server")]
     pub full: bool,
+
+    /// Show version information
+    #[arg(short = 'v', long = "version")]
+    pub version: bool,
 }
 
 #[derive(Debug, Subcommand)]
