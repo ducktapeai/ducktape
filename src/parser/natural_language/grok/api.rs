@@ -19,26 +19,20 @@ use std::env;
 
 /// Helper function to get available calendars
 async fn get_available_calendars() -> Result<Vec<String>> {
-    let output = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(
-            r#"tell application "Calendar"
-            set calList to {}
-            repeat with c in calendars
-                copy (name of c) to end of calList
-            end repeat
-            return calList
-        end tell"#,
-        )
-        .output()?;
-
-    let calendars_str = String::from_utf8_lossy(&output.stdout);
-    Ok(calendars_str
-        .trim_matches('{')
-        .trim_matches('}')
-        .split(", ")
-        .map(|s| s.trim_matches('"').to_string())
-        .collect())
+    // Try to run the calendar list command
+    match crate::calendar::get_available_calendars() {
+        Ok(calendars) => Ok(calendars),
+        Err(e) => {
+            warn!("Failed to get calendars: {}", e);
+            // Provide some defaults as fallback
+            Ok(vec![
+                "Calendar".to_string(),
+                "Work".to_string(),
+                "Home".to_string(),
+                "KIDS".to_string(),
+            ])
+        }
+    }
 }
 
 /// Parse natural language input into a Ducktape command
@@ -266,6 +260,59 @@ Rules:
 
     // Enhanced command processing with proper pipeline
     let mut enhanced_command = commands.clone();
+
+    // Add "ducktape" prefix if missing
+    if !enhanced_command.starts_with("ducktape") {
+        // Handle the case when the command might be just the arguments
+        if enhanced_command.starts_with("calendar create")
+            || enhanced_command.starts_with("todo create")
+            || enhanced_command.contains("calendar")
+            || enhanced_command.contains("todo")
+        {
+            enhanced_command = format!("ducktape {}", enhanced_command);
+        } else {
+            // If we don't have a proper "calendar create" or similar structure,
+            // try to create a proper calendar command from natural language input
+            if enhanced_command.contains("create")
+                && (enhanced_command.contains("event")
+                    || enhanced_command.contains("meeting")
+                    || enhanced_command.contains("appointment"))
+            {
+                // Extract potential title
+                let title = if let Some(pos) = enhanced_command.find("called") {
+                    let rest = &enhanced_command[pos + 6..];
+                    if let Some(end_pos) = rest.find(" at ") {
+                        &rest[..end_pos]
+                    } else if let Some(end_pos) = rest.find(" on ") {
+                        &rest[..end_pos]
+                    } else {
+                        rest
+                    }
+                } else {
+                    "Meeting"
+                };
+
+                // Default to today's date and next hour if not specified
+                let date = current_date.format("%Y-%m-%d").to_string();
+                let start_hour = (current_hour + 1).min(23);
+                let end_hour = (current_hour + 2).min(23);
+
+                // Create a basic calendar command
+                enhanced_command = format!(
+                    "ducktape calendar create \"{}\" {} {:02}:00 {:02}:00 \"{}\"",
+                    title.trim(),
+                    date,
+                    start_hour,
+                    end_hour,
+                    default_calendar
+                );
+            } else if enhanced_command.contains("remind") || enhanced_command.contains("reminder") {
+                // Create a basic reminder command
+                let title = enhanced_command.trim_start_matches("remind me to ").trim();
+                enhanced_command = format!("ducktape todo create \"{}\" Reminders", title);
+            }
+        }
+    }
 
     // Apply all enhancements in sequence
     enhanced_command = enhance_recurrence_command(&enhanced_command);

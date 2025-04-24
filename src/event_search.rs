@@ -476,6 +476,7 @@ fn format_command(event: &EventSearchResult, calendar_name: &str) -> String {
         notes.push_str(&format!("Event URL: {}", url));
     }
 
+    // Add notes flag if we have notes
     if !notes.is_empty() {
         command.push_str(&format!(" --notes \"{}\"", notes));
     }

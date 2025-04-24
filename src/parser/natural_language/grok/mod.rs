@@ -51,7 +51,29 @@ impl Parser for GrokParser {
             Ok(command) => {
                 debug!("Grok parser generated command: {}", command);
                 let sanitized = self.sanitize_command(&command);
-                Ok(ParseResult::CommandString(sanitized))
+
+                // If the command starts with "ducktape calendar create" or "ducktape todo create",
+                // we can directly return it as a command string
+                if sanitized.starts_with("ducktape calendar create")
+                    || sanitized.starts_with("ducktape todo create")
+                {
+                    Ok(ParseResult::CommandString(sanitized))
+                } else {
+                    // Try to convert to a structured command if possible
+                    match crate::command_processor::CommandArgs::parse(&sanitized) {
+                        Ok(args) => {
+                            debug!("Successfully converted to structured command: {:?}", args);
+                            Ok(ParseResult::StructuredCommand(args))
+                        }
+                        Err(e) => {
+                            debug!(
+                                "Could not convert to structured command: {}, returning command string",
+                                e
+                            );
+                            Ok(ParseResult::CommandString(sanitized))
+                        }
+                    }
+                }
             }
             Err(e) => {
                 error!("Grok parser error: {}", e);
