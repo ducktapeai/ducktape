@@ -216,9 +216,85 @@ impl Application {
         info!("Proceeding with natural language processing");
         println!("Processing natural language: '{}'", input);
 
+        // Check for common event creation patterns directly before parsing
+        let input_lower = input.to_lowercase();
+        if input_lower.contains("create an event")
+            || input_lower.contains("schedule a meeting")
+            || (input_lower.contains("create") && input_lower.contains("event"))
+            || (input_lower.contains("schedule") && input_lower.contains("meeting"))
+        {
+            log::debug!("Detected calendar event creation intent directly in input");
+
+            // Extract title if available
+            let mut title = "Event";
+            if input_lower.contains("called") {
+                if let Some(pos) = input.find("called") {
+                    let rest = &input[pos + 6..];
+                    if let Some(end_pos) = rest.find(" at ") {
+                        title = &rest[..end_pos].trim();
+                    } else if let Some(end_pos) = rest.find(" and ") {
+                        title = &rest[..end_pos].trim();
+                    } else {
+                        title = rest.trim();
+                    }
+                }
+            }
+
+            // Determine date and time
+            let now = chrono::Local::now();
+            let date = now.format("%Y-%m-%d").to_string();
+
+            // Default times
+            let mut start_time = "09:00";
+            let mut end_time = "10:00";
+
+            // Check for time patterns
+            if input_lower.contains("tonight") && input_lower.contains("10pm") {
+                start_time = "22:00";
+                end_time = "23:00";
+            } else if input_lower.contains(" at ") {
+                if let Some(time_pos) = input_lower.find(" at ") {
+                    let time_part = &input_lower[time_pos + 4..];
+                    if time_part.contains("10pm") || time_part.contains("10 pm") {
+                        start_time = "22:00";
+                        end_time = "23:00";
+                    }
+                }
+            }
+
+            // Check for contacts
+            let mut contact_arg = String::new();
+            if input_lower.contains("with") || input_lower.contains("invite") {
+                if let Some(contact_name) = self.extract_contact_name(input) {
+                    contact_arg = format!(" --contacts \"{}\"", contact_name);
+                }
+            }
+
+            // Create calendar command directly
+            let calendar_cmd = format!(
+                "ducktape calendar create \"{}\" {} {} {} \"Work\"{}",
+                title, date, start_time, end_time, contact_arg
+            );
+
+            log::info!("Created direct calendar command: {}", calendar_cmd);
+
+            // Execute the command
+            let command_args = match self.parse_command_string(&calendar_cmd) {
+                Ok(args) => args,
+                Err(_) => {
+                    // Fall back to legacy parser if needed
+                    CommandArgs::parse(&calendar_cmd)?
+                }
+            };
+
+            return self.command_processor.execute(command_args).await;
+        }
+
+        // Continue with normal processing for other cases
         let parser = ParserFactory::create_parser()?;
         let parse_result = parser.parse_input(input).await?;
 
+        // Rest of the function remains the same
         match parse_result {
             ParseResult::CommandString(command) => {
                 println!("Translated to command: {}", command);

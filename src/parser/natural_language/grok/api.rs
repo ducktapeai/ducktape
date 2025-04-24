@@ -261,56 +261,88 @@ Rules:
     // Enhanced command processing with proper pipeline
     let mut enhanced_command = commands.clone();
 
-    // Add "ducktape" prefix if missing
+    // Add "ducktape" prefix if missing, and correct command structure
     if !enhanced_command.starts_with("ducktape") {
-        // Handle the case when the command might be just the arguments
-        if enhanced_command.starts_with("calendar create")
-            || enhanced_command.starts_with("todo create")
-            || enhanced_command.contains("calendar")
-            || enhanced_command.contains("todo")
+        // Detect the type of command and translate to the proper format
+        // Handle the case when we need to convert "create an event" to "calendar create"
+        if enhanced_command.contains("create an event")
+            || enhanced_command.contains("schedule")
+            || enhanced_command.contains("add event")
+            || enhanced_command.contains("add a meeting")
+            || enhanced_command.contains("create a meeting")
         {
-            enhanced_command = format!("ducktape {}", enhanced_command);
-        } else {
-            // If we don't have a proper "calendar create" or similar structure,
-            // try to create a proper calendar command from natural language input
-            if enhanced_command.contains("create")
-                && (enhanced_command.contains("event")
-                    || enhanced_command.contains("meeting")
-                    || enhanced_command.contains("appointment"))
-            {
-                // Extract potential title
-                let title = if let Some(pos) = enhanced_command.find("called") {
-                    let rest = &enhanced_command[pos + 6..];
-                    if let Some(end_pos) = rest.find(" at ") {
-                        &rest[..end_pos]
-                    } else if let Some(end_pos) = rest.find(" on ") {
-                        &rest[..end_pos]
-                    } else {
-                        rest
-                    }
+            debug!("Detected calendar creation intent in: {}", enhanced_command);
+
+            // Extract potential title
+            let mut title = "Event";
+            if let Some(pos) = enhanced_command.find("called") {
+                let rest = &enhanced_command[pos + 6..];
+                if let Some(end_pos) = rest.find(" at ") {
+                    title = &rest[..end_pos].trim();
+                } else if let Some(end_pos) = rest.find(" on ") {
+                    title = &rest[..end_pos].trim();
                 } else {
-                    "Meeting"
+                    title = rest.trim();
+                }
+            }
+
+            // Time parsing
+            let current_date = Local::now();
+            let date_str = current_date.format("%Y-%m-%d").to_string();
+
+            // Extract time if available
+            let mut start_time = format!("{:02}:00", (current_hour + 1).min(23));
+            let mut end_time = format!("{:02}:00", (current_hour + 2).min(23));
+
+            if enhanced_command.contains("tonight") && enhanced_command.contains("10pm") {
+                start_time = "22:00".to_string();
+                end_time = "23:00".to_string();
+            } else if enhanced_command.contains(" at ") {
+                if let Some(time_pos) = enhanced_command.find(" at ") {
+                    let time_part = &enhanced_command[time_pos + 4..];
+                    // Simple time parsing - real implementation would be more robust
+                    if time_part.contains("10pm") {
+                        start_time = "22:00".to_string();
+                        end_time = "23:00".to_string();
+                    } else if time_part.contains("pm") || time_part.contains("am") {
+                        // More comprehensive time parsing would go here
+                    }
+                }
+            }
+
+            // Create a properly formatted calendar command
+            enhanced_command = format!(
+                "ducktape calendar create \"{}\" {} {} {} \"{}\"",
+                title, date_str, start_time, end_time, default_calendar
+            );
+
+            debug!("Transformed to calendar command: {}", enhanced_command);
+        } else if enhanced_command.contains("calendar create") {
+            enhanced_command = format!("ducktape {}", enhanced_command);
+        } else if enhanced_command.contains("todo create")
+            || enhanced_command.contains("remind me")
+            || enhanced_command.contains("add a reminder")
+        {
+            if enhanced_command.contains("todo create") {
+                enhanced_command = format!("ducktape {}", enhanced_command);
+            } else {
+                // Extract task description
+                let description = if enhanced_command.contains("remind me to ") {
+                    enhanced_command.trim_start_matches("remind me to ").trim()
+                } else if enhanced_command.contains("reminder") {
+                    enhanced_command
+                        .trim_start_matches("add a reminder")
+                        .trim_start_matches("to")
+                        .trim()
+                } else {
+                    enhanced_command.trim()
                 };
 
-                // Default to today's date and next hour if not specified
-                let date = current_date.format("%Y-%m-%d").to_string();
-                let start_hour = (current_hour + 1).min(23);
-                let end_hour = (current_hour + 2).min(23);
-
-                // Create a basic calendar command
-                enhanced_command = format!(
-                    "ducktape calendar create \"{}\" {} {:02}:00 {:02}:00 \"{}\"",
-                    title.trim(),
-                    date,
-                    start_hour,
-                    end_hour,
-                    default_calendar
-                );
-            } else if enhanced_command.contains("remind") || enhanced_command.contains("reminder") {
-                // Create a basic reminder command
-                let title = enhanced_command.trim_start_matches("remind me to ").trim();
-                enhanced_command = format!("ducktape todo create \"{}\" Reminders", title);
+                enhanced_command = format!("ducktape todo create \"{}\" Reminders", description);
             }
+        } else {
+            // For any other command that doesn't match specific patterns
+            enhanced_command = format!("ducktape {}", enhanced_command);
         }
     }
 
