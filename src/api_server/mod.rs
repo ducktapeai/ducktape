@@ -3,7 +3,6 @@
 // This module provides a complete HTTP and WebSocket API for frontend applications
 // to interact with DuckTape's functionality.
 
-
 mod handlers;
 mod models;
 mod routes;

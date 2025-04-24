@@ -3,7 +3,6 @@
 //! This module is kept for backward compatibility and redirects to the new modular structure.
 //! Use the `crate::parser::command` module instead.
 
-
 // Re-export the necessary types and functions for backward compatibility
 #[deprecated(since = "0.13.0", note = "Use crate::parser::command module instead")]
 pub use crate::parser::command::parse_with_clap;

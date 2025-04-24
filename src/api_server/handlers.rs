@@ -2,12 +2,7 @@
 //
 // This module contains handler functions for API endpoints.
 
-use axum::{
-    Json,
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use log::{debug, error};
 use std::fs;

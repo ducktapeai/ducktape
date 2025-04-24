@@ -1,4 +1,3 @@
-
 /// Test function to validate our quoted string parsing solution
 fn parse_with_shell_words(input: &str) -> anyhow::Result<Vec<String>> {
     // Use the shell-words crate to parse shell-like commands with proper quote handling

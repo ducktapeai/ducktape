@@ -3,7 +3,6 @@
 //! This module provides general utility functions that are used by multiple
 //! parser implementations.
 
-
 /// Preprocess input string before further parsing
 ///
 /// Standardizes whitespace, removes excess spaces, etc.
