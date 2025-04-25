@@ -33,7 +33,9 @@ impl GrokParser {
 fn check_xai_api_key() -> Result<()> {
     match env::var("XAI_API_KEY") {
         Ok(_) => Ok(()),
-        Err(_) => Err(anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'")),
+        Err(_) => Err(anyhow!(
+            "XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"
+        )),
     }
 }
 
@@ -45,12 +47,13 @@ impl Parser for GrokParser {
 
         // Special pattern detection for direct event creation commands
         let input_lower = input.to_lowercase();
-        let is_event_creation = input_lower.contains("create an event") 
+        let is_event_creation = input_lower.contains("create an event")
             || input_lower.contains("schedule a meeting")
             || input_lower.contains("create a meeting")
             || input_lower.contains("add an event")
             || input_lower.contains("create event")
-            || (input_lower.contains("schedule") && (input_lower.contains("meeting") || input_lower.contains("event")));
+            || (input_lower.contains("schedule")
+                && (input_lower.contains("meeting") || input_lower.contains("event")));
 
         if is_event_creation {
             debug!("Detected calendar event creation intent: {}", input);
