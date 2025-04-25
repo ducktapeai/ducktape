@@ -7,6 +7,7 @@ use crate::parser::traits::{ParseResult, Parser};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use log::{debug, error};
+use regex::Regex;
 use std::env;
 
 /// Parser that uses Grok/X.AI models for natural language understanding
@@ -66,9 +67,19 @@ impl Parser for GrokParser {
     }
 }
 
-/// Basic sanitization of natural language input
+/// Basic sanitization of natural language input keeping time information
 fn sanitize_nlp_command(command: &str) -> String {
-    // Remove potentially problematic characters and trim whitespace
+    // Extract time information if present using regex
+    let time_regex = Regex::new(r"(\d{1,2}(?::\d{2})?(?:\s*[ap]m)?)").unwrap();
+    let mut time_info = None;
+
+    if command.contains("calendar create") {
+        if let Some(captures) = time_regex.captures(command) {
+            time_info = captures.get(1).map(|m| m.as_str().to_string());
+        }
+    }
+
+    // Clean up the command
     let sanitized = command
         .trim()
         .replace(';', " ")
@@ -77,6 +88,13 @@ fn sanitize_nlp_command(command: &str) -> String {
         .replace('>', " ")
         .replace('<', " ")
         .replace('`', " ");
+
+    // If we found time information, make sure it's preserved in the output
+    if let Some(time) = time_info {
+        if !sanitized.contains(&time) {
+            return format!("{} at {}", sanitized, time);
+        }
+    }
 
     debug!("Sanitized command: {}", sanitized);
     sanitized
