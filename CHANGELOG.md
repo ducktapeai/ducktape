@@ -1,3 +1,24 @@
+## [0.16.9] - 2025-04-25
+### Added
+- Enhanced contact extraction functionality for calendar events
+- Support for \"and invite\" pattern in natural language commands
+
+### Fixed
+- Fixed compilation issues in parser modules
+- Improved error handling in command processing
+- Fixed type safety issues in parser trait implementations
+
+
+## [0.16.9] - 2025-04-25
+### Added
+- Enhanced contact extraction functionality for calendar events
+- Support for "and invite" pattern in natural language commands
+
+### Fixed
+- Fixed compilation issues in parser modules
+- Improved error handling in command processing
+- Fixed type safety issues in parser trait implementations
+
 ## [0.16.8] - 2025-04-25
 ### Changed
 - version bump
@@ -393,16 +414,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
