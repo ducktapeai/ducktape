@@ -4,6 +4,7 @@
 //! for natural language processing.
 
 use super::cache;
+use super::time_extractor::extract_time_from_title;
 use super::utils::{
     enhance_command_with_contacts, enhance_command_with_zoom, enhance_recurrence_command,
     fix_calendar_end_time_format, sanitize_nlp_command,
@@ -271,6 +272,7 @@ Rules:
     enhanced_command = enhance_recurrence_command(&enhanced_command);
     enhanced_command = enhance_command_with_contacts(&enhanced_command, &sanitized_input);
     enhanced_command = enhance_command_with_zoom(&enhanced_command, &sanitized_input);
+    enhanced_command = extract_time_from_title(&enhanced_command, &sanitized_input);
     enhanced_command = fix_calendar_end_time_format(&enhanced_command);
 
     // Final validation of the returned commands
