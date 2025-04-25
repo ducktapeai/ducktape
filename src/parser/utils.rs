@@ -48,6 +48,54 @@ pub fn sanitize_nlp_command(command: &str) -> String {
         .replace("\u{a0}", " ") // Replace non-breaking spaces
         .replace("\"\"", "\""); // Replace double quotes
 
+    // Detect event creation patterns and convert to calendar command
+    let lower = cleaned.to_lowercase();
+    let is_event_creation = lower.contains("create an event")
+        || lower.contains("schedule a meeting")
+        || lower.contains("create a meeting")
+        || lower.contains("add an event")
+        || lower.contains("create event")
+        || (lower.contains("schedule") && (lower.contains("meeting") || lower.contains("event")));
+
+    if is_event_creation {
+        // Try to extract event title from patterns like 'called X' or 'titled X'
+        let mut title = "Event";
+        if let Some(idx) = lower.find(" called ") {
+            let after = &cleaned[idx + 8..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        } else if let Some(idx) = lower.find(" titled ") {
+            let after = &cleaned[idx + 8..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        } else if let Some(idx) = lower.find("create an event called ") {
+            let after = &cleaned[idx + 21..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        } else if let Some(idx) = lower.find("create a meeting called ") {
+            let after = &cleaned[idx + 22..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        } else if let Some(idx) = lower.find("create an event ") {
+            // e.g. 'create an event test tonight at 10pm'
+            let after = &cleaned[idx + 15..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        } else if let Some(idx) = lower.find("schedule a meeting ") {
+            let after = &cleaned[idx + 18..];
+            let end =
+                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
+            title = after[..end].trim();
+        }
+        // Compose a basic calendar create command (date/time parsing is handled elsewhere)
+        return format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", title);
+    }
+
     // Ensure the command starts with ducktape
     if !cleaned.starts_with("ducktape") {
         return format!("ducktape {}", cleaned);
