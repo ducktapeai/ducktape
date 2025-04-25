@@ -1,8 +1,9 @@
-## [0.16.10] - 2025-04-25
+## [0.16.11] - 2025-04-26
 ### Fixed
-- Fixed time parsing in natural language event titles (e.g., "tonight at 7pm")
-- Added proper extraction of time expressions from event titles
-- Implemented comprehensive time pattern detection for calendar events
+- Fixed time parsing in natural language commands with specific time expressions (e.g., "tonight at 7pm")
+- Added proper AM/PM to 24-hour time conversion for calendar events
+- Improved time extraction from user input to ensure correct event scheduling
+- Added comprehensive documentation and test cases for time-related parsing
 
 ## [0.16.10] - 2025-04-25
 ### Fixed
@@ -376,10 +377,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
 ### Changed
@@ -420,9 +417,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
 ### Changed
@@ -452,6 +446,12 @@
 ## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
 - Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
