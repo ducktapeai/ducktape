@@ -68,7 +68,10 @@ impl Parser for GrokParser {
                     warn!("Failed to parse event creation command with API, using fallback method");
                     // Use fallback mechanism with simple format for basic functionality
                     let sanitized = utils::sanitize_nlp_command(input);
-                    Ok(ParseResult::CommandString(sanitized))
+                    // Always enhance with contacts and zoom, even in fallback
+                    let enhanced = utils::enhance_command_with_contacts(&sanitized, input);
+                    let enhanced = utils::enhance_command_with_zoom(&enhanced, input);
+                    Ok(ParseResult::CommandString(enhanced))
                 }
             }
         } else {
