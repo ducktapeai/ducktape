@@ -1,13 +1,8 @@
-## [0.16.0] - 2025-04-25
-### Added
-- Enhanced natural language processing for calendar events
-- Improved command detection for event creation phrases
-- Added automated prefix handling for natural language commands
-
+## [0.16.1] - 2025-04-26
 ### Fixed
-- Fixed issue with "create an event" commands not being properly recognized
-- Fixed natural language parsing for event creation without explicit prefixes
-- Added comprehensive test cases for natural language event creation
+- Fixed natural language processing for "create an event" commands
+- Improved command parsing for event creation without explicit calendar prefix
+- Enhanced sanitization of natural language inputs in the Grok parser
 
 ## [0.16.0] - 2025-04-25
 ### Added
@@ -159,6 +154,11 @@
 - Improved terminal experience by ensuring exit commands work even if LLM API calls fail
 
 ## [0.11.20] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
+
+## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
