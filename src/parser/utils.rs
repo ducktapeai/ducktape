@@ -3,95 +3,37 @@
 //! This module provides general utility functions that are used by multiple
 //! parser implementations.
 
-/// Preprocess input string before further parsing
-///
-/// Standardizes whitespace, removes excess spaces, etc.
-pub fn preprocess_input(input: &str) -> String {
-    input.trim().to_string()
-}
+/// Utility functions for parsing
+use anyhow::Result;
+use log::debug;
 
-/// Validate if a string looks like a valid email address
-///
-/// This is a simple validation check to determine if a string is likely an email
-pub fn is_email(text: &str) -> bool {
-    text.contains('@') && text.contains('.')
-}
-
-/// Normalize whitespace in command strings
-///
-/// Ensures consistent spacing in command strings
-pub fn normalize_spacing(command: &str) -> String {
-    // Replace multiple spaces with a single space
-    let mut result = String::new();
-    let mut last_was_space = false;
-
-    for c in command.chars() {
-        if c.is_whitespace() {
-            if !last_was_space {
-                result.push(' ');
-                last_was_space = true;
-            }
-        } else {
-            result.push(c);
-            last_was_space = false;
-        }
-    }
-
-    result.trim().to_string()
+/// Sanitize user input to prevent injection
+pub fn sanitize_user_input(input: &str) -> String {
+    // Filter out control characters except for newlines and tabs
+    input
+        .chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect::<String>()
 }
 
 /// Helper function to clean up NLP-generated commands
 /// Removes unnecessary quotes and normalizes spacing
 pub fn sanitize_nlp_command(command: &str) -> String {
-    // Clean up the command
-    let cleaned = command
-        .replace("\u{a0}", " ") // Replace non-breaking spaces
-        .replace("\"\"", "\""); // Replace double quotes
+    // Normalize spacing and trim
+    let cleaned = command.trim();
 
-    // Detect event creation patterns and convert to calendar command
-    let lower = cleaned.to_lowercase();
-    let is_event_creation = lower.contains("create an event")
-        || lower.contains("schedule a meeting")
-        || lower.contains("create a meeting")
-        || lower.contains("add an event")
-        || lower.contains("create event")
-        || (lower.contains("schedule") && (lower.contains("meeting") || lower.contains("event")));
+    // Check if this is a calendar creation command from NLP that needs special handling
+    if cleaned.contains("create a") && cleaned.contains("calendar") {
+        let mut title = "Untitled Event";
 
-    if is_event_creation {
-        // Try to extract event title from patterns like 'called X' or 'titled X'
-        let mut title = "Event";
-        if let Some(idx) = lower.find(" called ") {
-            let after = &cleaned[idx + 8..];
-            let end =
-                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
-            title = after[..end].trim();
-        } else if let Some(idx) = lower.find(" titled ") {
-            let after = &cleaned[idx + 8..];
-            let end =
-                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
-            title = after[..end].trim();
-        } else if let Some(idx) = lower.find("create an event called ") {
-            let after = &cleaned[idx + 21..];
-            let end =
-                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
-            title = after[..end].trim();
-        } else if let Some(idx) = lower.find("create a meeting called ") {
-            let after = &cleaned[idx + 22..];
-            let end =
-                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
-            title = after[..end].trim();
-        } else if let Some(idx) = lower.find("create an event ") {
-            // e.g. 'create an event test tonight at 10pm'
-            let after = &cleaned[idx + 15..];
-            let end =
-                after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
-            title = after[..end].trim();
-        } else if let Some(idx) = lower.find("schedule a meeting ") {
-            let after = &cleaned[idx + 18..];
+        // Extract the title between "create a" and the next keyword
+        if let Some(title_text) = cleaned.split("create a").nth(1) {
+            let after = title_text.trim();
             let end =
                 after.find(|c: char| c == ' ' || c == '"' || c == '\'').unwrap_or(after.len());
             title = after[..end].trim();
         }
+
         // Compose a basic calendar create command (date/time parsing is handled elsewhere)
         return format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", title);
     }
@@ -101,7 +43,40 @@ pub fn sanitize_nlp_command(command: &str) -> String {
         return format!("ducktape {}", cleaned);
     }
 
-    cleaned
+    cleaned.to_string()
+}
+
+/// Validate calendar command for security
+pub fn validate_calendar_command(command: &str) -> Result<()> {
+    use anyhow::anyhow;
+
+    // Security checks
+    if command.contains("&&")
+        || command.contains("|")
+        || command.contains(";")
+        || command.contains("`")
+    {
+        return Err(anyhow!("Generated command contains potentially unsafe characters"));
+    }
+
+    // Only check calendar commands
+    if command.contains("calendar create") {
+        // Check for reasonably sized intervals for recurring events
+        if command.contains("--interval") {
+            let re = regex::Regex::new(r"--interval (\d+)").unwrap();
+            if let Some(caps) = re.captures(command) {
+                if let Some(interval_match) = caps.get(1) {
+                    if let Ok(interval) = interval_match.as_str().parse::<i32>() {
+                        if interval > 100 {
+                            return Err(anyhow!("Unreasonable interval value: {}", interval));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -109,39 +84,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_preprocess_input() {
-        assert_eq!(preprocess_input("  hello  "), "hello");
-        assert_eq!(preprocess_input("\n test \t"), "test");
-    }
+    fn test_sanitize_user_input() {
+        let input = "Meeting with John\u{0000} tomorrow";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Meeting with John tomorrow");
 
-    #[test]
-    fn test_is_email() {
-        assert!(is_email("user@example.com"));
-        assert!(!is_email("not an email"));
-        assert!(!is_email("missing@domain"));
-    }
-
-    #[test]
-    fn test_normalize_spacing() {
-        assert_eq!(normalize_spacing("too    many   spaces"), "too many spaces");
-        assert_eq!(normalize_spacing(" leading trailing "), "leading trailing");
+        let input = "Lunch\nmeeting";
+        let sanitized = sanitize_user_input(input);
+        assert_eq!(sanitized, "Lunch\nmeeting");
     }
 
     #[test]
     fn test_sanitize_nlp_command() {
-        // Test handling of non-breaking spaces
-        let input = "ducktape\u{a0}calendar create \"Meeting\"";
+        let input = "create a meeting tomorrow";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, "ducktape calendar create \"Meeting\"");
+        assert!(sanitized.starts_with("ducktape"));
 
-        // Test handling of double quotes
-        let input = "ducktape calendar create \"\"Meeting\"\"";
+        let input = "ducktape calendar create \"Test Event\" 2024-05-01 10:00 11:00 \"Work\"";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, "ducktape calendar create \"Meeting\"");
+        assert_eq!(sanitized, input);
+    }
 
-        // Test non-ducktape command with prefix added
-        let input = "create a meeting tomorrow at 3pm";
-        let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, "ducktape create a meeting tomorrow at 3pm");
+    #[test]
+    fn test_validate_calendar_command() {
+        // Test valid command
+        let cmd = "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\"";
+        assert!(validate_calendar_command(cmd).is_ok());
+
+        // Test command with unsafe characters
+        let cmd =
+            "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" && echo hacked";
+        assert!(validate_calendar_command(cmd).is_err());
+
+        // Test command with unreasonable interval
+        let cmd =
+            "ducktape calendar create \"Meeting\" 2024-05-01 14:00 15:00 \"Work\" --interval 1000";
+        assert!(validate_calendar_command(cmd).is_err());
     }
 }

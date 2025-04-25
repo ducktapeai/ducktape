@@ -15,10 +15,12 @@ use std::time::Duration;
 use tokio::time::interval;
 use uuid::Uuid;
 
+use crate::Config;
 use crate::calendar::{EventConfig, create_event, import_csv_events, import_ics_events};
 use crate::cli;
 use crate::command_processor::CommandArgs;
-use crate::parser;
+use crate::parser::{ParseResult, ParserFactory};
+use anyhow::{Result, anyhow};
 use std::path::Path;
 
 use super::models::{
@@ -144,7 +146,7 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
                     info!("WebSocket[{}]: Processing as DuckTape command", connection_id);
 
                     // Create a parser using the factory instead of directly using OpenAI parser
-                    let parser = match parser::ParserFactory::create_parser() {
+                    let parser = match crate::parser::ParserFactory::create_parser() {
                         Ok(parser) => parser,
                         Err(e) => {
                             error!("WebSocket[{}]: Failed to create parser: {}", connection_id, e);
@@ -161,11 +163,11 @@ async fn process_message(connection_id: Uuid, message: String, socket: &mut WebS
 
                     // Parse the input using the configured parser
                     match parser.parse_input(&content).await {
-                        Ok(parser::ParseResult::CommandString(command)) => {
+                        Ok(ParseResult::CommandString(command)) => {
                             info!("WebSocket[{}]: Parsed command: {}", connection_id, command);
                             handle_parsed_command(connection_id, command, socket).await;
                         }
-                        Ok(parser::ParseResult::StructuredCommand(args)) => {
+                        Ok(ParseResult::StructuredCommand(args)) => {
                             info!("WebSocket[{}]: Got structured command directly", connection_id);
                             handle_websocket_command(connection_id, args, socket).await;
                         }

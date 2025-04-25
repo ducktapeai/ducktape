@@ -48,6 +48,9 @@ pub mod utils {
             // Special handling for invite keyword which might not have a space before it
             let parts: Vec<&str> = input.splitn(2, "invite ").collect();
             if parts.len() > 1 { Some(parts[1]) } else { None }
+        } else if input_lower.contains(" and invite ") {
+            debug!("Found 'and invite' keyword for contact extraction");
+            input.split(" and invite ").nth(1)
         } else {
             None
         };
@@ -147,3 +150,42 @@ pub mod utils {
 
 // Re-export submodules
 pub mod grok;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_contact_names() {
+        // Test with single contact using "with" pattern
+        let input = "Schedule a meeting with John Smith tomorrow at 2pm";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["John Smith"]);
+
+        // Test with single contact using "invite" pattern
+        let input = "Schedule a meeting tomorrow at 2pm and invite Jane Doe";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["Jane Doe"]);
+
+        // Test with multiple contacts using commas
+        let input = "Meeting with Alice Johnson, Bob Brown tomorrow";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["Alice Johnson", "Bob Brown"]);
+
+        // Test with multiple contacts using "and"
+        let input = "Meeting with Alice Johnson and Bob Brown tomorrow";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["Alice Johnson", "Bob Brown"]);
+
+        // Test with "and invite" pattern for multiple contacts
+        let input =
+            "create an event called Team Meeting tonight and invite Shaun Stuart and Joe Buck";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["Shaun Stuart", "Joe Buck"]);
+
+        // Test with mixed separators (both comma and "and")
+        let input = "Schedule a meeting with Alice Johnson, Bob Brown and Jane Doe tomorrow";
+        let contacts = utils::extract_contact_names(input);
+        assert_eq!(contacts, vec!["Alice Johnson", "Bob Brown", "Jane Doe"]);
+    }
+}

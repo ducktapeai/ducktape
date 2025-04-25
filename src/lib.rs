@@ -61,4 +61,5 @@ pub use config::Config;
 pub use state::{CalendarItem, TodoItem};
 
 // Re-export parser types for convenience
-pub use parser::traits::{ParseResult, Parser, ParserFactory};
+pub use parser::ParserFactory;
+pub use parser::traits::{ParseResult, Parser};

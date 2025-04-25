@@ -167,9 +167,9 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
         // Get the current token
         let token = &tokens[i];
 
-        // Special handling for --contacts flag
-        if token == "--contacts" && i + 1 < tokens.len() {
-            debug!("Found --contacts flag, checking for multi-word/multi-contact value");
+        // Special handling for --contacts and --email flags
+        if (token == "--contacts" || token == "--email") && i + 1 < tokens.len() {
+            log::debug!("Found {} flag, checking for value", token);
             result.push(token.clone());
 
             // Get the next token for reference
@@ -180,48 +180,56 @@ fn postprocess_flags(tokens: &[String]) -> Vec<String> {
             if (next_token.starts_with('"') && next_token.ends_with('"'))
                 || (next_token.starts_with('\'') && next_token.ends_with('\''))
             {
-                debug!("Using quoted contacts list: '{}'", next_token);
+                log::debug!(
+                    "Using quoted {} list: '{}'",
+                    if token == "--contacts" { "contacts" } else { "emails" },
+                    next_token
+                );
                 result.push(next_token.clone());
                 i += 2; // Skip flag and quoted value
                 continue;
             }
 
-            // Need to collect all tokens that might be part of the contact string
+            // Need to collect all tokens that might be part of the contact/email string
             // (until we hit another flag or end of input)
-            let mut contact_parts = Vec::new();
+            let mut parts = Vec::new();
             let mut j = i + 1;
 
             while j < tokens.len() && !tokens[j].starts_with("--") {
-                contact_parts.push(tokens[j].clone());
+                parts.push(tokens[j].clone());
                 j += 1;
             }
 
             // If we have multiple parts, combine them
-            if !contact_parts.is_empty() {
-                let contact_str = contact_parts.join(" ");
-                debug!("Combined contact string: '{}'", contact_str);
+            if !parts.is_empty() {
+                let combined_str = parts.join(" ");
+                log::debug!(
+                    "Combined {} string: '{}'",
+                    if token == "--contacts" { "contacts" } else { "emails" },
+                    combined_str
+                );
 
-                // Add quotes around the combined contact string if it's not already quoted
-                if (contact_str.starts_with('"') && contact_str.ends_with('"'))
-                    || (contact_str.starts_with('\'') && contact_str.ends_with('\''))
+                // Add quotes around the combined string if it's not already quoted
+                if (combined_str.starts_with('"') && combined_str.ends_with('"'))
+                    || (combined_str.starts_with('\'') && combined_str.ends_with('\''))
                 {
-                    result.push(contact_str);
+                    result.push(combined_str);
                 } else {
-                    result.push(format!("\"{}\"", contact_str));
+                    result.push(format!("\"{}\"", combined_str));
                 }
 
-                i = j; // Skip to the position after all contact parts
+                i = j; // Skip to the position after all parts
             } else {
-                // No contact parts found (shouldn't normally happen)
+                // No parts found (shouldn't normally happen)
                 i += 2;
             }
         }
         // Special handling for other flags that might need quoted values
         else if token.starts_with("--")
-            && ["location", "notes", "email", "contacts"].contains(&&token[2..])
+            && ["location", "notes"].contains(&&token[2..])
             && i + 1 < tokens.len()
         {
-            debug!("Found special flag: {}", token);
+            log::debug!("Found special flag: {}", token);
             result.push(token.clone());
 
             // Add the value as-is, preserving quotes if present

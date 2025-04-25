@@ -41,12 +41,27 @@ pub struct CommandResponse {
 /// Converts between the new and old ParsedCommand types
 #[allow(deprecated)]
 pub fn parse_command(message: &str) -> Option<ParsedCommand> {
-    // Delegate to the new parse_command_natural
-    if let Some(new_cmd) = crate::parser::command::parse_command_natural(message) {
-        // Convert between the two types
-        Some(ParsedCommand { command_type: new_cmd.command_type, details: new_cmd.details })
-    } else {
-        None
+    // Use a Result to Option conversion pattern to handle the Result correctly
+    match crate::parser::command::parse_command_natural(message) {
+        Ok(parse_result) => {
+            match parse_result {
+                crate::parser::ParseResult::CommandString(cmd) => {
+                    // Convert to old format
+                    Some(ParsedCommand {
+                        command_type: "command".to_string(),
+                        details: serde_json::json!({ "command": cmd }),
+                    })
+                }
+                crate::parser::ParseResult::StructuredCommand(args) => {
+                    // Convert structured command to old format
+                    Some(ParsedCommand {
+                        command_type: args.command,
+                        details: serde_json::json!({ "args": args.args }),
+                    })
+                }
+            }
+        }
+        Err(_) => None,
     }
 }
 

@@ -4,10 +4,14 @@
 //! Use the `crate::parser::traits` module instead.
 
 // Re-export all types from the new module for backward compatibility
-pub use crate::parser::traits::{ParseResult, Parser, ParserFactory};
+pub use crate::parser::ParserFactory;
+pub use crate::parser::traits::{ParseResult, Parser};
 
-// Re-export required types that were previously imported directly
-pub use crate::command_processor::CommandArgs;
-pub use anyhow::Result;
-pub use async_trait::async_trait;
-pub use log::debug;
+#[deprecated(
+    since = "0.13.0",
+    note = "Use crate::parser::traits::create_parser function instead"
+)]
+pub async fn create_parser_by_name(name: &str) -> anyhow::Result<Box<dyn Parser + Send + Sync>> {
+    // Delegate to the new implementation
+    crate::parser::traits::create_parser(name)
+}

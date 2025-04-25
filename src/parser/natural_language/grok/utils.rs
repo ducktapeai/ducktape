@@ -177,7 +177,7 @@ pub fn enhance_command_with_contacts(command: &str, input: &str) -> String {
     // Step 4: Clean up any incorrectly placed contact names in email flags
     if enhanced.contains("--email") {
         // Pattern: --email "Name Without @ Symbol"
-        let email_regex = Regex::new(r#"--email\s+"([^@"]+)""#).unwrap();
+        let email_regex = regex::Regex::new(r#"--email\s+"([^@"]+)""#).unwrap();
 
         if let Some(caps) = email_regex.captures(&enhanced) {
             if let Some(email_match) = caps.get(1) {
@@ -340,6 +340,27 @@ mod tests {
         let input = "Schedule a regular meeting with the team";
         let enhanced = enhance_command_with_zoom(cmd, input);
         assert!(!enhanced.contains("--zoom"));
+    }
+
+    #[test]
+    fn test_enhance_command_with_contacts() {
+        // Test adding contacts with "with" pattern
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a meeting with Joe Smith";
+        let enhanced = enhance_command_with_contacts(cmd, input);
+        assert!(enhanced.contains("--contacts \"Joe Smith\""));
+
+        // Test adding contacts with "invite" pattern
+        let cmd = "ducktape calendar create \"Team Meeting\" 2024-03-15 10:00 11:00 \"Work\"";
+        let input = "Schedule a meeting and invite Jane Doe";
+        let enhanced = enhance_command_with_contacts(cmd, input);
+        assert!(enhanced.contains("--contacts \"Jane Doe\""));
+
+        // Test adding contacts with "and invite" pattern (new pattern we fixed)
+        let cmd = "ducktape calendar create \"TestEvent\" today 00:00 01:00 \"Calendar\"";
+        let input = "create an event called TestEvent tonight at 10pm and invite Shaun Stuart";
+        let enhanced = enhance_command_with_contacts(cmd, input);
+        assert!(enhanced.contains("--contacts \"Shaun Stuart\""));
     }
 
     #[test]
