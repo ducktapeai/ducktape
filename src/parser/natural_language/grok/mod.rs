@@ -18,14 +18,12 @@ pub mod utils;
 pub struct GrokParser;
 
 impl GrokParser {
-    /// Create a new GrokParser instance
-    pub fn create() -> Result<Self> {
+    pub fn new() -> Result<Self> {
         // Check for XAI_API_KEY upfront to avoid misleading errors
         check_xai_api_key()?;
         Ok(Self)
     }
 
-    /// Check for the required XAI_API_KEY environment variable
     fn check_env_vars() -> Result<()> {
         check_xai_api_key()
     }
@@ -35,9 +33,7 @@ impl GrokParser {
 fn check_xai_api_key() -> Result<()> {
     match env::var("XAI_API_KEY") {
         Ok(_) => Ok(()),
-        Err(_) => Err(anyhow!(
-            "XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'"
-        )),
+        Err(_) => Err(anyhow!("XAI_API_KEY environment variable not set. Please set your X.AI API key using: export XAI_API_KEY='your-key-here'")),
     }
 }
 
@@ -47,15 +43,43 @@ impl Parser for GrokParser {
         // Check environment variables first to catch missing XAI_API_KEY early
         check_xai_api_key()?;
 
-        match self.parse_natural_language(input).await {
-            Ok(command) => {
-                debug!("Grok parser generated command: {}", command);
-                let sanitized = self.sanitize_command(&command);
-                Ok(ParseResult::CommandString(sanitized))
+        // Special pattern detection for direct event creation commands
+        let input_lower = input.to_lowercase();
+        let is_event_creation = input_lower.contains("create an event") 
+            || input_lower.contains("schedule a meeting")
+            || input_lower.contains("create a meeting")
+            || input_lower.contains("add an event")
+            || input_lower.contains("create event")
+            || (input_lower.contains("schedule") && (input_lower.contains("meeting") || input_lower.contains("event")));
+
+        if is_event_creation {
+            debug!("Detected calendar event creation intent: {}", input);
+            // For these commands, we want to ensure they're treated as calendar events
+            match self.parse_natural_language(input).await {
+                Ok(command) => {
+                    debug!("Grok parser generated calendar command: {}", command);
+                    let sanitized = self.sanitize_command(&command);
+                    Ok(ParseResult::CommandString(sanitized))
+                }
+                Err(e) => {
+                    warn!("Failed to parse event creation command with API, using fallback method");
+                    // Use fallback mechanism with simple format for basic functionality
+                    let sanitized = utils::sanitize_nlp_command(input);
+                    Ok(ParseResult::CommandString(sanitized))
+                }
             }
-            Err(e) => {
-                error!("Grok parser error: {}", e);
-                Err(e)
+        } else {
+            // Normal flow for non-event creation commands
+            match self.parse_natural_language(input).await {
+                Ok(command) => {
+                    debug!("Grok parser generated command: {}", command);
+                    let sanitized = self.sanitize_command(&command);
+                    Ok(ParseResult::CommandString(sanitized))
+                }
+                Err(e) => {
+                    error!("Grok parser error: {}", e);
+                    Err(e)
+                }
             }
         }
     }
