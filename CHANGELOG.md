@@ -1,3 +1,8 @@
+## [0.16.6] - 2025-04-25
+### Changed
+- Added contacts to llm model processing
+
+
 ## [0.16.2] - 2025-04-25
 ### Changed
 - Improved stability and performance for calendar integrations
