@@ -11,7 +11,19 @@ use regex::Regex;
 pub fn sanitize_nlp_command(command: &str) -> String {
     // Ensure the command starts with ducktape
     if !command.starts_with("ducktape") {
-        return command.to_string();
+        // If command mentions creating an event but doesn't have the ducktape calendar syntax,
+        // convert it to a proper calendar command
+        if command.contains("create an event")
+            || command.contains("schedule a")
+            || command.contains("create event")
+            || command.contains("schedule event")
+            || command.contains("create a meeting")
+            || command.contains("schedule meeting")
+        {
+            debug!("Converting event creation command to calendar command: {}", command);
+            return format!("ducktape calendar {}", command);
+        }
+        return format!("ducktape {}", command);
     }
 
     // Basic sanitization to fix common issues with NLP-generated commands
@@ -248,10 +260,20 @@ mod tests {
         let sanitized = sanitize_nlp_command(input);
         assert_eq!(sanitized, "ducktape calendar create \"Meeting\"");
 
-        // Test non-ducktape command
+        // Test natural language event creation command
+        let input = "create an event called test tonight at 10pm";
+        let sanitized = sanitize_nlp_command(input);
+        assert_eq!(sanitized, "ducktape calendar create an event called test tonight at 10pm");
+
+        // Test another event creation pattern
+        let input = "schedule a meeting with Joe tomorrow at 9am";
+        let sanitized = sanitize_nlp_command(input);
+        assert_eq!(sanitized, "ducktape calendar schedule a meeting with Joe tomorrow at 9am");
+
+        // Test non-calendar command
         let input = "not a ducktape command";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, input);
+        assert_eq!(sanitized, "ducktape not a ducktape command");
     }
 
     #[test]
