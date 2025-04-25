@@ -315,7 +315,7 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
                         .timezone()
                         .from_local_datetime(&naive_end)
                         .single()
-                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
                 }
             } else {
                 Local::now()
@@ -328,7 +328,10 @@ async fn create_single_event(config: EventConfig) -> Result<()> {
     } else {
         // If no end time is specified, use start time + 1 hour instead of defaulting to midnight
         let default_end_dt = local_start + chrono::Duration::hours(1);
-        debug!("No end time specified, using start time + 1 hour: {}", default_end_dt.format("%H:%M"));
+        debug!(
+            "No end time specified, using start time + 1 hour: {}",
+            default_end_dt.format("%H:%M")
+        );
         default_end_dt
     };
 

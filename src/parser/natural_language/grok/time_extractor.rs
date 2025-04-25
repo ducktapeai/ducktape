@@ -35,18 +35,16 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         (r"(?i)today\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
         (r"(?i)tomorrow\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "tomorrow"),
         (r"(?i)this\s+evening\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-        
         // "at N(am|pm)" patterns
         (r"(?i)at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-        
         // Direct time mentions without specific date context
         (r"(?i)(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
     ];
-    
+
     // Special case check for your specific example: "tonight at 7pm"
     if input_lower.contains("tonight at 7pm") {
         debug!("Found exact match for 'tonight at 7pm'");
-        
+
         // Extract the title from command
         let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
         let title = if let Some(caps) = re.captures(command) {
@@ -60,10 +58,10 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         } else {
             "Event".to_string()
         };
-        
+
         // Get today's date
         let date = Local::now().format("%Y-%m-%d").to_string();
-        
+
         // Extract suffix after Calendar if exists
         let cmd_suffix = if let Some(pos) = command.find(" \"Calendar\"") {
             let pos_after_calendar = pos + " \"Calendar\"".len();
@@ -71,9 +69,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         } else {
             ""
         };
-        
+
         debug!("Special case: tonight at 7pm -> 19:00, title: '{}'", title);
-        
+
         // Return the command with 7pm (19:00) time
         return format!(
             r#"ducktape calendar create "{}" {} 19:00 20:00 "Calendar"{}"#,
@@ -86,10 +84,11 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let time_re = Regex::new(pattern).unwrap();
         if let Some(time_caps) = time_re.captures(input) {
             debug!("Time pattern match found: {}", pattern);
-            
+
             // Extract hour, minute and am/pm
             let hour: u32 = time_caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
-            let minute: u32 = time_caps.get(2)
+            let minute: u32 = time_caps
+                .get(2)
                 .map_or("0", |m| m.as_str().trim_start_matches(':'))
                 .parse()
                 .unwrap_or(0);
@@ -114,7 +113,7 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             let title = if let Some(caps) = re.captures(command) {
                 let full_title = caps.get(1).map_or("", |m| m.as_str());
                 let mut cleaned_title = full_title.to_string();
-                
+
                 // Remove various time expressions from the title
                 let title_patterns = [
                     "tonight at \\d{1,2}(:\\d{2})?(\\s*)(am|pm)",
@@ -124,13 +123,13 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
                     "at \\d{1,2}(:\\d{2})?(\\s*)(am|pm)",
                     "\\d{1,2}(:\\d{2})?(\\s*)(am|pm)",
                 ];
-                
+
                 for tp in title_patterns {
                     if let Ok(tpre) = Regex::new(&format!("(?i){}", tp)) {
                         cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
                     }
                 }
-                
+
                 cleaned_title.trim().to_string()
             } else {
                 "Event".to_string()

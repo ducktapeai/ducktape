@@ -8,20 +8,20 @@ use log::debug;
 use regex::Regex;
 
 /// Clean up NLP-generated commands by removing unnecessary quotes and normalizing spacing
-/// 
+///
 /// This function handles the conversion of natural language commands into structured `ducktape`
 /// commands. It has special handling for time expressions in event creation commands:
-/// 
+///
 /// # Time Parsing
-/// 
-/// When creating calendar events with time specifications like "tonight at 7pm", this function 
+///
+/// When creating calendar events with time specifications like "tonight at 7pm", this function
 /// extracts and converts these expressions to proper 24-hour format times. For example:
 /// - "tonight at 7pm" → 19:00
 /// - "today at 3:30pm" → 15:30
 /// - "tomorrow at 9am" → 09:00
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// let input = "create an event called Meeting tonight at 7pm";
 /// let result = sanitize_nlp_command(input);
@@ -53,9 +53,9 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                 (r"this evening at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
                 (r"at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
             ];
-            
+
             let command_lower = command.to_lowercase();
-            
+
             // Check each pattern for a match
             for (pattern, date_text) in &time_patterns {
                 if let Ok(re) = Regex::new(pattern) {
@@ -64,17 +64,17 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                         // Extract hour
                         if let Some(hour_match) = caps.get(1) {
                             let hour: u32 = hour_match.as_str().parse().unwrap_or(0);
-                            
+
                             // Extract minute
                             let minute: u32 = if let Some(min_match) = caps.get(2) {
                                 min_match.as_str().trim_start_matches(':').parse().unwrap_or(0)
                             } else {
                                 0
                             };
-                            
+
                             // Extract am/pm
                             let meridiem = caps.get(3).map_or("", |m| m.as_str());
-                            
+
                             time_info = (Some(hour), Some(minute), Some(meridiem.to_string()));
                             debug!("Extracted time: {}:{} {}", hour, minute, meridiem);
                             break;
@@ -103,13 +103,13 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                     title = &title_part[..end_pos];
                 }
             }
-            
+
             // Handle the specific case for "tonight at 7pm" and other time expressions
             let specific_time_case = command_lower.contains("tonight at 7pm");
             if specific_time_case || (time_info.0.is_some() && time_info.2.is_some()) {
                 // Get today's date
                 let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-                
+
                 // Format start time
                 let (start_hour, start_min) = if specific_time_case {
                     // Special case: 7pm = 19:00
@@ -119,7 +119,7 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                     let hour = time_info.0.unwrap();
                     let minute = time_info.1.unwrap_or(0);
                     let meridiem = time_info.2.unwrap();
-                    
+
                     let hour_24 = match (hour, meridiem.as_str()) {
                         (12, "am") => 0,
                         (h, "am") => h,
@@ -127,15 +127,15 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                         (h, "pm") => h + 12,
                         _ => hour,
                     };
-                    
+
                     (hour_24, minute)
                 };
-                
+
                 let start_time = format!("{:02}:{:02}", start_hour, start_min);
                 let end_time = format!("{:02}:{:02}", (start_hour + 1) % 24, start_min);
-                
+
                 debug!("Using time: {} to {}", start_time, end_time);
-                
+
                 // Format a proper calendar command with the extracted time
                 return format!(
                     "ducktape calendar create \"{}\" {} {} {} \"Calendar\"",

@@ -4,9 +4,9 @@
 //! for natural language processing.
 //!
 //! # Time Parsing
-//! 
+//!
 //! When users enter commands like "create an event called test tonight at 7pm",
-//! the API module passes the original natural language input to the time extraction 
+//! the API module passes the original natural language input to the time extraction
 //! function. The `sanitize_nlp_command` utility then extracts and converts time
 //! expressions to the proper 24-hour format (e.g., 7pm becomes 19:00).
 //!
@@ -28,7 +28,7 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         if parts.len() > 1 {
             // Extract text after "called" and before time expression
             let after_called = parts[1].trim();
-            
+
             if let Some(idx) = after_called.find(" tonight at ") {
                 after_called[..idx].trim()
             } else if let Some(idx) = after_called.find(" at ") {
@@ -45,9 +45,10 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
     };
 
     debug!("Extracted initial title: '{}'", initial_title);
-    
+
     // Create a very simple initial command
-    let command = format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", initial_title);
+    let command =
+        format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", initial_title);
     debug!("Initial command: {}", command);
 
     // First try the time extraction from the full input

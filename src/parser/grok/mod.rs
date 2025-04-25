@@ -7,8 +7,8 @@ use crate::parser::traits::{ParseResult, Parser};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use log::{debug, error};
-use std::env;
 use regex::Regex;
+use std::env;
 
 /// Parser that uses Grok/X.AI models for natural language understanding
 pub struct GrokParser;
@@ -72,7 +72,7 @@ fn sanitize_nlp_command(command: &str) -> String {
     // Extract time information if present using regex
     let time_regex = Regex::new(r"(\d{1,2}(?::\d{2})?(?:\s*[ap]m)?)").unwrap();
     let mut time_info = None;
-    
+
     if command.contains("calendar create") {
         if let Some(captures) = time_regex.captures(command) {
             time_info = captures.get(1).map(|m| m.as_str().to_string());
