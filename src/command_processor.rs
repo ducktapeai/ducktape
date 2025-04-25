@@ -323,7 +323,7 @@ impl CommandHandler for CalendarHandler {
 
                     // --- NEW: resolve relative date strings ---
                     if date.eq_ignore_ascii_case("today") || date.eq_ignore_ascii_case("tomorrow") {
-                        match crate::reminder::reminder_util::resolve_relative_date(&date) {
+                        match crate::reminder::resolve_relative_date(&date) {
                             Ok(resolved) => {
                                 debug!("Resolved relative date '{}' to '{}'.", date, resolved);
                                 date = resolved;
@@ -398,7 +398,7 @@ impl CommandHandler for CalendarHandler {
                     let days = args.flags.get("days").cloned().flatten();
 
                     // Create event config and pass to calendar module
-                    let mut config = crate::calendar::EventConfig::new(title, date, start_time);
+                    let mut config = crate::calendar::EventConfig::new(title, &date, start_time);
                     config.end_time = Some(end_time.clone());
 
                     // Validate calendar name
