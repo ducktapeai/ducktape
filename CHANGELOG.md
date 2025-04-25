@@ -1,3 +1,25 @@
+## [0.16.0] - 2025-04-25
+### Added
+- Enhanced natural language processing for calendar events
+- Improved command detection for event creation phrases
+- Added automated prefix handling for natural language commands
+
+### Fixed
+- Fixed issue with "create an event" commands not being properly recognized
+- Fixed natural language parsing for event creation without explicit prefixes
+- Added comprehensive test cases for natural language event creation
+
+## [0.16.0] - 2025-04-25
+### Added
+- Enhanced natural language processing for calendar events
+- Improved command detection for event creation phrases
+- Added automated prefix handling for natural language commands
+
+### Fixed
+- Fixed issue with "create an event" commands not being properly recognized
+- Fixed natural language parsing for event creation without explicit prefixes
+- Added comprehensive test cases for natural language event creation
+
 ## [0.15.5] - 2025-04-25
 ### Added
 - New release version 0.15.5
@@ -350,17 +372,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
-
 ## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
