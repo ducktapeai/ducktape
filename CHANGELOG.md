@@ -1,3 +1,9 @@
+## [0.16.2] - 2025-04-25
+### Changed
+- Improved stability and performance for calendar integrations
+- Enhanced error handling for network requests
+- Updated dependencies for better security
+
 ## [0.16.1] - 2025-04-26
 ### Fixed
 - Fixed natural language processing for "create an event" commands
@@ -372,17 +378,11 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
-- Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
