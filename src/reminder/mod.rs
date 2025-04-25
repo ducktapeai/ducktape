@@ -11,6 +11,7 @@ mod reminder_validation;
 
 pub use reminder_applescript::*;
 pub use reminder_types::*;
+pub use reminder_util::*;
 pub use reminder_validation::*;
 
 /// Create a new reminder
