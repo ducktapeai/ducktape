@@ -42,3 +42,4 @@ files-to-remove.txt
 run-dev.sh
 update-version.sh
 install_local.sh
+ducktape-0.16.0.tar.gz
