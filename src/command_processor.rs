@@ -299,8 +299,6 @@ impl CommandHandler for CalendarHandler {
                     let mut combined_title = String::new();
                     let mut _title_index = 1;
                     let mut date_index = 2;
-
-                    // Check if we have multiple words before a date format
                     if args.args.len() >= 6
                         && !args.args[1].contains('-')
                         && !args.args[1].contains(':')
@@ -310,20 +308,35 @@ impl CommandHandler for CalendarHandler {
                     {
                         debug!("Detected potential multi-word title");
                         combined_title = format!("{} {}", args.args[1], args.args[2]);
-                        _title_index = 0; // We'll use our combined title instead
-                        date_index = 3; // Date is at position 3
+                        _title_index = 0;
+                        date_index = 3;
                     }
-
-                    // Get title and trim surrounding quotes if present
                     let raw_title = if !combined_title.is_empty() {
                         combined_title
                     } else {
                         args.args[1].clone()
                     };
                     let title = raw_title.trim_matches('"');
-                    let date = &args.args[date_index];
+                    let mut date = args.args[date_index].clone();
                     let start_time = &args.args[date_index + 1];
                     let end_time = &args.args[date_index + 2];
+
+                    // --- NEW: resolve relative date strings ---
+                    if date.eq_ignore_ascii_case("today") || date.eq_ignore_ascii_case("tomorrow") {
+                        match crate::reminder::reminder_util::resolve_relative_date(&date) {
+                            Ok(resolved) => {
+                                debug!("Resolved relative date '{}' to '{}'.", date, resolved);
+                                date = resolved;
+                            }
+                            Err(e) => {
+                                log::warn!("Could not resolve relative date '{}': {}", date, e);
+                                println!("Invalid date: {}", date);
+                                return Ok(());
+                            }
+                        }
+                    }
+                    // --- END NEW ---
+
                     // Check if the date_index + 3 argument is a calendar or part of a flag
                     let calendar = if args
                         .args
