@@ -1,13 +1,14 @@
-## [0.16.9] - 2025-04-25
-### Added
-- Enhanced contact extraction functionality for calendar events
-- Support for \"and invite\" pattern in natural language commands
-
+## [0.16.10] - 2025-04-25
 ### Fixed
-- Fixed compilation issues in parser modules
-- Improved error handling in command processing
-- Fixed type safety issues in parser trait implementations
+- Fixed time parsing in natural language event titles (e.g., "tonight at 7pm")
+- Added proper extraction of time expressions from event titles
+- Implemented comprehensive time pattern detection for calendar events
 
+## [0.16.10] - 2025-04-25
+### Fixed
+- Fixed time parsing in natural language event titles (e.g., "tonight at 7pm")
+- Added proper extraction of time expressions from event titles
+- Implemented comprehensive time pattern detection for calendar events
 
 ## [0.16.9] - 2025-04-25
 ### Added
@@ -18,6 +19,7 @@
 - Fixed compilation issues in parser modules
 - Improved error handling in command processing
 - Fixed type safety issues in parser trait implementations
+
 
 ## [0.16.8] - 2025-04-25
 ### Changed
@@ -370,6 +372,10 @@
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
 
+## [0.11.19] - 2025-04-15
+### Changed
+- Started new development cycle with minor version bump
+- Preparing for new feature additions
 ## [0.11.19] - 2025-04-15
 ### Changed
 - Started new development cycle with minor version bump
