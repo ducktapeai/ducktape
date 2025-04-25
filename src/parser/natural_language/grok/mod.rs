@@ -12,6 +12,7 @@ use std::env;
 
 pub mod api;
 pub mod cache;
+pub mod time_extractor;
 pub mod utils;
 
 /// Parser that uses Grok/X.AI models for natural language understanding
