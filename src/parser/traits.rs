@@ -7,87 +7,45 @@ use crate::command_processor::CommandArgs;
 use crate::config::{Config, LLMProvider};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use log::info;
 
-/// Represents the result of parsing an input
+/// Result type from parsing input
 #[derive(Debug)]
 pub enum ParseResult {
-    /// A simple command string that needs further processing
+    /// Command string in Ducktape CLI format (e.g. "ducktape calendar create ...")
     CommandString(String),
-    /// A fully structured command ready for execution
-    StructuredCommand(CommandArgs),
+    /// Structured command arguments
+    StructuredCommand(crate::command_processor::CommandArgs),
 }
 
-/// Core parser trait that all parser implementations must implement
+/// Parser trait for all parser implementations
 #[async_trait]
 pub trait Parser: Send + Sync {
-    /// Parse a string input into a ParseResult
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - The string to parse
-    ///
-    /// # Returns
-    ///
-    /// A Result containing either a ParseResult or an error
+    /// Parse input to either a command string or structured command
     async fn parse_input(&self, input: &str) -> Result<ParseResult>;
 
-    /// Create a new instance of the parser
+    /// Create a new instance of this parser
     fn new() -> Result<Self>
     where
         Self: Sized;
 }
 
-/// Factory for creating the appropriate parser based on configuration
-pub struct ParserFactory;
-
-impl ParserFactory {
-    /// Create a parser based on the current configuration
-    ///
-    /// This will return an appropriate parser implementation based on the
-    /// LLMProvider specified in the config.
-    pub fn create_parser() -> Result<Box<dyn Parser + Send + Sync>> {
-        let config = Config::load()?;
-
-        match config.language_model.provider {
-            Some(LLMProvider::Grok) => {
-                info!("Creating Grok parser");
-                let parser = crate::parser::grok::GrokParser::new()?;
-                Ok(Box::new(parser))
-            }
-            Some(LLMProvider::DeepSeek) => {
-                info!("Creating DeepSeek parser");
-                let parser = crate::parser::deepseek::DeepSeekParser::new()?;
-                Ok(Box::new(parser))
-            }
-            None => {
-                info!("Creating Terminal parser (no language model selected)");
-                crate::parser::terminal::create_terminal_parser()
-            }
+/// Parser factory for creating parsers by name
+pub fn create_parser(name: &str) -> Result<Box<dyn Parser + Send + Sync>> {
+    match name.to_lowercase().as_str() {
+        "grok" => {
+            let parser = crate::parser::grok::GrokParser::new()?;
+            Ok(Box::new(parser))
         }
-    }
-
-    /// Create a specific parser by name
-    ///
-    /// This is useful for testing or when you need to specify
-    /// a parser that's different from what's in the config.
-    pub fn create_parser_by_name(name: &str) -> Result<Box<dyn Parser + Send + Sync>> {
-        match name.to_lowercase().as_str() {
-            "grok" => {
-                let parser = crate::parser::grok::GrokParser::new()?;
-                Ok(Box::new(parser))
-            }
-            "deepseek" => {
-                let parser = crate::parser::deepseek::DeepSeekParser::new()?;
-                Ok(Box::new(parser))
-            }
-            "terminal" => crate::parser::terminal::create_terminal_parser(),
-            "command" => {
-                let parser = crate::parser::command::CommandParser::new()?;
-                Ok(Box::new(parser))
-            }
-            _ => Err(anyhow!("Unknown parser type: {}", name)),
+        "deepseek" => {
+            let parser = crate::parser::deepseek::DeepSeekParser::new()?;
+            Ok(Box::new(parser))
         }
+        "terminal" => crate::parser::terminal::create_terminal_parser(),
+        "command" => {
+            let parser = crate::parser::command::CommandParser::new()?;
+            Ok(Box::new(parser))
+        }
+        _ => Err(anyhow!("Unknown parser type: {}", name)),
     }
 }
 
@@ -102,7 +60,7 @@ mod tests {
         let parser_types = ["terminal", "command"];
 
         for parser_type in parser_types {
-            let result = ParserFactory::create_parser_by_name(parser_type);
+            let result = create_parser(parser_type);
             assert!(result.is_ok(), "Failed to create parser: {}", parser_type);
         }
     }

@@ -1,6 +1,6 @@
 use crate::command_processor::{CommandArgs, CommandProcessor};
 use crate::config::{Config, LLMProvider};
-use crate::parser::{Parser, ParserFactory};
+use crate::parser::{ParseResult, Parser, ParserFactory};
 use anyhow::{Result, anyhow};
 use clap::Parser as ClapParser;
 use rustyline::DefaultEditor;
@@ -226,17 +226,40 @@ impl Application {
                 println!("Sanitized command: {}", sanitized_command);
                 log::debug!("Sanitized NLP command: {}", sanitized_command);
 
+                // Apply enhancements for contacts and other special cases
+                // This ensures the "and invite" pattern is correctly handled
+                let mut enhanced_command = sanitized_command.clone();
+
+                // Add contacts if this is a calendar command
+                if enhanced_command.contains("calendar create") {
+                    // Extract contacts using the utility function that now handles "and invite" pattern
+                    let contacts =
+                        crate::parser::natural_language::utils::extract_contact_names(input);
+
+                    if !contacts.is_empty() {
+                        log::debug!("Found contacts in natural language input: {:?}", contacts);
+                        let contacts_str = contacts.join(",");
+
+                        // Only add the --contacts flag if not already present
+                        if !enhanced_command.contains("--contacts") {
+                            enhanced_command =
+                                format!("{} --contacts \"{}\"", enhanced_command, contacts_str);
+                            log::debug!("Enhanced command with contacts: {}", enhanced_command);
+                        }
+                    }
+                }
+
                 // Check if the generated command starts with ducktape
-                if sanitized_command.starts_with("ducktape") {
+                if enhanced_command.starts_with("ducktape") {
                     // Try to use the Clap parser first
-                    match self.parse_command_string(&sanitized_command) {
+                    match self.parse_command_string(&enhanced_command) {
                         Ok(args) => {
                             log::debug!("Final parsed arguments: {:?}", args);
                             self.command_processor.execute(args).await
                         }
                         Err(_) => {
                             // Fall back to legacy parser if Clap fails
-                            let mut args = CommandArgs::parse(&sanitized_command)?;
+                            let mut args = CommandArgs::parse(&enhanced_command)?;
 
                             // Further sanitize individual arguments to remove any remaining quotes
                             args.args = args
@@ -252,7 +275,7 @@ impl Application {
                 } else {
                     println!(
                         "Generated command doesn't start with 'ducktape': {}",
-                        sanitized_command
+                        enhanced_command
                     );
                     Ok(())
                 }
