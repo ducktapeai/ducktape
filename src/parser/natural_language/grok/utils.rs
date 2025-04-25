@@ -11,18 +11,23 @@ use regex::Regex;
 pub fn sanitize_nlp_command(command: &str) -> String {
     // Ensure the command starts with ducktape
     if !command.starts_with("ducktape") {
-        // If command mentions creating an event but doesn't have the ducktape calendar syntax,
-        // convert it to a proper calendar command
-        if command.contains("create an event")
+        // Check for event creation patterns
+        let is_event_creation = command.contains("create an event")
             || command.contains("schedule a")
             || command.contains("create event")
             || command.contains("schedule event")
             || command.contains("create a meeting")
-            || command.contains("schedule meeting")
-        {
+            || command.contains("schedule meeting");
+
+        if is_event_creation {
             debug!("Converting event creation command to calendar command: {}", command);
-            return format!("ducktape calendar {}", command);
+
+            // For event creation, structure it as a calendar create command
+            // This preserves the original natural language for the LLM parser to handle
+            return format!("ducktape calendar create {}", command);
         }
+
+        // For other commands, just prefix with ducktape
         return format!("ducktape {}", command);
     }
 
@@ -263,12 +268,18 @@ mod tests {
         // Test natural language event creation command
         let input = "create an event called test tonight at 10pm";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, "ducktape calendar create an event called test tonight at 10pm");
+        assert_eq!(
+            sanitized,
+            "ducktape calendar create create an event called test tonight at 10pm"
+        );
 
         // Test another event creation pattern
         let input = "schedule a meeting with Joe tomorrow at 9am";
         let sanitized = sanitize_nlp_command(input);
-        assert_eq!(sanitized, "ducktape calendar schedule a meeting with Joe tomorrow at 9am");
+        assert_eq!(
+            sanitized,
+            "ducktape calendar create schedule a meeting with Joe tomorrow at 9am"
+        );
 
         // Test non-calendar command
         let input = "not a ducktape command";
