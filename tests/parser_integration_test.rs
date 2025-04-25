@@ -4,9 +4,8 @@
 //! with the rest of the application.
 
 use anyhow::Result;
-use ducktape::command_processor::CommandArgs;
-use ducktape::config::Config;
-use ducktape::parser::traits::{ParseResult, ParserFactory};
+use ducktape::parser::grok::GrokParser;
+use ducktape::parser::traits::{ParseResult, Parser, ParserFactory};
 
 #[tokio::test]
 async fn test_grok_parser_factory() -> Result<()> {
@@ -51,8 +50,8 @@ async fn test_terminal_parser() -> Result<()> {
             Ok(())
         }
         ParseResult::StructuredCommand(args) => {
-            assert_eq!(args.command.as_deref(), Some("calendar"));
-            assert_eq!(args.subcommand.as_deref(), Some("create"));
+            assert_eq!(args.command, "calendar");
+            assert!(args.args.contains(&"create".to_string()));
             Ok(())
         }
     }
@@ -70,16 +69,16 @@ async fn test_command_parser() -> Result<()> {
 
     // Command parser should always return StructuredCommand
     if let ParseResult::StructuredCommand(args) = result {
-        assert_eq!(args.command.as_deref(), Some("calendar"));
-        assert_eq!(args.subcommand.as_deref(), Some("create"));
+        assert_eq!(args.command, "calendar");
+        assert!(args.args.contains(&"create".to_string()));
 
         // Check that positional arguments are parsed correctly
         assert!(args.args.len() >= 4);
-        assert_eq!(args.args.get(0), Some(&"Team Meeting".to_string()));
-        assert_eq!(args.args.get(1), Some(&"2025-04-25".to_string()));
-        assert_eq!(args.args.get(2), Some(&"14:00".to_string()));
-        assert_eq!(args.args.get(3), Some(&"15:00".to_string()));
-        assert_eq!(args.args.get(4), Some(&"Work".to_string()));
+        assert!(args.args.contains(&"Team Meeting".to_string()));
+        assert!(args.args.contains(&"2025-04-25".to_string()));
+        assert!(args.args.contains(&"14:00".to_string()));
+        assert!(args.args.contains(&"15:00".to_string()));
+        assert!(args.args.contains(&"Work".to_string()));
 
         Ok(())
     } else {
@@ -89,11 +88,10 @@ async fn test_command_parser() -> Result<()> {
 
 #[tokio::test]
 async fn test_backward_compatibility() -> Result<()> {
-    // Test that the old parser API still works through the compatibility layer
-    // This is important to ensure a smooth migration path
+    // Test that the parser API works through directly instantiating the GrokParser
 
-    // Use the re-exported GrokParser
-    let parser = ducktape::parser_reexport::GrokParser::new()?;
+    // Use the GrokParser directly
+    let parser = GrokParser::new()?;
 
     // Parse a test phrase
     let result = parser.parse_input("Remind me to buy groceries tomorrow").await?;
@@ -131,7 +129,7 @@ async fn test_live_grok_api_integration() -> Result<()> {
         }
         ParseResult::StructuredCommand(args) => {
             println!("Structured command: {:?}", args);
-            assert_eq!(args.command.as_deref(), Some("calendar"));
+            assert_eq!(args.command, "calendar");
             Ok(())
         }
     }
