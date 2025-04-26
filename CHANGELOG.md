@@ -1,4 +1,9 @@
 ## [0.16.11] - 2025-04-26
+### Changed
+- Version bump for new release
+- Minor stability improvements
+- Updated dependencies
+
 ### Fixed
 - Fixed time parsing in natural language commands with specific time expressions (e.g., "tonight at 7pm")
 - Added proper AM/PM to 24-hour time conversion for calendar events
@@ -452,7 +457,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-- Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
 ### Changed
@@ -513,10 +517,6 @@
 ### Changed
 - Started new development cycle with minor version bump
 - Preparing for new feature additions
-
-## [0.11.19] - 2025-04-15
-### Changed
-- Started new development cycle with minor version bump
 - Preparing for new feature additions
 
 ## [0.11.19] - 2025-04-15
