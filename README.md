@@ -18,6 +18,8 @@ DuckTape is an AI-powered command-line interface that simplifies managing your A
 - **Apple Contacts Integration**: Automatically add attendees to events using Apple Contacts
 - **Reminder Management**: Create and manage reminders with due dates and notes
 - **Recurring Events**: Create daily, weekly, monthly, or yearly recurring events
+- **Improved Time Parsing**: Enhanced detection of time expressions in natural language commands
+- **Smart Contact Detection**: Better recognition of contact information in event creation
 
 ---
 
@@ -90,7 +92,7 @@ To make these changes persistent, add them to your shell profile (e.g., `~/.zshr
 4. DuckTape will process your natural language request and execute the appropriate command:
    ```
    Processing natural language: 'create a zoom event today at 10am called Team Check in and invite Joe Duck'
-   Translated to command: ducktape calendar create "Team Check in" 2025-04-22 10:00 11:00 "Work" --email "joe.duck@example.com" --contacts "Joe Duck" --zoom
+   Translated to command: ducktape calendar create "Team Check in" 2025-04-26 10:00 11:00 "Work" --email "joe.duck@example.com" --contacts "Joe Duck" --zoom
    ```
 
 The power of Natural Language Mode is that it automatically interprets dates, times, and contacts, saving you time and effort.
@@ -100,7 +102,7 @@ The power of Natural Language Mode is that it automatically interprets dates, ti
 In this mode, DuckTape operates as a traditional command-line interface (CLI) where you directly execute structured commands without requiring any API keys.
 
 ```bash
-ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
+ducktape calendar create "Team Meeting" 2025-04-26 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
 ```
 
 This command explicitly specifies all parameters: event title, date, start time, end time, calendar name, contacts, and the zoom flag to create a meeting link.
@@ -136,17 +138,17 @@ This command explicitly specifies all parameters: event title, date, start time,
   ```
 - Create a calendar event:
   ```bash
-  ducktape calendar create "Project-Review" 2025-04-20 15:00 16:00 "Work"
+  ducktape calendar create "Project-Review" 2025-04-28 15:00 16:00 "Work"
   ```
 - Create an event with a Zoom meeting and contacts:
   ```bash
-  ducktape calendar create "Team Meeting" 2025-04-15 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
+  ducktape calendar create "Team Meeting" 2025-04-27 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
   ```
 
 #### Reminder Commands
 - Create a reminder:
   ```bash
-  ducktape reminder create "Buy groceries" --remind "2025-04-22 18:00"
+  ducktape reminder create "Buy groceries" --remind "2025-04-28 18:00"
   ```
 - List reminders:
   ```bash
@@ -241,13 +243,15 @@ For more details on Zoom integration, see [ducktapeai.com/docs/zoom.html](https:
 DuckTape integrates with Apple Contacts to automatically look up email addresses:
 
 ```bash
-ducktape calendar create "Project Discussion" 2025-04-23 14:00 15:00 "Work" --contacts "Joe Duck, Jane Doe"
+ducktape calendar create "Project Discussion" 2025-04-28 14:00 15:00 "Work" --contacts "Joe Duck, Jane Doe"
 ```
 
 Or in Natural Language Mode:
 ```
 🦆 schedule a meeting with Joe Duck and Jane Doe tomorrow at 2pm
 ```
+
+The latest version (0.16.11) provides enhanced contact extraction with support for the "and invite" pattern in natural language commands.
 
 ---
 
@@ -258,21 +262,39 @@ Or in Natural Language Mode:
 - **Invalid Calendar Name**: Use `ducktape calendar list` to see available calendars.
 - **Contact Not Found**: Verify that the contact exists in your Apple Contacts app.
 - **Zoom Integration Issues**: Check that your Zoom API credentials are correct and have the necessary permissions.
+- **Time Parsing Problems**: If times aren't recognized correctly, try to be more explicit with AM/PM designations.
 
 DuckTape provides detailed logging information that can help diagnose issues:
 
 ```
-[2025-04-21T20:04:10Z INFO ducktape::calendar] Creating Zoom meeting for event: Team Check in
-[2025-04-21T20:04:11Z INFO ducktape::zoom] Successfully created Zoom meeting: 84349352425
+[2025-04-26T20:04:10Z INFO ducktape::calendar] Creating Zoom meeting for event: Team Check in
+[2025-04-26T20:04:11Z INFO ducktape::zoom] Successfully created Zoom meeting: 84349352425
 ```
 
 For more troubleshooting tips, visit our documentation at [ducktapeai.com/docs](https://ducktapeai.com/docs).
 
 ---
 
+## Recent Updates (v0.16.11)
+
+- Fixed time parsing in natural language commands with specific time expressions
+- Improved AM/PM to 24-hour time conversion for calendar events
+- Enhanced contact extraction functionality for calendar events
+- Added support for "and invite" pattern in natural language commands
+- Improved error handling and stability for calendar operations
+- Fixed compilation issues in parser modules
+
+---
+
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started.
+
+---
+
+## Security
+
+DuckTape takes security seriously. We follow Rust security best practices and regularly update dependencies for security patches. For more information, see our [Security Policy](SECURITY.md).
 
 ---
 
