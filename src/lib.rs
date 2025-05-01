@@ -3,7 +3,7 @@ pub mod app;
 pub mod calendar;
 pub mod cli;
 #[deprecated(since = "0.14.0", note = "Use parser module instead")]
-pub mod command_parser;
+// pub mod command_parser; // Removed: use parser::command instead
 pub mod command_processor;
 pub mod config;
 pub mod contact_groups;
@@ -28,14 +28,13 @@ pub mod zoom;
 
 // Deprecated modules - will be removed after migration
 // command_parser already declared above with deprecation notice
-#[deprecated(since = "0.13.0", note = "Use crate::parser::deepseek module instead")]
-pub mod deepseek_parser;
+// pub mod deepseek_parser; // Removed: use parser::deepseek instead
 #[deprecated(since = "0.13.0", note = "Use crate::parser::grok module instead")]
 pub mod grok_parser;
 #[deprecated(since = "0.13.0", note = "Use crate::parser::traits module instead")]
 pub mod parser_trait;
-#[deprecated(since = "0.13.0", note = "Use crate::parser::terminal module instead")]
-pub mod terminal_parser;
+// pub mod terminal_parser; // Deprecated: use parser::terminal instead
+// pub mod openai_parser; // Removed: use parser::openai instead
 
 use anyhow::Result;
 use log::*;
