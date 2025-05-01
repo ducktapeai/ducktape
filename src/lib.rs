@@ -29,8 +29,6 @@ pub mod zoom;
 // Deprecated modules - will be removed after migration
 // command_parser already declared above with deprecation notice
 // pub mod deepseek_parser; // Removed: use parser::deepseek instead
-#[deprecated(since = "0.13.0", note = "Use crate::parser::grok module instead")]
-pub mod grok_parser;
 #[deprecated(since = "0.13.0", note = "Use crate::parser::traits module instead")]
 pub mod parser_trait;
 // pub mod terminal_parser; // Deprecated: use parser::terminal instead
