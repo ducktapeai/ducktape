@@ -2,6 +2,10 @@
 //!
 //! This module is kept for backward compatibility and redirects to the new modular structure.
 //! Use the `crate::parser::terminal` module instead.
+// This module is fully deprecated. Use crate::parser::terminal instead.
+// Keeping for backward compatibility only. All logic is delegated.
+//
+// Consider removing this file in a future release.
 
 use anyhow::Result;
 use async_trait::async_trait;
