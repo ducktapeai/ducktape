@@ -85,62 +85,51 @@ pub enum CalendarActions {
         /// Event title
         #[arg(required = true)]
         title: String,
-
         /// Event date (YYYY-MM-DD)
         #[arg(required = true)]
         date: String,
-
         /// Start time (HH:MM)
         #[arg(required = true)]
         start_time: String,
-
         /// End time (HH:MM)
         #[arg(required = true)]
         end_time: String,
-
         /// Calendar name
         #[arg(default_value = "Work")]
         calendar: String,
-
         /// Contact names to invite
         #[arg(long, value_delimiter = ',')]
         contacts: Option<Vec<String>>,
-
         /// Email addresses to invite
         #[arg(long, value_delimiter = ',')]
         email: Option<Vec<String>>,
-
         /// Event location
         #[arg(long)]
         location: Option<String>,
-
         /// Event notes/description
         #[arg(long)]
         notes: Option<String>,
-
         /// Create a Zoom meeting for this event
         #[arg(long)]
         zoom: bool,
-
         /// Recurrence frequency (daily, weekly, monthly, yearly)
         #[arg(long, alias = "recurring")]
         repeat: Option<RecurrenceFreq>,
-
         /// Recurrence interval (e.g., every 2 weeks)
         #[arg(long)]
         interval: Option<u32>,
-
         /// End date for recurrence (YYYY-MM-DD)
         #[arg(long)]
         until: Option<String>,
-
         /// Number of occurrences
         #[arg(long)]
         count: Option<u32>,
-
         /// Days of week (0=Sun, 1=Mon, etc.)
         #[arg(long, value_delimiter = ',')]
         days: Option<Vec<u8>>,
+        /// Check for calendar conflicts before creating the event
+        #[arg(long)]
+        check_conflicts: bool,
     },
 
     /// Delete a calendar event
@@ -388,6 +377,7 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
                         until,
                         count,
                         days,
+                        check_conflicts,
                     } => {
                         args.push("create".to_string());
                         args.push(title.clone());
@@ -432,6 +422,9 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
                         if let Some(e) = email {
                             let email_str = e.join(",");
                             flags.insert("email".to_string(), Some(email_str));
+                        }
+                        if *check_conflicts {
+                            flags.insert("check_conflicts".to_string(), Some("true".to_string()));
                         }
                     }
                     CalendarActions::Delete { event_id, calendar } => {
