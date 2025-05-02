@@ -254,8 +254,11 @@ impl Application {
                 // Sanitize the NLP-generated command to remove unnecessary quotes
                 let mut sanitized_command = crate::parser::sanitize_nlp_command(&command);
                 // Guarantee --zoom is present if needed
-                let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
-                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw)) && !sanitized_command.contains("--zoom") {
+                let zoom_keywords =
+                    ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
+                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw))
+                    && !sanitized_command.contains("--zoom")
+                {
                     sanitized_command.push_str(" --zoom");
                 }
                 println!("Sanitized command: {}", sanitized_command);
@@ -266,7 +269,8 @@ impl Application {
 
                 // Add contacts if this is a calendar command
                 if enhanced_command.contains("calendar create") {
-                    let contacts = crate::parser::natural_language::utils::extract_contact_names(input);
+                    let contacts =
+                        crate::parser::natural_language::utils::extract_contact_names(input);
                     if !contacts.is_empty() {
                         log::debug!("Found contacts in natural language input: {:?}", contacts);
                         let contacts_str = contacts.join(",");
