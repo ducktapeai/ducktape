@@ -2,7 +2,9 @@ use anyhow::Result;
 use ducktape::calendar::{
     self, CalendarError, EventConfig, RecurrenceFrequency, RecurrencePattern,
 };
-use ducktape::command_processor::{CalendarHandler, CommandArgs, CommandHandler};
+use ducktape::command_processor::CalendarHandler;
+use ducktape::command_processor::CommandArgs;
+use ducktape::command_processor::CommandHandler;
 use std::collections::HashMap;
 
 #[tokio::test]

@@ -40,6 +40,17 @@ async fn main() -> Result<()> {
         return api_server::start_api_server(config, &address).await;
     }
 
+    // Remove obsolete --ai flag and nl_command handling
+    // Only handle the ai subcommand for natural language input
+    if let Some(cli::Commands::Ai { nl_command }) = &cli.command {
+        let nl_input = nl_command.join(" ");
+        if nl_input.trim().is_empty() {
+            println!("Error: No natural language command provided to 'ai' subcommand.");
+            std::process::exit(1);
+        }
+        return app.process_natural_language(&nl_input).await;
+    }
+
     if cli.full {
         // Start both terminal and API server (original behavior)
         return app.run().await;

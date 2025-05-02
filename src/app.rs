@@ -126,8 +126,8 @@ impl Application {
         Ok(())
     }
 
-    async fn process_input(&self, input: &str, use_natural_language: bool) -> Result<()> {
-        log::debug!("Inside process_input: use_natural_language = {}", use_natural_language);
+    async fn process_input(&self, input: &str, _use_natural_language: bool) -> Result<()> {
+        log::debug!("Hybrid input mode: auto-detecting command vs natural language");
 
         // Check for direct exit command regardless of mode
         let preprocessed = crate::command_processor::preprocess_input(input);
@@ -137,7 +137,6 @@ impl Application {
             || preprocessed == "ducktape quit"
         {
             log::info!("Exit command detected, bypassing language processing");
-            // Create command args for exit command
             let command_args = crate::command_processor::CommandArgs::new(
                 "exit".to_string(),
                 vec![],
@@ -146,21 +145,43 @@ impl Application {
             return self.command_processor.execute(command_args).await;
         }
 
-        if !use_natural_language {
-            log::info!("Skipping natural language processing as Terminal Mode is enabled");
-            println!(
-                "Note: To enable natural language processing, update and enable the 'provider' field in the 'language_model' section of your config.toml file."
-            );
+        // List of known DuckTape commands (expanded from README)
+        const KNOWN_COMMANDS: &[&str] = &[
+            "calendar",
+            "reminder",
+            "todo",
+            "note",
+            "config",
+            "contact",
+            "help",
+            "exit",
+            "version",
+            "--help",
+            "--version",
+        ];
+        let trimmed = preprocessed.trim_start();
+        let is_direct_command = KNOWN_COMMANDS.iter().any(|cmd| {
+            trimmed.starts_with(cmd) || trimmed.starts_with(&format!("ducktape {}", cmd))
+        });
+
+        if is_direct_command {
+            log::info!("Detected direct DuckTape command: {}", trimmed);
             return self.process_command(input).await;
         }
 
-        log::info!("Proceeding with natural language processing");
-
-        // Proceed with natural language processing if enabled
+        log::info!("Detected natural language input, routing to NLP pipeline");
         self.process_natural_language(input).await
     }
 
-    /// Process a direct command string - now public for CLI use
+    /// Process a direct DuckTape command string.
+    ///
+    /// # Security
+    /// - Only call this with validated, preprocessed input.
+    /// - Do not expose this method to external crates except for CLI entry points.
+    /// - All input should be sanitized and validated before execution.
+    ///
+    /// # Errors
+    /// Returns an error if the command is invalid or execution fails.
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
 
@@ -210,7 +231,16 @@ impl Application {
         }
     }
 
-    async fn process_natural_language(&self, input: &str) -> Result<()> {
+    /// Process a natural language command string.
+    ///
+    /// # Security
+    /// - Only call this with validated, preprocessed input.
+    /// - Do not expose this method to external crates except for CLI entry points.
+    /// - All input should be sanitized and validated before execution.
+    ///
+    /// # Errors
+    /// Returns an error if the command is invalid or execution fails.
+    pub async fn process_natural_language(&self, input: &str) -> Result<()> {
         println!("Processing natural language: '{}'", input);
 
         // Create appropriate parser using factory
@@ -222,25 +252,28 @@ impl Application {
                 println!("Translated to command: {}", command);
 
                 // Sanitize the NLP-generated command to remove unnecessary quotes
-                let sanitized_command = crate::parser::sanitize_nlp_command(&command);
+                let mut sanitized_command = crate::parser::sanitize_nlp_command(&command);
+                // Guarantee --zoom is present if needed
+                let zoom_keywords =
+                    ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
+                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw))
+                    && !sanitized_command.contains("--zoom")
+                {
+                    sanitized_command.push_str(" --zoom");
+                }
                 println!("Sanitized command: {}", sanitized_command);
                 log::debug!("Sanitized NLP command: {}", sanitized_command);
 
                 // Apply enhancements for contacts and other special cases
-                // This ensures the "and invite" pattern is correctly handled
                 let mut enhanced_command = sanitized_command.clone();
 
                 // Add contacts if this is a calendar command
                 if enhanced_command.contains("calendar create") {
-                    // Extract contacts using the utility function that now handles "and invite" pattern
                     let contacts =
                         crate::parser::natural_language::utils::extract_contact_names(input);
-
                     if !contacts.is_empty() {
                         log::debug!("Found contacts in natural language input: {:?}", contacts);
                         let contacts_str = contacts.join(",");
-
-                        // Only add the --contacts flag if not already present
                         if !enhanced_command.contains("--contacts") {
                             enhanced_command =
                                 format!("{} --contacts \"{}\"", enhanced_command, contacts_str);
@@ -251,23 +284,18 @@ impl Application {
 
                 // Check if the generated command starts with ducktape
                 if enhanced_command.starts_with("ducktape") {
-                    // Try to use the Clap parser first
                     match self.parse_command_string(&enhanced_command) {
                         Ok(args) => {
                             log::debug!("Final parsed arguments: {:?}", args);
                             self.command_processor.execute(args).await
                         }
                         Err(_) => {
-                            // Fall back to legacy parser if Clap fails
                             let mut args = CommandArgs::parse(&enhanced_command)?;
-
-                            // Further sanitize individual arguments to remove any remaining quotes
                             args.args = args
                                 .args
                                 .into_iter()
                                 .map(|arg| arg.trim_matches('"').to_string())
                                 .collect();
-
                             log::debug!("Final parsed arguments (legacy): {:?}", args);
                             self.command_processor.execute(args).await
                         }
@@ -283,8 +311,6 @@ impl Application {
             Ok(crate::parser::ParseResult::StructuredCommand(args)) => {
                 log::debug!("Got pre-parsed structured command: {:?}", args);
                 println!("Processed command structure from natural language");
-
-                // Execute directly with the structured command
                 self.command_processor.execute(args).await
             }
             Err(e) => {

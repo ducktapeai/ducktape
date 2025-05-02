@@ -1,6 +1,6 @@
 # DuckTape 🦆 - Your Personal TimeAI
 
-DuckTape is an AI-powered command-line interface that simplifies managing your Apple Calendar, Reminders, and Notes. With DuckTape, you can use two distinct approaches: **Natural Language Mode** and **Terminal Mode**.
+DuckTape is an AI-powered command-line interface that simplifies managing your Apple Calendar, Reminders, and Notes. DuckTape now supports a **hybrid CLI**: you can use direct commands, natural language in interactive mode, or run natural language directly from the terminal using the `ai` subcommand.
 
 > **Note**: DuckTape currently only works on macOS and requires Apple Calendar, Reminders, and Notes to be properly configured on your system. [Learn how to set up Apple Calendar](https://support.apple.com/guide/calendar/set-up-icloud-calendar-icl1022/mac).
 > DuckTape will use your native Apple capabilities, for example Apple Contacts, Apple Reminders and so forth. Please ensure these Applications are properly setup and configured.
@@ -11,6 +11,7 @@ DuckTape is an AI-powered command-line interface that simplifies managing your A
 
 ## Features
 
+- **Hybrid CLI**: Use direct commands, natural language in interactive mode, or natural language via the `ai` subcommand
 - **Natural Language Processing**: Use everyday language to create events, reminders, and notes
 - **Command-Line Interface**: Execute precise commands for advanced control
 - **AI Model Support**: Integrates with OpenAI, Grok (X.AI), and DeepSeek for natural language understanding
@@ -55,137 +56,65 @@ cargo install --path .
 
 ## Getting Started
 
-DuckTape offers two modes of operation:
+DuckTape now supports three ways to use commands:
 
-### 1. Natural Language Mode (Requires API Key)
+### 1. Interactive Hybrid Mode (Recommended)
 
-In this mode, DuckTape uses AI language models to interpret natural language commands. This requires setting up API keys for one of the supported AI providers.
-
-#### Setting Up API Keys
-
-Choose at least one provider and set the corresponding environment variable:
+Type `ducktape` to enter interactive mode. You can then type either direct commands or natural language:
 
 ```bash
-# For OpenAI
-export OPENAI_API_KEY='your-openai-api-key-here'
-
-# For Grok (X.AI)
-export XAI_API_KEY='your-xai-api-key-here'
-
-# For DeepSeek
-export DEEPSEEK_API_KEY='your-deepseek-api-key-here'
+ducktape
 ```
 
-To make these changes persistent, add them to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`).
+**Examples in interactive mode:**
+```
+🦆 calendar list
+🦆 schedule a meeting in 30 minutes with Joe
+🦆 remind me to call Jane tomorrow at 2pm
+🦆 ducktape note create "Project ideas" "Content for the note"
+```
 
-#### Running in Natural Language Mode
+### 2. Direct CLI Commands (Terminal Mode)
 
-1. Open your terminal.
-2. Type `ducktape` and press enter to start the interactive Natural Language terminal:
-   ```bash
-   ducktape
-   ```
-3. You'll see a welcome message. Then type your request using natural language:
-   ```
-   🦆 create a zoom event today at 10am called Team Check in and invite Joe Duck
-   ```
-4. DuckTape will process your natural language request and execute the appropriate command:
-   ```
-   Processing natural language: 'create a zoom event today at 10am called Team Check in and invite Joe Duck'
-   Translated to command: ducktape calendar create "Team Check in" 2025-04-26 10:00 11:00 "Work" --email "joe.duck@example.com" --contacts "Joe Duck" --zoom
-   ```
-
-The power of Natural Language Mode is that it automatically interprets dates, times, and contacts, saving you time and effort.
-
-### 2. Terminal Mode (No API Key Required)
-
-In this mode, DuckTape operates as a traditional command-line interface (CLI) where you directly execute structured commands without requiring any API keys.
+Run structured commands directly from your shell:
 
 ```bash
+ducktape calendar list
 ducktape calendar create "Team Meeting" 2025-04-26 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
+ducktape note list
 ```
 
-This command explicitly specifies all parameters: event title, date, start time, end time, calendar name, contacts, and the zoom flag to create a meeting link.
+### 3. Natural Language via `ai` Subcommand
+
+Run natural language commands directly from your shell using the `ai` subcommand:
+
+```bash
+ducktape ai schedule a meeting in 30 minutes with Joe
+ducktape ai remind me to call Jane tomorrow at 2pm
+ducktape ai create a zoom event today at 10am called Team Check in and invite Joe Duck
+ducktape ai add a note about the new marketing strategy
+```
 
 ---
 
 ## Command Examples
 
-### Natural Language Examples
+### Interactive Mode (Hybrid)
+- `calendar list`
+- `schedule a meeting in 30 minutes with Joe`
+- `remind me to call Jane tomorrow at 2pm`
+- `note create "Project ideas" "Content for the note"`
 
-#### Calendar Events
-- `create an event Team Meeting with Joe Duck for this coming Tuesday`
-- `create a zoom event today at 10am called Team Check in and invite Joe Duck`
-- `schedule a meeting with Joe Duck tomorrow at 2pm about project review`
-- `create a weekly team meeting every Tuesday at 10am`
+### Direct CLI Commands
+- `ducktape calendar list`
+- `ducktape calendar create "Project-Review" 2025-04-28 15:00 16:00 "Work"`
+- `ducktape reminder create "Buy groceries" --remind "2025-04-28 18:00"`
+- `ducktape note list`
 
-#### Reminders
-- `create a reminder today at 11pm called Check if Ducks are swimming`
-- `add a reminder to buy groceries next Monday morning`
-- `remind me to call Joe Duck on Friday at 3pm`
-- `set a reminder for tomorrow at noon to review documents`
-
-#### Notes
-- `create a note titled "Meeting Ideas" with content about product planning`
-- `add a note about the new marketing strategy`
-
-### Terminal Command Examples
-
-#### Calendar Commands
-- List all calendars:
-  ```bash
-  ducktape calendar list
-  ```
-- Create a calendar event:
-  ```bash
-  ducktape calendar create "Project-Review" 2025-04-28 15:00 16:00 "Work"
-  ```
-- Create an event with a Zoom meeting and contacts:
-  ```bash
-  ducktape calendar create "Team Meeting" 2025-04-27 13:00 14:00 "Work" --contacts "Joe Duck" --zoom
-  ```
-
-#### Reminder Commands
-- Create a reminder:
-  ```bash
-  ducktape reminder create "Buy groceries" --remind "2025-04-28 18:00"
-  ```
-- List reminders:
-  ```bash
-  ducktape reminder list
-  ```
-- Create a reminder in a specific list:
-  ```bash
-  ducktape reminder create "Call Joe Duck" "Work" --remind "tomorrow at 3pm"
-  ```
-
-> **Note**: For backward compatibility, the `todo` command is also supported and maps to the reminder functionality.
-
-#### Notes Commands
-- Create a note:
-  ```bash
-  ducktape note create "Project ideas" "Content for the note"
-  ```
-- List notes:
-  ```bash
-  ducktape note list
-  ```
-
-#### Utility Commands
-- Show version:
-  ```bash
-  ducktape --version
-  ```
-- Show help:
-  ```bash
-  ducktape --help
-  ```
-- Exit the application:
-  ```bash
-  exit
-  ```
-
-For more detailed command documentation, visit [ducktapeai.com/docs](https://ducktapeai.com/docs).
+### Natural Language via `ai` Subcommand
+- `ducktape ai schedule a meeting in 30 minutes with Joe`
+- `ducktape ai remind me to call Jane tomorrow at 2pm`
+- `ducktape ai create a note titled "Meeting Ideas" with content about product planning`
 
 ---
 
