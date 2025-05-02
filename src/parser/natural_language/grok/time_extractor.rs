@@ -20,7 +20,10 @@ fn convert_to_24_hour(hour: u32, minute: u32, meridiem: &str) -> (u32, u32) {
 }
 
 pub fn extract_time_from_title(command: &str, input: &str) -> String {
-    println!("DEBUG: extract_time_from_title received input: '{}', command: '{}'", input, command);
+    println!(
+        "DEBUG: extract_time_from_title received input: '{}', command: '{}'",
+        input, command
+    );
     // Print all regex matches for 'in.*minutes' in the input
     let re_any_minutes = Regex::new(r"in.*minutes?").unwrap();
     for m in re_any_minutes.find_iter(&input.to_lowercase()) {
