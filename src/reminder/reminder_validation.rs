@@ -32,7 +32,40 @@ pub fn validate_reminder_time(time: &str) -> Result<()> {
         ))));
     }
 
-    // More sophisticated validation could be added here
+    // Parse and validate hour and minute
+    let parts: Vec<&str> = time.split_whitespace().collect();
+    if parts.len() != 2 {
+        return Err(anyhow!(ReminderError::InvalidInput(format!(
+            "Invalid reminder time format: '{}'. Expected format: YYYY-MM-DD HH:MM",
+            time
+        ))));
+    }
+    let time_part = parts[1];
+    let hm: Vec<&str> = time_part.split(':').collect();
+    if hm.len() != 2 {
+        return Err(anyhow!(ReminderError::InvalidInput(format!(
+            "Invalid time component: '{}'. Expected HH:MM",
+            time_part
+        ))));
+    }
+    let hour: u32 = hm[0]
+        .parse()
+        .map_err(|_| anyhow!(ReminderError::InvalidInput(format!("Invalid hour: '{}'", hm[0]))))?;
+    let minute: u32 = hm[1].parse().map_err(|_| {
+        anyhow!(ReminderError::InvalidInput(format!("Invalid minute: '{}'", hm[1])))
+    })?;
+    if hour >= 24 {
+        return Err(anyhow!(ReminderError::InvalidInput(format!(
+            "Hour out of range: {} (must be 0-23)",
+            hour
+        ))));
+    }
+    if minute >= 60 {
+        return Err(anyhow!(ReminderError::InvalidInput(format!(
+            "Minute out of range: {} (must be 0-59)",
+            minute
+        ))));
+    }
 
     Ok(())
 }

@@ -4,13 +4,14 @@
 //! with the rest of the application.
 
 use anyhow::Result;
+use ducktape::parser::ParserFactory;
 use ducktape::parser::grok::GrokParser;
-use ducktape::parser::traits::{ParseResult, Parser, ParserFactory};
+use ducktape::parser::traits::{ParseResult, Parser};
 
 #[tokio::test]
 async fn test_grok_parser_factory() -> Result<()> {
     // Test that the parser factory can create a grok parser
-    let parser = ParserFactory::create_parser_by_name("grok")?;
+    let parser = ParserFactory::create_parser()?;
 
     // Use a test phrase that should be recognized as a calendar command
     let result = parser
@@ -35,7 +36,7 @@ async fn test_grok_parser_factory() -> Result<()> {
 #[tokio::test]
 async fn test_terminal_parser() -> Result<()> {
     // Test that the terminal parser works correctly with direct commands
-    let parser = ParserFactory::create_parser_by_name("terminal")?;
+    let parser = ParserFactory::create_parser()?;
 
     // Use a direct command string
     let result = parser
@@ -60,7 +61,7 @@ async fn test_terminal_parser() -> Result<()> {
 #[tokio::test]
 async fn test_command_parser() -> Result<()> {
     // Test that the command parser works correctly for structured commands
-    let parser = ParserFactory::create_parser_by_name("command")?;
+    let parser = ParserFactory::create_parser()?;
 
     // Use a direct command string
     let result = parser
@@ -116,7 +117,7 @@ async fn test_live_grok_api_integration() -> Result<()> {
     // This test requires a valid XAI_API_KEY environment variable
     // Only run this test when specifically testing the live API integration
 
-    let parser = ParserFactory::create_parser_by_name("grok")?;
+    let parser = ParserFactory::create_parser()?;
 
     // Use a test phrase that should be recognized as a calendar command
     let result = parser.parse_input("Schedule a team meeting for tomorrow at 2pm").await?;

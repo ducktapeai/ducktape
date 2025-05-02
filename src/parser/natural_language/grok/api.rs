@@ -20,15 +20,15 @@ use log::debug;
 
 /// Parse user input into a command string using Grok API
 pub async fn parse_natural_language(input: &str) -> Result<String> {
-    debug!("Processing input with Grok API: {}", input);
+    println!("DEBUG: parse_natural_language received input: '{}'", input);
+    debug!("parse_natural_language received input: '{}'", input);
 
-    // Create initial command - simplified approach
+    // Try to extract a title if possible
     let initial_title = if input.contains("called") {
         let parts: Vec<&str> = input.split("called").collect();
         if parts.len() > 1 {
             // Extract text after "called" and before time expression
             let after_called = parts[1].trim();
-
             if let Some(idx) = after_called.find(" tonight at ") {
                 after_called[..idx].trim()
             } else if let Some(idx) = after_called.find(" at ") {
@@ -41,6 +41,8 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
             "Event"
         }
     } else {
+        // Try to extract a title from 'schedule a meeting ...' or similar
+        // If not found, fallback to 'Event'
         "Event"
     };
 
@@ -51,9 +53,10 @@ pub async fn parse_natural_language(input: &str) -> Result<String> {
         format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", initial_title);
     debug!("Initial command: {}", command);
 
-    // First try the time extraction from the full input
+    // Always pass the full input to the time extractor, not just the title
     debug!("Attempting direct time extraction from input: '{}'", input);
     let command_with_time = extract_time_from_title(&command, input);
+    println!("DEBUG: after extract_time_from_title: {}", command_with_time);
     debug!("After time extraction: {}", command_with_time);
 
     // Then enhance with contacts and other attributes

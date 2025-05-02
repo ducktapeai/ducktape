@@ -1,5 +1,7 @@
 use anyhow::Result;
-use ducktape::command_processor::{CommandArgs, CommandHandler, ConfigHandler};
+use ducktape::command_processor::CommandArgs;
+use ducktape::command_processor::CommandHandler;
+use ducktape::command_processor::ConfigHandler;
 use std::collections::HashMap;
 
 #[tokio::test]

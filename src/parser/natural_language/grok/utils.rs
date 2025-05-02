@@ -41,56 +41,13 @@ pub fn sanitize_nlp_command(command: &str) -> String {
         if is_event_creation {
             debug!("Converting event creation command to calendar command: {}", command);
 
-            // For event creation, extract event title if possible
+            // Extract event title if possible (keep existing logic)
             let mut title = "Event";
-            let mut time_info = (None, None, None); // (hour, minute, am/pm)
-
-            // First, look for time patterns like "X at Ypm"
-            let time_patterns = [
-                (r"tonight at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-                (r"today at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-                (r"tomorrow at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "tomorrow"),
-                (r"this evening at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-                (r"at (\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
-            ];
-
-            let command_lower = command.to_lowercase();
-
-            // Check each pattern for a match
-            for (pattern, date_text) in &time_patterns {
-                if let Ok(re) = Regex::new(pattern) {
-                    if let Some(caps) = re.captures(&command_lower) {
-                        debug!("Found time pattern match: {}", pattern);
-                        // Extract hour
-                        if let Some(hour_match) = caps.get(1) {
-                            let hour: u32 = hour_match.as_str().parse().unwrap_or(0);
-
-                            // Extract minute
-                            let minute: u32 = if let Some(min_match) = caps.get(2) {
-                                min_match.as_str().trim_start_matches(':').parse().unwrap_or(0)
-                            } else {
-                                0
-                            };
-
-                            // Extract am/pm
-                            let meridiem = caps.get(3).map_or("", |m| m.as_str());
-
-                            time_info = (Some(hour), Some(minute), Some(meridiem.to_string()));
-                            debug!("Extracted time: {}:{} {}", hour, minute, meridiem);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Then look for "called X" or "titled X" patterns to extract the title
             if command.contains(" called ") {
                 let parts: Vec<&str> = command.split(" called ").collect();
                 if parts.len() > 1 {
-                    // Extract everything until the next marker word
                     let title_part = parts[1];
                     let end_markers = [" at ", " on ", " for ", " with ", " and "];
-
                     let mut end_pos = title_part.len();
                     for marker in &end_markers {
                         if let Some(pos) = title_part.find(marker) {
@@ -99,61 +56,21 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                             }
                         }
                     }
-
                     title = &title_part[..end_pos];
                 }
             }
-
-            // Handle the specific case for "tonight at 7pm" and other time expressions
-            let specific_time_case = command_lower.contains("tonight at 7pm");
-            if specific_time_case || (time_info.0.is_some() && time_info.2.is_some()) {
-                // Get today's date
-                let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-
-                // Format start time
-                let (start_hour, start_min) = if specific_time_case {
-                    // Special case: 7pm = 19:00
-                    (19, 0)
-                } else {
-                    // Convert to 24-hour time
-                    let hour = time_info.0.unwrap();
-                    let minute = time_info.1.unwrap_or(0);
-                    let meridiem = time_info.2.unwrap();
-
-                    let hour_24 = match (hour, meridiem.as_str()) {
-                        (12, "am") => 0,
-                        (h, "am") => h,
-                        (12, "pm") => 12,
-                        (h, "pm") => h + 12,
-                        _ => hour,
-                    };
-
-                    (hour_24, minute)
-                };
-
-                let start_time = format!("{:02}:{:02}", start_hour, start_min);
-                let end_time = format!("{:02}:{:02}", (start_hour + 1) % 24, start_min);
-
-                debug!("Using time: {} to {}", start_time, end_time);
-
-                // Format a proper calendar command with the extracted time
-                return format!(
-                    "ducktape calendar create \"{}\" {} {} {} \"Calendar\"",
-                    title, today, start_time, end_time
-                );
-            }
-
-            // Default format when no time is specified
-            return format!(
-                "ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"",
-                title
+            // Build initial command
+            let initial_command =
+                format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", title);
+            // Always delegate to extract_time_from_title for robust time parsing
+            return crate::parser::natural_language::grok::time_extractor::extract_time_from_title(
+                &initial_command,
+                command,
             );
         }
-
         // For other commands, just prefix with ducktape
         return format!("ducktape {}", command);
     }
-
     // Basic sanitization to fix common issues with NLP-generated commands
     command
         .replace("\u{a0}", " ") // Replace non-breaking spaces

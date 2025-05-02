@@ -126,8 +126,8 @@ impl Application {
         Ok(())
     }
 
-    async fn process_input(&self, input: &str, use_natural_language: bool) -> Result<()> {
-        log::debug!("Inside process_input: use_natural_language = {}", use_natural_language);
+    async fn process_input(&self, input: &str, _use_natural_language: bool) -> Result<()> {
+        log::debug!("Hybrid input mode: auto-detecting command vs natural language");
 
         // Check for direct exit command regardless of mode
         let preprocessed = crate::command_processor::preprocess_input(input);
@@ -137,7 +137,6 @@ impl Application {
             || preprocessed == "ducktape quit"
         {
             log::info!("Exit command detected, bypassing language processing");
-            // Create command args for exit command
             let command_args = crate::command_processor::CommandArgs::new(
                 "exit".to_string(),
                 vec![],
@@ -146,21 +145,43 @@ impl Application {
             return self.command_processor.execute(command_args).await;
         }
 
-        if !use_natural_language {
-            log::info!("Skipping natural language processing as Terminal Mode is enabled");
-            println!(
-                "Note: To enable natural language processing, update and enable the 'provider' field in the 'language_model' section of your config.toml file."
-            );
+        // List of known DuckTape commands (expanded from README)
+        const KNOWN_COMMANDS: &[&str] = &[
+            "calendar",
+            "reminder",
+            "todo",
+            "note",
+            "config",
+            "contact",
+            "help",
+            "exit",
+            "version",
+            "--help",
+            "--version",
+        ];
+        let trimmed = preprocessed.trim_start();
+        let is_direct_command = KNOWN_COMMANDS.iter().any(|cmd| {
+            trimmed.starts_with(cmd) || trimmed.starts_with(&format!("ducktape {}", cmd))
+        });
+
+        if is_direct_command {
+            log::info!("Detected direct DuckTape command: {}", trimmed);
             return self.process_command(input).await;
         }
 
-        log::info!("Proceeding with natural language processing");
-
-        // Proceed with natural language processing if enabled
+        log::info!("Detected natural language input, routing to NLP pipeline");
         self.process_natural_language(input).await
     }
 
-    /// Process a direct command string - now public for CLI use
+    /// Process a direct DuckTape command string.
+    ///
+    /// # Security
+    /// - Only call this with validated, preprocessed input.
+    /// - Do not expose this method to external crates except for CLI entry points.
+    /// - All input should be sanitized and validated before execution.
+    ///
+    /// # Errors
+    /// Returns an error if the command is invalid or execution fails.
     pub async fn process_command(&self, input: &str) -> Result<()> {
         log::info!("Processing command: {}", input);
 
@@ -210,7 +231,16 @@ impl Application {
         }
     }
 
-    async fn process_natural_language(&self, input: &str) -> Result<()> {
+    /// Process a natural language command string.
+    ///
+    /// # Security
+    /// - Only call this with validated, preprocessed input.
+    /// - Do not expose this method to external crates except for CLI entry points.
+    /// - All input should be sanitized and validated before execution.
+    ///
+    /// # Errors
+    /// Returns an error if the command is invalid or execution fails.
+    pub async fn process_natural_language(&self, input: &str) -> Result<()> {
         println!("Processing natural language: '{}'", input);
 
         // Create appropriate parser using factory

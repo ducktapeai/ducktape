@@ -14,7 +14,6 @@ use std::path::PathBuf;
 #[command(about = "AI-powered terminal tool for Apple Calendar, Reminders and Notes", long_about = None)]
 #[command(version)]
 pub struct Cli {
-    /// Command to execute (if not specified, enters interactive terminal mode)
     #[command(subcommand)]
     pub command: Option<Commands>,
 
@@ -67,6 +66,13 @@ pub enum Commands {
     Utility {
         #[command(subcommand)]
         action: UtilityActions,
+    },
+
+    /// Run a natural language command using AI
+    Ai {
+        /// The natural language command
+        #[arg(required = true, num_args = 1.., value_delimiter = ' ', trailing_var_arg = true)]
+        nl_command: Vec<String>,
     },
 }
 
@@ -600,6 +606,17 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
                 }
 
                 Some(CommandArgs { command: "utility".to_string(), args, flags })
+            }
+            Commands::Ai { nl_command } => {
+                let mut args = Vec::new();
+                let flags = HashMap::new();
+
+                args.push("ai".to_string());
+                for cmd in nl_command {
+                    args.push(cmd.clone());
+                }
+
+                Some(CommandArgs { command: "ai".to_string(), args, flags })
             }
         },
         None => {
