@@ -252,25 +252,24 @@ impl Application {
                 println!("Translated to command: {}", command);
 
                 // Sanitize the NLP-generated command to remove unnecessary quotes
-                let sanitized_command = crate::parser::sanitize_nlp_command(&command);
+                let mut sanitized_command = crate::parser::sanitize_nlp_command(&command);
+                // Guarantee --zoom is present if needed
+                let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
+                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw)) && !sanitized_command.contains("--zoom") {
+                    sanitized_command.push_str(" --zoom");
+                }
                 println!("Sanitized command: {}", sanitized_command);
                 log::debug!("Sanitized NLP command: {}", sanitized_command);
 
                 // Apply enhancements for contacts and other special cases
-                // This ensures the "and invite" pattern is correctly handled
                 let mut enhanced_command = sanitized_command.clone();
 
                 // Add contacts if this is a calendar command
                 if enhanced_command.contains("calendar create") {
-                    // Extract contacts using the utility function that now handles "and invite" pattern
-                    let contacts =
-                        crate::parser::natural_language::utils::extract_contact_names(input);
-
+                    let contacts = crate::parser::natural_language::utils::extract_contact_names(input);
                     if !contacts.is_empty() {
                         log::debug!("Found contacts in natural language input: {:?}", contacts);
                         let contacts_str = contacts.join(",");
-
-                        // Only add the --contacts flag if not already present
                         if !enhanced_command.contains("--contacts") {
                             enhanced_command =
                                 format!("{} --contacts \"{}\"", enhanced_command, contacts_str);
@@ -281,23 +280,18 @@ impl Application {
 
                 // Check if the generated command starts with ducktape
                 if enhanced_command.starts_with("ducktape") {
-                    // Try to use the Clap parser first
                     match self.parse_command_string(&enhanced_command) {
                         Ok(args) => {
                             log::debug!("Final parsed arguments: {:?}", args);
                             self.command_processor.execute(args).await
                         }
                         Err(_) => {
-                            // Fall back to legacy parser if Clap fails
                             let mut args = CommandArgs::parse(&enhanced_command)?;
-
-                            // Further sanitize individual arguments to remove any remaining quotes
                             args.args = args
                                 .args
                                 .into_iter()
                                 .map(|arg| arg.trim_matches('"').to_string())
                                 .collect();
-
                             log::debug!("Final parsed arguments (legacy): {:?}", args);
                             self.command_processor.execute(args).await
                         }
@@ -313,8 +307,6 @@ impl Application {
             Ok(crate::parser::ParseResult::StructuredCommand(args)) => {
                 log::debug!("Got pre-parsed structured command: {:?}", args);
                 println!("Processed command structure from natural language");
-
-                // Execute directly with the structured command
                 self.command_processor.execute(args).await
             }
             Err(e) => {
