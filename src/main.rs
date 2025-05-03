@@ -21,8 +21,10 @@ async fn main() -> Result<()> {
     // Force set the API key
     env_debug::force_set_api_key();
 
-    // Create a String from all command line args to preserve exact quoting
-    let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
+    // Collect all command line args
+    let all_args: Vec<String> = std::env::args().collect();
+    // Create input string properly from arguments
+    let input = all_args.iter().skip(1).map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
 
     debug!("Raw input from command line: '{}'", input);
 
@@ -40,8 +42,7 @@ async fn main() -> Result<()> {
         return api_server::start_api_server(config, &address).await;
     }
 
-    // Remove obsolete --ai flag and nl_command handling
-    // Only handle the ai subcommand for natural language input
+    // Handle the ai subcommand for natural language input
     if let Some(cli::Commands::Ai { nl_command }) = &cli.command {
         let nl_input = nl_command.join(" ");
         if nl_input.trim().is_empty() {
@@ -56,9 +57,10 @@ async fn main() -> Result<()> {
         return app.run().await;
     }
 
-    // If we have command line arguments, process them directly
-    if !input.trim().is_empty() {
-        return app.process_command(&input).await;
+    // If we have command line arguments, process them directly with our new method
+    // that supports natural language detection
+    if all_args.len() > 1 {
+        return app.execute_from_args(all_args).await;
     }
 
     // No command specified, run in terminal-only mode
