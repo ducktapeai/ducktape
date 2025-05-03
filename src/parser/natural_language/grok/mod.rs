@@ -56,7 +56,38 @@ impl Parser for GrokParser {
             || (input_lower.contains("schedule")
                 && (input_lower.contains("meeting") || input_lower.contains("event")));
 
-        if is_event_creation {
+        // Special pattern detection for note creation commands
+        let is_note_creation = input_lower.contains("create a note")
+            || input_lower.contains("add a note")
+            || input_lower.contains("take note")
+            || input_lower.contains("note called")
+            || input_lower.contains("create note");
+
+        if is_note_creation {
+            debug!("Detected note creation intent: {}", input);
+            // Use the parse_natural_language_to_command function to directly generate a note command
+            match crate::parser::utils::parse_natural_language_to_command(input) {
+                Ok(command) => {
+                    debug!("Generated note command: {}", command);
+                    Ok(ParseResult::CommandString(command))
+                }
+                Err(e) => {
+                    warn!("Failed to parse note creation command: {}", e);
+                    // Fallback to the API parser
+                    match self.parse_natural_language(input).await {
+                        Ok(command) => {
+                            debug!("Grok parser generated note command: {}", command);
+                            let sanitized = self.sanitize_command(&command);
+                            Ok(ParseResult::CommandString(sanitized))
+                        }
+                        Err(e) => {
+                            error!("Failed to parse note command with API: {}", e);
+                            Err(e)
+                        }
+                    }
+                }
+            }
+        } else if is_event_creation {
             debug!("Detected calendar event creation intent: {}", input);
             // For these commands, we want to ensure they're treated as calendar events
             match self.parse_natural_language(input).await {

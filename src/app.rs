@@ -243,6 +243,47 @@ impl Application {
     pub async fn process_natural_language(&self, input: &str) -> Result<()> {
         println!("Processing natural language: '{}'", input);
 
+        // Direct handling for note creation commands
+        let input_lower = input.to_lowercase();
+        let is_note_creation = input_lower.contains("create a note") || 
+                              input_lower.contains("add a note") ||
+                              input_lower.contains("note called") ||
+                              input_lower.contains("create note");
+        
+        if is_note_creation {
+            log::debug!("Detected note creation intent: {}", input);
+            // Use the parse_natural_language_to_command function directly
+            match crate::parser::utils::parse_natural_language_to_command(input) {
+                Ok(command) => {
+                    log::debug!("Generated note command: {}", command);
+                    println!("Sanitized command: {}", command);
+                    
+                    // Execute the generated command directly
+                    match self.parse_command_string(&command) {
+                        Ok(args) => {
+                            log::debug!("Final parsed arguments for note command: {:?}", args);
+                            return self.command_processor.execute(args).await;
+                        }
+                        Err(_) => {
+                            // Fallback to legacy parsing
+                            let mut args = CommandArgs::parse(&command)?;
+                            args.args = args
+                                .args
+                                .into_iter()
+                                .map(|arg| arg.trim_matches('"').to_string())
+                                .collect();
+                            log::debug!("Final parsed arguments for note command (legacy): {:?}", args);
+                            return self.command_processor.execute(args).await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to parse note creation command: {}", e);
+                    // Continue with regular processing
+                }
+            }
+        }
+
         // Create appropriate parser using factory
         let parser = ParserFactory::create_parser()?;
 
@@ -251,14 +292,12 @@ impl Application {
             Ok(crate::parser::ParseResult::CommandString(command)) => {
                 println!("Translated to command: {}", command);
 
-                // Sanitize the NLP-generated command to remove unnecessary quotes
+                // Always treat LLM output as natural language and run through sanitizer
                 let mut sanitized_command = crate::parser::sanitize_nlp_command(&command);
+                log::debug!("After sanitize_nlp_command: '{}'", sanitized_command);
                 // Guarantee --zoom is present if needed
-                let zoom_keywords =
-                    ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
-                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw))
-                    && !sanitized_command.contains("--zoom")
-                {
+                let zoom_keywords = ["zoom", "video call", "video meeting", "virtual meeting", "online meeting"];
+                if zoom_keywords.iter().any(|kw| input.to_lowercase().contains(kw)) && !sanitized_command.contains("--zoom") {
                     sanitized_command.push_str(" --zoom");
                 }
                 println!("Sanitized command: {}", sanitized_command);
@@ -344,6 +383,37 @@ impl Application {
         // Convert from Clap command to CommandArgs
         crate::cli::convert_to_command_args(&cli)
             .ok_or_else(|| anyhow!("Failed to convert parsed command to CommandArgs"))
+    }
+
+    /// Called by the CLI entry point to execute a command from args
+    pub async fn execute_from_args(&self, mut args: Vec<String>) -> Result<()> {
+        // Check for natural language intent when the first argument isn't a recognized command
+        if args.len() > 1 {
+            let first_arg = &args[1].to_lowercase(); // args[0] is the program name
+            
+            // List of known DuckTape commands
+            const KNOWN_COMMANDS: &[&str] = &[
+                "calendar", "reminder", "todo", "note", "config", 
+                "contact", "help", "exit", "version", "ai", 
+                "--help", "--version"
+            ];
+            
+            // Check if it's not a known command and not starting with a dash
+            let is_unknown_command = !KNOWN_COMMANDS.iter().any(|cmd| first_arg == *cmd) && 
+                                    !first_arg.starts_with('-');
+                                    
+            // If not a recognized command, treat the entire input as natural language
+            if is_unknown_command {
+                // Reconstruct the natural language input (skip program name)
+                let nl_input = args[1..].join(" ");
+                log::info!("Unknown command detected, treating as natural language: {}", nl_input);
+                return self.process_natural_language(&nl_input).await;
+            }
+        }
+        
+        // Normal command line argument processing
+        let input = args.join(" ");
+        self.process_command(&input).await
     }
 }
 
