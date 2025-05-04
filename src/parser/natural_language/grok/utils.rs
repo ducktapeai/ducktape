@@ -36,7 +36,9 @@ pub fn sanitize_nlp_command(command: &str) -> String {
             || command.contains("create event")
             || command.contains("schedule event")
             || command.contains("create a meeting")
-            || command.contains("schedule meeting");
+            || command.contains("schedule meeting")
+            || command.contains("create a zoom meeting") // Added this pattern for Zoom meetings
+            || command.contains("schedule a zoom meeting"); // Added this pattern for Zoom meetings
 
         if is_event_creation {
             debug!("Converting event creation command to calendar command: {}", command);
@@ -59,9 +61,23 @@ pub fn sanitize_nlp_command(command: &str) -> String {
                     title = &title_part[..end_pos];
                 }
             }
-            // Build initial command
-            let initial_command =
-                format!("ducktape calendar create \"{}\" today 00:00 01:00 \"Calendar\"", title);
+
+            // Get default calendar from config
+            let default_calendar = match crate::config::Config::load() {
+                Ok(config) => {
+                    config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
+                }
+                Err(_) => "Calendar".to_string(), // Fallback to "Calendar" if config can't be loaded
+            };
+
+            debug!("Using default calendar from config: {}", default_calendar);
+
+            // Build initial command with the default calendar from config
+            let initial_command = format!(
+                "ducktape calendar create \"{}\" today 00:00 01:00 \"{}\"",
+                title, default_calendar
+            );
+
             // Always delegate to extract_time_from_title for robust time parsing
             return crate::parser::natural_language::grok::time_extractor::extract_time_from_title(
                 &initial_command,
@@ -318,6 +334,19 @@ mod tests {
         let sanitized = sanitize_nlp_command(input);
         assert!(sanitized.starts_with("ducktape calendar create"));
         assert!(sanitized.contains("09:00")); // 9am should be converted to 09:00
+
+        // Test zoom meeting creation pattern
+        let input = "create a zoom meeting tomorrow at 8am called Important Review";
+        let sanitized = sanitize_nlp_command(input);
+        assert!(sanitized.starts_with("ducktape calendar create"));
+        assert!(sanitized.contains("Important Review"));
+        assert!(sanitized.contains("08:00")); // 8am should be converted to 08:00
+
+        // Test another zoom meeting pattern
+        let input = "schedule a zoom meeting with the team at 3pm";
+        let sanitized = sanitize_nlp_command(input);
+        assert!(sanitized.starts_with("ducktape calendar create"));
+        assert!(sanitized.contains("15:00")); // 3pm should be converted to 15:00
 
         // Test specific case that caused issues: tonight at 7pm
         let input = "create an event called test tonight at 7pm";

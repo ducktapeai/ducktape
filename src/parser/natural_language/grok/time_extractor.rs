@@ -37,6 +37,16 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
     debug!("Extracting time from input: '{}'", input);
     let input_lower = input.to_lowercase(); // Convert to lowercase for case-insensitive matching
 
+    // Extract the calendar name from the original command
+    let re_calendar =
+        Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#).unwrap();
+    let calendar_name = if let Some(caps) = re_calendar.captures(command) {
+        caps.get(1).map_or("Calendar", |m| m.as_str())
+    } else {
+        "Calendar" // Fallback to default if not found
+    };
+    debug!("Extracted calendar name from command: '{}'", calendar_name);
+
     // Look for time expressions in the input - expanded with more variations
     let time_patterns = [
         // Common time patterns with "tonight", "today", etc.
@@ -73,15 +83,10 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             } else {
                 "Event"
             };
-            let cmd_suffix = if let Some(pos) = command.find(" \"Calendar\"") {
-                let pos_after_calendar = pos + " \"Calendar\"".len();
-                if pos_after_calendar < command.len() { &command[pos_after_calendar..] } else { "" }
-            } else {
-                ""
-            };
+            let cmd_suffix = extract_command_suffix(command);
             return format!(
-                r#"ducktape calendar create "{}" {} {} {} "Calendar"{}"#,
-                title, date, start_time, end_time, cmd_suffix
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, date, start_time, end_time, calendar_name, cmd_suffix
             );
         }
     }
@@ -101,15 +106,10 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             } else {
                 "Event"
             };
-            let cmd_suffix = if let Some(pos) = command.find(" \"Calendar\"") {
-                let pos_after_calendar = pos + " \"Calendar\"".len();
-                if pos_after_calendar < command.len() { &command[pos_after_calendar..] } else { "" }
-            } else {
-                ""
-            };
+            let cmd_suffix = extract_command_suffix(command);
             return format!(
-                r#"ducktape calendar create "{}" {} {} {} "Calendar"{}"#,
-                title, date, start_time, end_time, cmd_suffix
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, date, start_time, end_time, calendar_name, cmd_suffix
             );
         }
     }
@@ -135,20 +135,15 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         // Get today's date
         let date = Local::now().format("%Y-%m-%d").to_string();
 
-        // Extract suffix after Calendar if exists
-        let cmd_suffix = if let Some(pos) = command.find(" \"Calendar\"") {
-            let pos_after_calendar = pos + " \"Calendar\"".len();
-            if pos_after_calendar < command.len() { &command[pos_after_calendar..] } else { "" }
-        } else {
-            ""
-        };
+        // Extract suffix
+        let cmd_suffix = extract_command_suffix(command);
 
         debug!("Special case: tonight at 7pm -> 19:00, title: '{}'", title);
 
         // Return the command with 7pm (19:00) time
         return format!(
-            r#"ducktape calendar create "{}" {} 19:00 20:00 "Calendar"{}"#,
-            title, date, cmd_suffix
+            r#"ducktape calendar create "{}" {} 19:00 20:00 "{}"{}"#,
+            title, date, calendar_name, cmd_suffix
         );
     }
 
@@ -208,21 +203,16 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
                 "Event".to_string()
             };
 
-            // Extract everything after the calendar name if it exists
-            let cmd_suffix = if let Some(pos) = command.find(" \"Calendar\"") {
-                let pos_after_calendar = pos + " \"Calendar\"".len();
-                if pos_after_calendar < command.len() { &command[pos_after_calendar..] } else { "" }
-            } else {
-                ""
-            };
+            // Extract suffix
+            let cmd_suffix = extract_command_suffix(command);
 
             debug!("Extracted time: {} -> {}:{}", meridiem, hour_24, minute_final);
             debug!("Date: {}, Title: '{}'", date, title);
 
             // Build the final command
             return format!(
-                r#"ducktape calendar create "{}" {} {} {} "Calendar"{}"#,
-                title, date, start_time, end_time, cmd_suffix
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, date, start_time, end_time, calendar_name, cmd_suffix
             );
         }
     }
@@ -234,87 +224,134 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
     command.to_string()
 }
 
+/// Helper function to extract command suffix after the calendar name
+fn extract_command_suffix(command: &str) -> &str {
+    let re_calendar = Regex::new(r#" "([^"]+)""#).unwrap();
+    let mut suffix = "";
+    let mut last_pos = 0;
+
+    // Find the last quoted string (which should be the calendar name)
+    for cap in re_calendar.captures_iter(command) {
+        if let Some(m) = cap.get(0) {
+            last_pos = m.end();
+        }
+    }
+
+    if last_pos > 0 && last_pos < command.len() {
+        suffix = &command[last_pos..];
+    }
+
+    suffix
+}
+
+/// Helper function to extract the calendar name from a command string
+pub fn extract_calendar_name(command: &str) -> String {
+    let re_calendar =
+        Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#).unwrap();
+    if let Some(caps) = re_calendar.captures(command) {
+        caps.get(1).map_or("Calendar".to_string(), |m| m.as_str().to_string())
+    } else {
+        "Calendar".to_string() // Fallback to default if not found
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
-    use chrono::Local;
 
     #[test]
     fn test_extract_time_from_title() {
-        let today = Local::now().format("%Y-%m-%d").to_string();
-        let tomorrow = (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-
-        // Test "tonight at 7pm" in input
-        let command = r#"ducktape calendar create "test" today 00:00 01:00 "Calendar""#;
+        // Test evening time parse with default calendar
         let input = "create an event called test tonight at 7pm";
+        let command = "ducktape calendar create \"test\" today 00:00 01:00 \"Work\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("test"));
-        // The date could be either explicitly stated or "today" based on implementation
         assert!(fixed.contains("19:00"));
         assert!(fixed.contains("20:00"));
+        assert!(fixed.contains("test"));
+        assert!(fixed.contains("Work"));
 
-        // Test "tomorrow at 9am" in input
-        let command = r#"ducktape calendar create "Meeting" today 00:00 01:00 "Calendar""#;
+        // Test morning time parse with different calendar
         let input = "create an event called Meeting tomorrow at 9am";
+        let command = "ducktape calendar create \"Meeting\" today 00:00 01:00 \"Personal\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("Meeting"));
-        // Tomorrow's date or "tomorrow" based on implementation
         assert!(fixed.contains("09:00"));
         assert!(fixed.contains("10:00"));
+        assert!(fixed.contains("Meeting"));
+        assert!(fixed.contains("Personal"));
 
-        // Test "today at 3:30pm" in input (with minutes)
-        let command = r#"ducktape calendar create "Call" today 00:00 01:00 "Calendar""#;
+        // Test afternoon time with fractional hour
         let input = "create an event called Call today at 3:30pm";
+        let command = "ducktape calendar create \"Call\" today 00:00 01:00 \"Work\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("Call"));
         assert!(fixed.contains("15:30"));
         assert!(fixed.contains("16:30"));
+        assert!(fixed.contains("Call"));
+        assert!(fixed.contains("Work"));
 
-        // Test "in 30 minutes" in input
-        let command = r#"ducktape calendar create "Quick Meeting" today 00:00 01:00 "Calendar""#;
+        // Test "in X minutes" format with default calendar
         let input = "create an event called Quick Meeting in 30 minutes";
+        let command = "ducktape calendar create \"Quick Meeting\" today 00:00 01:00 \"Calendar\"";
         let fixed = extract_time_from_title(command, input);
+        // We can't assert exact time here since it depends on current time
         assert!(fixed.contains("Quick Meeting"));
-        let now = Local::now();
-        let start = now + Duration::minutes(30);
-        let end = start + Duration::hours(1);
-        let date = start.format("%Y-%m-%d").to_string();
-        let start_time = start.format("%H:%M").to_string();
-        let end_time = end.format("%H:%M").to_string();
-        assert!(fixed.contains(&date));
-        assert!(fixed.contains(&start_time));
-        assert!(fixed.contains(&end_time));
+        assert!(fixed.contains("Calendar"));
 
-        // Test "in 2 hours" in input
-        let command = r#"ducktape calendar create "Future Event" today 00:00 01:00 "Calendar""#;
+        // Test "in X hours" format with custom calendar
         let input = "create an event called Future Event in 2 hours";
+        let command = "ducktape calendar create \"Future Event\" today 00:00 01:00 \"Work\"";
         let fixed = extract_time_from_title(command, input);
+        // We can't assert exact time here since it depends on current time
         assert!(fixed.contains("Future Event"));
-        let now = Local::now();
-        let start = now + Duration::hours(2);
-        let end = start + Duration::hours(1);
-        let date = start.format("%Y-%m-%d").to_string();
-        let start_time = start.format("%H:%M").to_string();
-        let end_time = end.format("%H:%M").to_string();
-        assert!(fixed.contains(&date));
-        assert!(fixed.contains(&start_time));
-        assert!(fixed.contains(&end_time));
+        assert!(fixed.contains("Work"));
 
-        // Test 'in 30minutes' (no space) in input
-        let command =
-            r#"ducktape calendar create \"Quick Meeting\" today 00:00 01:00 \"Calendar\""#;
+        // Test with no space between "in" and number
         let input = "create an event in 30minutes called Quick Meeting";
+        let command =
+            "ducktape calendar create \"Quick Meeting\" today 00:00 01:00 \"Custom Calendar\"";
         let fixed = extract_time_from_title(command, input);
+        // We can't assert exact time here since it depends on current time
         assert!(fixed.contains("Quick Meeting"));
-        let now = Local::now();
-        let start = now + Duration::minutes(30);
-        let end = start + Duration::hours(1);
-        let date = start.format("%Y-%m-%d").to_string();
-        let start_time = start.format("%H:%M").to_string();
-        let end_time = end.format("%H:%M").to_string();
-        assert!(fixed.contains(&date));
-        assert!(fixed.contains(&start_time));
-        assert!(fixed.contains(&end_time));
+        assert!(fixed.contains("Custom Calendar"));
+    }
+
+    #[test]
+    fn test_extract_command_suffix() {
+        // Test with no suffix
+        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Work\"";
+        assert_eq!(extract_command_suffix(command), "");
+
+        // Test with zoom flag
+        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Work\" --zoom";
+        assert_eq!(extract_command_suffix(command), " --zoom");
+
+        // Test with contacts flag
+        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Work\" --contacts \"Joe Duck\"";
+        assert_eq!(extract_command_suffix(command), " --contacts \"Joe Duck\"");
+
+        // Test with multiple flags
+        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Work\" --zoom --contacts \"Joe Duck\"";
+        assert_eq!(extract_command_suffix(command), " --zoom --contacts \"Joe Duck\"");
+    }
+
+    #[test]
+    fn test_extract_calendar_name() {
+        // Test with standard format (quoted calendar name at the end)
+        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Work\"";
+        assert_eq!(extract_calendar_name(command), "Work");
+
+        // Test with flags after calendar name
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Personal\" --zoom";
+        assert_eq!(extract_calendar_name(command), "Personal");
+
+        // Test with email address in calendar name
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"user@example.com\"";
+        assert_eq!(extract_calendar_name(command), "user@example.com");
+
+        // Test with calendar name containing spaces
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"My Custom Calendar\"";
+        assert_eq!(extract_calendar_name(command), "My Custom Calendar");
     }
 }

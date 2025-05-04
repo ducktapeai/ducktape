@@ -409,6 +409,14 @@ impl CommandHandler for CalendarHandler {
                     let mut config = crate::calendar::EventConfig::new(title, &date, start_time);
                     config.end_time = Some(end_time.clone());
 
+                    // Load app configuration to get default calendar
+                    let app_config = crate::config::Config::load()?;
+                    let default_calendar = app_config
+                        .calendar
+                        .default_calendar
+                        .clone()
+                        .unwrap_or_else(|| "Calendar".to_string());
+
                     // Validate calendar name
                     let available_calendars = crate::calendar::get_available_calendars().await?;
                     if let Some(cal) = &calendar {
@@ -418,15 +426,19 @@ impl CommandHandler for CalendarHandler {
                                 cal
                             );
                             println!(
-                                "Warning: Calendar '{}' not found. Using default calendar.",
-                                cal
+                                "Warning: Calendar '{}' not found. Using default calendar: {}",
+                                cal, default_calendar
                             );
-                            config.calendars = vec!["Work".to_string()]; // Fallback to default calendar
+                            config.calendars = vec![default_calendar.clone()]; // Use configured default calendar
                         } else {
                             config.calendars = vec![cal.clone()];
                         }
                     } else {
-                        config.calendars = vec!["Work".to_string()]; // Use default calendar if none specified
+                        debug!(
+                            "No explicit calendar specified, using default calendar: {}",
+                            default_calendar
+                        );
+                        config.calendars = vec![default_calendar]; // Use configured default calendar
                     }
 
                     config.location = location;
