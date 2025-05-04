@@ -306,7 +306,8 @@ mod tests {
 
         // Test with no space between "in" and number
         let input = "create an event in 30minutes called Quick Meeting";
-        let command = "ducktape calendar create \"Quick Meeting\" today 00:00 01:00 \"Custom Calendar\"";
+        let command =
+            "ducktape calendar create \"Quick Meeting\" today 00:00 01:00 \"Custom Calendar\"";
         let fixed = extract_time_from_title(command, input);
         // We can't assert exact time here since it depends on current time
         assert!(fixed.contains("Quick Meeting"));
@@ -339,15 +340,18 @@ mod tests {
         assert_eq!(extract_calendar_name(command), "Work");
 
         // Test with flags after calendar name
-        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Personal\" --zoom";
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"Personal\" --zoom";
         assert_eq!(extract_calendar_name(command), "Personal");
 
         // Test with email address in calendar name
-        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"user@example.com\"";
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"user@example.com\"";
         assert_eq!(extract_calendar_name(command), "user@example.com");
 
         // Test with calendar name containing spaces
-        let command = "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"My Custom Calendar\"";
+        let command =
+            "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"My Custom Calendar\"";
         assert_eq!(extract_calendar_name(command), "My Custom Calendar");
     }
 }
