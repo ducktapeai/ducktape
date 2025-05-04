@@ -8,6 +8,10 @@ use anyhow::Result;
 use clap::Parser;
 use log::debug;
 
+// Define a constant for the version to ensure it's correctly embedded in the binary
+// This serves as a fallback in case env!("CARGO_PKG_VERSION") doesn't work correctly
+const VERSION: &str = "0.16.12";
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
@@ -21,10 +25,15 @@ async fn main() -> Result<()> {
     // Force set the API key
     env_debug::force_set_api_key();
 
-    // Collect all command line args
-    let all_args: Vec<String> = std::env::args().collect();
+    // Handle version flag if first argument is --version
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "--version" || args[1] == "-V") {
+        println!("ducktape {}", VERSION);
+        return Ok(());
+    }
+
     // Create input string properly from arguments
-    let input = all_args.iter().skip(1).map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
+    let input = args.iter().skip(1).map(|s| s.as_str()).collect::<Vec<_>>().join(" ");
 
     debug!("Raw input from command line: '{}'", input);
 
@@ -59,8 +68,8 @@ async fn main() -> Result<()> {
 
     // If we have command line arguments, process them directly with our new method
     // that supports natural language detection
-    if all_args.len() > 1 {
-        return app.execute_from_args(all_args).await;
+    if args.len() > 1 {
+        return app.execute_from_args(args).await;
     }
 
     // No command specified, run in terminal-only mode

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 #[command(name = "ducktape")]
 #[command(about = "AI-powered terminal tool for Apple Calendar, Reminders and Notes", long_about = None)]
-#[command(version)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
