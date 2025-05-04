@@ -7,9 +7,10 @@ use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 
 const STATE_DIR: &str = ".ducktape";
-const TODOS_FILE: &str = "todos.json";
+// TODOS_FILE constant removed in version 0.17.0, use REMINDERS_FILE instead
 const EVENTS_FILE: &str = "events.json";
 const NOTES_FILE: &str = "notes.json";
+const REMINDERS_FILE: &str = "reminders.json";
 // Maximum allowed size for state files to prevent DoS attacks (10MB)
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 
@@ -18,9 +19,11 @@ pub trait Persistent: Sized + Serialize + for<'de> Deserialize<'de> {
     fn filename() -> &'static str;
 }
 
+// TodoItem struct removed in version 0.17.0, use ReminderItem instead
+
 // Make the structs public and cloneable
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TodoItem {
+pub struct ReminderItem {
     pub title: String,
     pub notes: Option<String>,
     pub lists: Vec<String>,
@@ -49,12 +52,6 @@ pub struct NoteItem {
     pub created_at: String,
 }
 
-impl Persistent for TodoItem {
-    fn filename() -> &'static str {
-        TODOS_FILE
-    }
-}
-
 impl Persistent for CalendarItem {
     fn filename() -> &'static str {
         EVENTS_FILE
@@ -64,6 +61,12 @@ impl Persistent for CalendarItem {
 impl Persistent for NoteItem {
     fn filename() -> &'static str {
         NOTES_FILE
+    }
+}
+
+impl Persistent for ReminderItem {
+    fn filename() -> &'static str {
+        REMINDERS_FILE
     }
 }
 
@@ -145,21 +148,21 @@ impl StateManager {
         });
         self.save(&events)?;
 
-        // Clean up old todos
-        let todos: Vec<TodoItem> = self.load()?;
+        // Clean up old reminders
+        let reminders: Vec<ReminderItem> = self.load()?;
         let one_month_ago = now - Duration::days(30);
-        let todos: Vec<_> = todos
+        let reminders: Vec<_> = reminders
             .into_iter()
-            .filter(|todo| {
-                if let Some(time) = &todo.reminder_time {
-                    if let Ok(todo_date) = DateTime::parse_from_str(time, "%Y-%m-%d %H:%M") {
-                        return todo_date > one_month_ago;
+            .filter(|reminder| {
+                if let Some(time) = &reminder.reminder_time {
+                    if let Ok(reminder_date) = DateTime::parse_from_str(time, "%Y-%m-%d %H:%M") {
+                        return reminder_date > one_month_ago;
                     }
                 }
-                true // Keep todos without dates
+                true // Keep reminders without dates
             })
             .collect();
-        self.save(&todos)?;
+        self.save(&reminders)?;
 
         Ok(())
     }
@@ -167,7 +170,7 @@ impl StateManager {
     #[allow(dead_code)]
     pub fn vacuum(&self) -> Result<()> {
         // Compact JSON files by removing whitespace
-        for filename in &[TODOS_FILE, EVENTS_FILE, NOTES_FILE] {
+        for filename in &[EVENTS_FILE, NOTES_FILE, REMINDERS_FILE] {
             let path = self.state_dir.join(filename);
             if path.exists() {
                 // Check file size before loading to prevent DoS attacks
@@ -197,17 +200,82 @@ impl StateManager {
                 serde_json::to_writer(file, &items)?;
             }
         }
+
+        // For backward compatibility, check if old todos.json exists and vacuum it as well
+        let old_todos_path = self.state_dir.join("todos.json");
+        if old_todos_path.exists() {
+            log::info!("Found old todos.json file, converting to reminders.json format");
+
+            // Read and parse the old format
+            let metadata = std::fs::metadata(&old_todos_path)?;
+            if metadata.len() <= MAX_FILE_SIZE {
+                let file = File::open(&old_todos_path)?;
+                let reader = BufReader::new(file);
+
+                // We can't use TodoItem type anymore, so parse as generic Value
+                if let Ok(json_value) = serde_json::from_reader::<_, serde_json::Value>(reader) {
+                    // Convert old items to ReminderItem format
+                    if let Some(array) = json_value.as_array() {
+                        if array.len() <= 10000 {
+                            // Create ReminderItems from the generic values
+                            let mut reminders: Vec<ReminderItem> = self.load()?;
+
+                            for item in array {
+                                if let (Some(title), Some(lists)) =
+                                    (item.get("title"), item.get("lists"))
+                                {
+                                    if let (Some(title_str), Some(lists_arr)) =
+                                        (title.as_str(), lists.as_array())
+                                    {
+                                        let lists_vec = lists_arr
+                                            .iter()
+                                            .filter_map(|l| l.as_str())
+                                            .map(String::from)
+                                            .collect();
+
+                                        let notes = item
+                                            .get("notes")
+                                            .and_then(|n| n.as_str())
+                                            .map(String::from);
+
+                                        let reminder_time = item
+                                            .get("reminder_time")
+                                            .and_then(|r| r.as_str())
+                                            .map(String::from);
+
+                                        let reminder = ReminderItem {
+                                            title: title_str.to_string(),
+                                            notes,
+                                            lists: lists_vec,
+                                            reminder_time,
+                                        };
+
+                                        // Only add if not a duplicate
+                                        if !reminders.iter().any(|r| r.title == reminder.title) {
+                                            reminders.push(reminder);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Save the combined reminders
+                            self.save(&reminders)?;
+
+                            // Rename the old file as backup
+                            let backup_path = self.state_dir.join("todos.json.bak");
+                            std::fs::rename(&old_todos_path, backup_path)?;
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
 // Convenience functions for backward compatibility
-#[allow(dead_code)]
-pub fn load_todos() -> Result<Vec<TodoItem>> {
-    let manager = StateManager::new()?;
-    manager.cleanup_old_items()?;
-    manager.load()
-}
+// load_todos function removed in version 0.17.0, use load_reminders instead
 
 #[allow(dead_code)]
 pub fn load_events() -> Result<Vec<CalendarItem>> {
@@ -219,6 +287,12 @@ pub fn load_events() -> Result<Vec<CalendarItem>> {
 #[allow(dead_code)] // Add this attribute since we might use this function later
 pub fn load_notes() -> Result<Vec<NoteItem>> {
     StateManager::new()?.load()
+}
+
+#[allow(dead_code)]
+pub fn load_reminders() -> Result<Vec<ReminderItem>> {
+    let manager = StateManager::new()?;
+    manager.load()
 }
 
 #[cfg(test)]
@@ -234,19 +308,6 @@ mod tests {
         env::set_var("HOME", temp_dir.path());
 
         let manager = StateManager::new()?;
-
-        // Test todos
-        let todo = TodoItem {
-            title: "Test Todo".to_string(),
-            notes: Some("Test Notes".to_string()),
-            lists: vec!["Test List".to_string()],
-            reminder_time: None,
-        };
-        manager.add(todo)?;
-
-        let todos: Vec<TodoItem> = manager.load()?;
-        assert_eq!(todos.len(), 1);
-        assert_eq!(todos[0].title, "Test Todo");
 
         // Test calendar events
         let event = CalendarItem {
@@ -265,6 +326,32 @@ mod tests {
         let events: Vec<CalendarItem> = manager.load()?;
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].title, "Test Event");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_reminder_state() -> Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempdir()?;
+        env::set_var("HOME", temp_dir.path());
+
+        let manager = StateManager::new()?;
+
+        // Test reminders
+        let reminder = ReminderItem {
+            title: "Test Reminder".to_string(),
+            notes: Some("Reminder Notes".to_string()),
+            lists: vec!["Reminders".to_string()],
+            reminder_time: Some("2025-05-10 15:30".to_string()),
+        };
+        manager.add(reminder)?;
+
+        let reminders: Vec<ReminderItem> = manager.load()?;
+        assert_eq!(reminders.len(), 1);
+        assert_eq!(reminders[0].title, "Test Reminder");
+        assert_eq!(reminders[0].lists[0], "Reminders");
+        assert_eq!(reminders[0].reminder_time, Some("2025-05-10 15:30".to_string()));
 
         Ok(())
     }

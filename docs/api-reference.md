@@ -129,13 +129,13 @@ Creates a new calendar event.
 }
 ```
 
-### Create Todo Item
+### Create Reminder Item
 
 ```
-POST /todo
+POST /reminder
 ```
 
-Creates a new todo/reminder item.
+Creates a new reminder item.
 
 **Request Body:**
 ```json
@@ -148,18 +148,18 @@ Creates a new todo/reminder item.
 ```
 
 **Required Fields:**
-- `title`: Todo item title
+- `title`: Reminder item title
 
 **Optional Fields:**
 - `lists`: Array of list names to add the item to
 - `reminder_time`: Reminder time in YYYY-MM-DD HH:MM format
-- `notes`: Additional notes for the todo item
+- `notes`: Additional notes for the reminder item
 
 **Example Response:**
 ```json
 {
   "success": true,
-  "message": "Todo created successfully"
+  "message": "Reminder created successfully"
 }
 ```
 

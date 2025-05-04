@@ -550,25 +550,92 @@ impl CommandHandler for CalendarHandler {
     }
 }
 
-// Todo handler
+// Reminder handler
 #[derive(Debug)]
-pub struct TodoHandler;
+pub struct ReminderHandler;
 
-impl CommandHandler for TodoHandler {
+impl CommandHandler for ReminderHandler {
     fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
         Box::pin(async move {
+            // Check for natural language "remind me" pattern and convert it to a standard create command
+            if args.command == "remind" && !args.args.is_empty() {
+                debug!("Detected natural language reminder command");
+                
+                // This handles commands like "remind me to call Jane tomorrow at 2pm"
+                // Extract reminder title and time from natural language format
+                
+                // Skip "me" at the beginning if present
+                let start_idx = if args.args[0] == "me" { 1 } else { 0 };
+                
+                // Skip "to" after "me" if present 
+                let start_idx = if start_idx < args.args.len() && args.args[start_idx] == "to" {
+                    start_idx + 1
+                } else {
+                    start_idx
+                };
+                
+                if start_idx >= args.args.len() {
+                    println!("Not enough arguments for reminder command");
+                    println!("Usage: ducktape remind me to <task> [time/date information]");
+                    return Ok(());
+                }
+                
+                // Find time indicators (tomorrow, at, on, etc.)
+                let mut title_end_idx = args.args.len();
+                let mut time_parts = Vec::new();
+                let time_indicators = ["tomorrow", "today", "at", "on", "next", "this"];
+                
+                for (i, arg) in args.args.iter().enumerate().skip(start_idx) {
+                    if time_indicators.contains(&arg.as_str()) || arg.contains(':') || 
+                       arg.contains('-') || arg.contains('/') || 
+                       arg.ends_with("am") || arg.ends_with("pm") {
+                        title_end_idx = i;
+                        time_parts = args.args[i..].to_vec();
+                        break;
+                    }
+                }
+                
+                // Extract the title - everything from start_idx to title_end_idx
+                let title = if title_end_idx > start_idx {
+                    args.args[start_idx..title_end_idx].join(" ")
+                } else {
+                    args.args[start_idx..].join(" ")
+                };
+                
+                debug!("Extracted title: '{}', time parts: {:?}", title, time_parts);
+                
+                // Create a new CommandArgs for the standard create command
+                let mut new_args = Vec::new();
+                new_args.push("create".to_string());
+                new_args.push(title);
+                
+                // Add time information if present
+                if !time_parts.is_empty() {
+                    let time_str = time_parts.join(" ");
+                    new_args.push("--remind".to_string());
+                    new_args.push(time_str);
+                }
+                
+                debug!("Transformed to standard reminder create command with args: {:?}", new_args);
+                
+                // Create a new CommandArgs and recursively call execute
+                let new_command_args = CommandArgs::new("reminder".to_string(), new_args, args.flags);
+                return self.execute(new_command_args).await;
+            }
+            
+            // Original implementation for standard commands
             match args.args.first().map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
                     if args.args.len() < 2 {
-                        println!("Not enough arguments for todo create command");
-                        println!("Usage: ducktape todo create <title> [list1] [list2] ...");
+                        println!("Not enough arguments for reminder create command");
+                        println!("Usage: ducktape reminder create <title> [list1] [list2] ...");
                         return Ok(());
                     }
 
                     let title = &args.args[1];
 
-                    // Create a new TodoConfig with the title
-                    let mut config = crate::todo::TodoConfig::new(title);
+                    // Create a new ReminderConfig with the title
+                    let mut config = crate::reminder::ReminderConfig::new(title);
 
                     // Set lists if provided in arguments (args[2] and beyond are list names)
                     if args.args.len() > 2 {
@@ -633,32 +700,34 @@ impl CommandHandler for TodoHandler {
                             Some(note_text.trim_matches('"').trim_matches('\'').to_string());
                     }
 
-                    debug!("Final todo config: {:?}", config);
+                    debug!("Final reminder config: {:?}", config);
 
-                    // Use await with the async create_todo function
-                    match crate::todo::create_todo(config).await {
+                    // Use await with the async create_reminder function
+                    match crate::reminder::create_reminder(config).await {
                         Ok(_) => {
-                            println!("Todo '{}' created successfully", title);
+                            println!("Reminder '{}' created successfully", title);
                             Ok(())
                         }
                         Err(e) => {
-                            println!("Failed to create todo: {}", e);
-                            Err(anyhow!("Failed to create todo: {}", e))
+                            println!("Failed to create reminder: {}", e);
+                            Err(anyhow!("Failed to create reminder: {}", e))
                         }
                     }
                 }
                 Some("list") => {
-                    // Implementation for listing todos would go here using async/await
-                    println!("Listing todos... (not implemented yet)");
+                    // Implementation for listing reminders would go here using async/await
+                    println!("Listing reminders... (not implemented yet)");
                     Ok(())
                 }
                 Some("delete") => {
-                    // Implementation for deleting todos would go here using async/await
-                    println!("Deleting todo... (not implemented yet)");
+                    // Implementation for deleting reminders would go here using async/await
+                    println!("Deleting reminder... (not implemented yet)");
                     Ok(())
                 }
                 _ => {
-                    println!("Unknown todo command. Available commands: create/add, list, delete");
+                    println!(
+                        "Unknown reminder command. Available commands: create/add, list, delete"
+                    );
                     Ok(())
                 }
             }
@@ -666,7 +735,7 @@ impl CommandHandler for TodoHandler {
     }
 
     fn can_handle(&self, command: &str) -> bool {
-        command == "todo" || command == "todos"
+        command == "reminder" || command == "reminders" || command == "todo" || command == "todos" || command == "remind"
     }
 }
 
@@ -902,8 +971,8 @@ impl CommandHandler for ConfigHandler {
                                 return Ok(());
                             }
                         }
-                        "todo.default_list" => {
-                            config.todo.default_list = Some(value.clone());
+                        "reminder.default_list" => {
+                            config.reminder.default_list = Some(value.clone());
                         }
                         "notes.default_folder" => {
                             config.notes.default_folder = Some(value.clone());
@@ -973,10 +1042,13 @@ impl CommandHandler for ConfigHandler {
                                     .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                         }
-                        "todo.default_list" => {
+                        "reminder.default_list" => {
                             println!(
-                                "todo.default_list = {}",
-                                config.todo.default_list.unwrap_or_else(|| "Not set".to_string())
+                                "reminder.default_list = {}",
+                                config
+                                    .reminder
+                                    .default_list
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                         }
                         "notes.default_folder" => {
@@ -1021,8 +1093,11 @@ impl CommandHandler for ConfigHandler {
                                     .map_or_else(|| "Not set".to_string(), |m| m.to_string())
                             );
                             println!(
-                                "todo.default_list = {}",
-                                config.todo.default_list.unwrap_or_else(|| "Not set".to_string())
+                                "reminder.default_list = {}",
+                                config
+                                    .reminder
+                                    .default_list
+                                    .unwrap_or_else(|| "Not set".to_string())
                             );
                             println!(
                                 "notes.default_folder = {}",
@@ -1251,128 +1326,6 @@ impl CommandHandler for ExitHandler {
     }
 }
 
-// Reminder handler (using Apple's terminology "Reminders" for the app)
-#[derive(Debug)]
-pub struct ReminderHandler;
-
-impl CommandHandler for ReminderHandler {
-    fn execute(&self, args: CommandArgs) -> Pin<Box<dyn Future<Output = Result<()>> + '_>> {
-        Box::pin(async move {
-            match args.args.first().map(|s| s.as_str()) {
-                Some("create") | Some("add") => {
-                    if args.args.len() < 2 {
-                        println!("Not enough arguments for reminder create command");
-                        println!("Usage: ducktape reminder create <title> [list1] [list2] ...");
-                        return Ok(());
-                    }
-
-                    let title = &args.args[1];
-
-                    // Create a new ReminderConfig with the title
-                    let mut config = crate::reminder::ReminderConfig::new(title);
-
-                    // Set lists if provided in arguments (args[2] and beyond are list names)
-                    if args.args.len() > 2 {
-                        // Only collect lists that don't start with "--" (those are flags)
-                        let list_names: Vec<&str> = args.args[2..]
-                            .iter()
-                            .map(|s| s.as_str())
-                            .filter(|s| !s.starts_with("--"))
-                            .collect();
-
-                        if !list_names.is_empty() {
-                            config.lists = list_names;
-                        }
-                    }
-
-                    // Process standard flags (like --remind)
-                    // Look for --remind flag in both formats: as key in flags HashMap or as commandline arg
-                    let reminder_time = if let Some(Some(time)) = args.flags.get("remind") {
-                        // Found in the flags HashMap
-                        debug!("Found reminder time in flags HashMap: {}", time);
-                        Some(time.as_str())
-                    } else if let Some(remind_idx) =
-                        args.args.iter().position(|arg| arg == "--remind")
-                    {
-                        // Found as a commandline arg
-                        if remind_idx + 1 < args.args.len() {
-                            let time = &args.args[remind_idx + 1];
-                            debug!("Found reminder time as arg: {}", time);
-                            Some(time.trim_matches('"').trim_matches('\''))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    if let Some(time_str) = reminder_time {
-                        debug!("Setting reminder time: {}", time_str);
-                        config.reminder_time = Some(time_str);
-                    }
-
-                    // Set notes if provided via --notes flag (similar approach as reminder time)
-                    let notes = if let Some(Some(note_text)) = args.flags.get("notes") {
-                        // Found in the flags HashMap
-                        Some(note_text.clone())
-                    } else if let Some(notes_idx) =
-                        args.args.iter().position(|arg| arg == "--notes")
-                    {
-                        // Found as a commandline arg
-                        if notes_idx + 1 < args.args.len() {
-                            Some(args.args[notes_idx + 1].clone())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    if let Some(note_text) = notes {
-                        debug!("Setting notes: {}", note_text);
-                        config.notes =
-                            Some(note_text.trim_matches('"').trim_matches('\'').to_string());
-                    }
-
-                    debug!("Final reminder config: {:?}", config);
-
-                    // Use await with the async create_reminder function
-                    match crate::reminder::create_reminder(config).await {
-                        Ok(_) => {
-                            println!("Reminder '{}' created successfully", title);
-                            Ok(())
-                        }
-                        Err(e) => {
-                            println!("Failed to create reminder: {}", e);
-                            Err(anyhow!("Failed to create reminder: {}", e))
-                        }
-                    }
-                }
-                Some("list") => {
-                    // Implementation for listing reminders would go here using async/await
-                    println!("Listing reminders... (not implemented yet)");
-                    Ok(())
-                }
-                Some("delete") => {
-                    // Implementation for deleting reminders would go here using async/await
-                    println!("Deleting reminder... (not implemented yet)");
-                    Ok(())
-                }
-                _ => {
-                    println!(
-                        "Unknown reminder command. Available commands: create/add, list, delete"
-                    );
-                    Ok(())
-                }
-            }
-        })
-    }
-
-    fn can_handle(&self, command: &str) -> bool {
-        command == "reminder" || command == "reminders"
-    }
-}
-
 // Print help information
 pub fn print_help() -> Result<()> {
     println!("DuckTape - A tool for interacting with Apple Calendar, Notes, and Reminders");
@@ -1382,7 +1335,7 @@ pub fn print_help() -> Result<()> {
     println!();
     println!("COMMANDS:");
     println!("  calendar  Manage calendar events");
-    println!("  todo      Manage todo items");
+    println!("  reminder  Manage reminders");
     println!("  notes     Manage notes");
     println!("  config    Manage configuration");
     println!("  contacts  Manage contact groups");
@@ -1396,7 +1349,7 @@ pub fn print_help() -> Result<()> {
     println!();
     println!("EXAMPLES:");
     println!("  ducktape calendar create \"Meeting with Team\" 2025-04-15 10:00 11:00");
-    println!("  ducktape todo add \"Buy groceries\" tomorrow 18:00");
+    println!("  ducktape reminder add \"Buy groceries\" tomorrow 18:00");
     println!("  ducktape notes create \"Meeting Notes\" \"Points discussed in the meeting\"");
     println!("  ducktape config set calendar.default \"Personal\"");
     Ok(())
@@ -1429,7 +1382,7 @@ impl CommandProcessor {
     pub fn new() -> Self {
         let handlers: Vec<Box<dyn CommandHandler>> = vec![
             Box::new(CalendarHandler),
-            Box::new(TodoHandler),
+            Box::new(ReminderHandler),
             Box::new(NotesHandler),
             Box::new(ConfigHandler),
             Box::new(UtilitiesHandler),
@@ -1437,7 +1390,6 @@ impl CommandProcessor {
             Box::new(VersionHandler),
             Box::new(HelpHandler),
             Box::new(ExitHandler),
-            Box::new(ReminderHandler),
         ];
         Self { handlers }
     }
