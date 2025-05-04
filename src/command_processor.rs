@@ -560,69 +560,74 @@ impl CommandHandler for ReminderHandler {
             // Check for natural language "remind me" pattern and convert it to a standard create command
             if args.command == "remind" && !args.args.is_empty() {
                 debug!("Detected natural language reminder command");
-                
+
                 // This handles commands like "remind me to call Jane tomorrow at 2pm"
                 // Extract reminder title and time from natural language format
-                
+
                 // Skip "me" at the beginning if present
                 let start_idx = if args.args[0] == "me" { 1 } else { 0 };
-                
-                // Skip "to" after "me" if present 
+
+                // Skip "to" after "me" if present
                 let start_idx = if start_idx < args.args.len() && args.args[start_idx] == "to" {
                     start_idx + 1
                 } else {
                     start_idx
                 };
-                
+
                 if start_idx >= args.args.len() {
                     println!("Not enough arguments for reminder command");
                     println!("Usage: ducktape remind me to <task> [time/date information]");
                     return Ok(());
                 }
-                
+
                 // Find time indicators (tomorrow, at, on, etc.)
                 let mut title_end_idx = args.args.len();
                 let mut time_parts = Vec::new();
                 let time_indicators = ["tomorrow", "today", "at", "on", "next", "this"];
-                
+
                 for (i, arg) in args.args.iter().enumerate().skip(start_idx) {
-                    if time_indicators.contains(&arg.as_str()) || arg.contains(':') || 
-                       arg.contains('-') || arg.contains('/') || 
-                       arg.ends_with("am") || arg.ends_with("pm") {
+                    if time_indicators.contains(&arg.as_str())
+                        || arg.contains(':')
+                        || arg.contains('-')
+                        || arg.contains('/')
+                        || arg.ends_with("am")
+                        || arg.ends_with("pm")
+                    {
                         title_end_idx = i;
                         time_parts = args.args[i..].to_vec();
                         break;
                     }
                 }
-                
+
                 // Extract the title - everything from start_idx to title_end_idx
                 let title = if title_end_idx > start_idx {
                     args.args[start_idx..title_end_idx].join(" ")
                 } else {
                     args.args[start_idx..].join(" ")
                 };
-                
+
                 debug!("Extracted title: '{}', time parts: {:?}", title, time_parts);
-                
+
                 // Create a new CommandArgs for the standard create command
                 let mut new_args = Vec::new();
                 new_args.push("create".to_string());
                 new_args.push(title);
-                
+
                 // Add time information if present
                 if !time_parts.is_empty() {
                     let time_str = time_parts.join(" ");
                     new_args.push("--remind".to_string());
                     new_args.push(time_str);
                 }
-                
+
                 debug!("Transformed to standard reminder create command with args: {:?}", new_args);
-                
+
                 // Create a new CommandArgs and recursively call execute
-                let new_command_args = CommandArgs::new("reminder".to_string(), new_args, args.flags);
+                let new_command_args =
+                    CommandArgs::new("reminder".to_string(), new_args, args.flags);
                 return self.execute(new_command_args).await;
             }
-            
+
             // Original implementation for standard commands
             match args.args.first().map(|s| s.as_str()) {
                 Some("create") | Some("add") => {
@@ -735,7 +740,11 @@ impl CommandHandler for ReminderHandler {
     }
 
     fn can_handle(&self, command: &str) -> bool {
-        command == "reminder" || command == "reminders" || command == "todo" || command == "todos" || command == "remind"
+        command == "reminder"
+            || command == "reminders"
+            || command == "todo"
+            || command == "todos"
+            || command == "remind"
     }
 }
 

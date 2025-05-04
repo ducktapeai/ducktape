@@ -68,28 +68,28 @@ pub fn resolve_relative_date(date_str: &str) -> Result<String> {
 pub fn parse_natural_language_time(time_expr: &str) -> Result<String> {
     let time_expr = time_expr.trim().to_lowercase();
     let now = Local::now();
-    
+
     // Extract time information using regex patterns
     let time_pattern = Regex::new(r"(\d{1,2})(:\d{2})?\s*(am|pm)?").unwrap();
     let mut hour = None;
     let mut minute = 0;
     let mut is_pm = false;
-    
+
     // Parse time component if present
     if let Some(time_captures) = time_pattern.captures(&time_expr) {
         hour = Some(time_captures[1].parse::<u32>()?);
-        
+
         // Parse minutes if provided
         if let Some(min_match) = time_captures.get(2) {
             minute = min_match.as_str()[1..].parse::<u32>()?;
         }
-        
+
         // Check for AM/PM
         if let Some(ampm) = time_captures.get(3) {
             is_pm = ampm.as_str() == "pm";
         }
     }
-    
+
     // Convert hour to 24-hour format if needed
     if let Some(h) = hour {
         if h <= 12 && is_pm {
@@ -98,25 +98,23 @@ pub fn parse_natural_language_time(time_expr: &str) -> Result<String> {
             hour = Some(0); // 12 AM = 0 in 24-hour format
         }
     }
-    
+
     // Determine the date
     let target_date = if time_expr.contains("tomorrow") {
-        now.date_naive().succ_opt().ok_or_else(|| anyhow!("Error calculating tomorrow's date"))?
+        now.date_naive()
+            .succ_opt()
+            .ok_or_else(|| anyhow!("Error calculating tomorrow's date"))?
     } else if time_expr.contains("today") {
         now.date_naive()
     } else {
         // Default to today if no specific date is mentioned
         now.date_naive()
     };
-    
+
     // Format the result in the expected format: YYYY-MM-DD HH:MM
-    let formatted_date = format!(
-        "{}-{:02}-{:02}",
-        target_date.year(),
-        target_date.month(),
-        target_date.day()
-    );
-    
+    let formatted_date =
+        format!("{}-{:02}-{:02}", target_date.year(), target_date.month(), target_date.day());
+
     // If a time was specified, include it; otherwise, use current time
     if let Some(h) = hour {
         Ok(format!("{} {:02}:{:02}", formatted_date, h, minute))

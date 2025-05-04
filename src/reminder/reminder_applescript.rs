@@ -3,7 +3,9 @@
 // This module provides functions to interact with the Reminders application via AppleScript
 
 use super::reminder_types::{ReminderConfig, ReminderError, ReminderItem};
-use super::reminder_util::{escape_applescript_string, format_reminder_time, parse_natural_language_time};
+use super::reminder_util::{
+    escape_applescript_string, format_reminder_time, parse_natural_language_time,
+};
 use anyhow::{Result, anyhow};
 use log::{debug, error, info};
 use std::process::Command;
@@ -68,18 +70,14 @@ pub(crate) async fn create_single_reminder(config: ReminderConfig<'_>) -> Result
                     return "Error: " & errMsg
                 end try
             end tell"#,
-            escaped_list_name,
-            escaped_list_name,
-            escaped_title,
-            escaped_notes,
-            formatted_time
+            escaped_list_name, escaped_list_name, escaped_title, escaped_notes, formatted_time
         );
 
         debug!("Executing AppleScript: {}", script);
 
         // Run the AppleScript command
         let result = run_applescript(&script)?;
-        
+
         if result.contains("Success") {
             info!("Reminder created in list {}: {}", list_name, title);
             success_count += 1;
@@ -102,13 +100,13 @@ pub(crate) async fn create_single_reminder(config: ReminderConfig<'_>) -> Result
 /// Run an AppleScript command and return the output
 fn run_applescript(script: &str) -> Result<String> {
     let output = Command::new("osascript").arg("-e").arg(script).output()?;
-    
+
     if !output.status.success() {
         return Err(anyhow!(ReminderError::ScriptError(
             String::from_utf8_lossy(&output.stderr).to_string()
         )));
     }
-    
+
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
