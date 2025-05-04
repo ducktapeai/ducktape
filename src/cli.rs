@@ -34,11 +34,11 @@ pub enum Commands {
         action: CalendarActions,
     },
 
-    /// Manage reminders/todos
-    #[command(alias = "todos")]
-    Todo {
+    /// Manage reminders
+    #[command(alias = "todos", alias = "reminders")]
+    Reminder {
         #[command(subcommand)]
-        action: TodoActions,
+        action: ReminderActions,
     },
 
     /// Manage notes
@@ -182,7 +182,7 @@ pub enum RecurrenceFreq {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum TodoActions {
+pub enum ReminderActions {
     /// List available reminder lists
     Lists,
 
@@ -452,21 +452,21 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
 
                 Some(CommandArgs { command: "calendar".to_string(), args, flags })
             }
-            Commands::Todo { action } => {
+            Commands::Reminder { action } => {
                 let mut args = Vec::new();
                 let mut flags = HashMap::new();
 
                 match action {
-                    TodoActions::Lists => {
+                    ReminderActions::Lists => {
                         args.push("lists".to_string());
                     }
-                    TodoActions::List { list } => {
+                    ReminderActions::List { list } => {
                         args.push("list".to_string());
                         if let Some(l) = list {
                             args.push(l.clone());
                         }
                     }
-                    TodoActions::Create { title, lists, remind, notes } => {
+                    ReminderActions::Create { title, lists, remind, notes } => {
                         args.push("create".to_string());
                         args.push(title.clone());
                         for list in lists {
@@ -479,27 +479,27 @@ pub fn convert_to_command_args(cli: &Cli) -> Option<CommandArgs> {
                             flags.insert("notes".to_string(), Some(n.clone()));
                         }
                     }
-                    TodoActions::Complete { reminder_id, list } => {
+                    ReminderActions::Complete { reminder_id, list } => {
                         args.push("complete".to_string());
                         args.push(reminder_id.clone());
                         if let Some(l) = list {
                             args.push(l.clone());
                         }
                     }
-                    TodoActions::Delete { reminder_id, list } => {
+                    ReminderActions::Delete { reminder_id, list } => {
                         args.push("delete".to_string());
                         args.push(reminder_id.clone());
                         if let Some(l) = list {
                             args.push(l.clone());
                         }
                     }
-                    TodoActions::SetList { list } => {
+                    ReminderActions::SetList { list } => {
                         args.push("set-list".to_string());
                         args.push(list.clone());
                     }
                 }
 
-                Some(CommandArgs { command: "todo".to_string(), args, flags })
+                Some(CommandArgs { command: "reminder".to_string(), args, flags })
             }
             Commands::Note { action } => {
                 let mut args = Vec::new();

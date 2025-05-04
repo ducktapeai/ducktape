@@ -3,7 +3,7 @@ default_calendar = "shaun.stuart@hashicorp.com"
 default_reminder_minutes = 30
 default_duration_minutes = 45
 
-[todo]
+[reminder]
 default_list = "Reminders"
 default_reminder = true
 

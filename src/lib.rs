@@ -21,7 +21,7 @@ pub mod reminder;
 pub mod reminders;
 pub mod state;
 pub mod storage;
-pub mod todo;
+// todo module removed in version 0.17.0, use reminder module instead
 pub mod utils;
 pub mod validation;
 pub mod zoom;
@@ -55,7 +55,9 @@ pub fn init_logger() {
 
 // Re-export commonly used types
 pub use config::Config;
-pub use state::{CalendarItem, TodoItem};
+pub use state::CalendarItem;
+pub use state::ReminderItem;
+// TodoItem type removed in version 0.17.0, use ReminderItem instead
 
 // Re-export parser types for convenience
 pub use parser::ParserFactory;

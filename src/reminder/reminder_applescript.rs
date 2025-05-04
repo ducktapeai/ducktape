@@ -3,7 +3,9 @@
 // This module provides functions to interact with the Reminders application via AppleScript
 
 use super::reminder_types::{ReminderConfig, ReminderError, ReminderItem};
-use super::reminder_util::escape_applescript_string;
+use super::reminder_util::{
+    escape_applescript_string, format_reminder_time, parse_natural_language_time,
+};
 use anyhow::{Result, anyhow};
 use log::{debug, error, info};
 use std::process::Command;
@@ -23,83 +25,65 @@ pub async fn ensure_reminders_running() -> Result<()> {
     if output.status.success() { Ok(()) } else { Err(anyhow!(ReminderError::NotRunning)) }
 }
 
-/// Create a single reminder in Reminders.app
-pub async fn create_single_reminder(config: ReminderConfig<'_>) -> Result<()> {
-    debug!("Creating reminder with config: {:?}", config);
-
+/// Create a single reminder using AppleScript
+pub(crate) async fn create_single_reminder(config: ReminderConfig<'_>) -> Result<()> {
     // Make sure Reminders app is running
     ensure_reminders_running().await?;
 
-    let target_lists = if config.lists.is_empty() { vec!["Reminders"] } else { config.lists };
+    // Extract parameters from config
+    let title = config.title;
+    let time_str = config.reminder_time.unwrap_or_default();
+    let list_names = if config.lists.is_empty() { vec!["Reminders"] } else { config.lists };
 
-    // Format reminder time to AppleScript-friendly string if provided
-    let reminder_prop = if let Some(time_str) = config.reminder_time {
-        // Parse input in format "YYYY-MM-DD HH:MM"
-        match chrono::NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M") {
-            Ok(naive_dt) => {
-                // Format as "date \"MM/dd/yyyy hh:mm:ss AM/PM\""
-                let formatted = naive_dt.format("%m/%d/%Y %I:%M:%S %p").to_string();
-                debug!("Setting reminder time to: {}", formatted);
-                // Use the correct AppleScript syntax for setting a due date on reminders
-                format!(", due date:date \"{}\"", formatted)
-            }
-            Err(e) => {
-                error!("Invalid reminder time format: {}", e);
-                String::new()
-            }
+    // First try to parse the time string as a natural language expression
+    let formatted_time = match parse_natural_language_time(time_str) {
+        Ok(parsed_time) => format_reminder_time(&parsed_time)?,
+        Err(_) => {
+            // If natural language parsing fails, try the original format
+            format_reminder_time(time_str)?
         }
-    } else {
-        String::new()
     };
 
+    // Create reminder for each list specified
     let mut success_count = 0;
-    for list in target_lists {
-        // Escape all inputs to prevent command injection
-        let escaped_list = escape_applescript_string(list);
-        let escaped_title = escape_applescript_string(config.title);
-        let escaped_notes = escape_applescript_string(config.notes.as_deref().unwrap_or(""));
+    for list_name in list_names {
+        // Escape strings for AppleScript
+        let escaped_title = escape_applescript_string(title);
+        let escaped_list_name = escape_applescript_string(list_name);
+        let escaped_notes = escape_applescript_string(&config.notes.clone().unwrap_or_default());
 
-        // Updated AppleScript with escaped inputs
+        // Build the AppleScript command
         let script = format!(
             r#"tell application "Reminders"
-    try
-        set remLists to lists whose name is "{}"
-        if (count of remLists) > 0 then
-            set targetList to item 1 of remLists
-        else
-            set targetList to make new list with properties {{name:"{}"}}
-        end if
-        
-        set newReminder to make new reminder in targetList with properties {{name:"{}", body:"{}"{} }}
-        
-        return "Success: Reminder created"
-    on error errMsg
-        return "Error: " & errMsg
-    end try
-end tell"#,
-            escaped_list, // search for list
-            escaped_list, // create list if not found
-            escaped_title,
-            escaped_notes,
-            reminder_prop
+                try
+                    set remLists to lists whose name is "{}"
+                    if (count of remLists) > 0 then
+                        set targetList to item 1 of remLists
+                    else
+                        set targetList to make new list with properties {{name:"{}"}}
+                    end if
+                    
+                    set newReminder to make new reminder in targetList with properties {{name:"{}", body:"{}", remind me date:date "{}"}}
+                    
+                    return "Success: Reminder created"
+                on error errMsg
+                    return "Error: " & errMsg
+                end try
+            end tell"#,
+            escaped_list_name, escaped_list_name, escaped_title, escaped_notes, formatted_time
         );
 
         debug!("Executing AppleScript: {}", script);
 
-        let output = Command::new("osascript").arg("-e").arg(&script).output()?;
-        let result = String::from_utf8_lossy(&output.stdout);
-        let error_output = String::from_utf8_lossy(&output.stderr);
-
-        if !error_output.is_empty() {
-            error!("AppleScript error: {}", error_output);
-        }
+        // Run the AppleScript command
+        let result = run_applescript(&script)?;
 
         if result.contains("Success") {
-            info!("Reminder created in list {}: {}", list, config.title);
+            info!("Reminder created in list {}: {}", list_name, title);
             success_count += 1;
         } else {
             let error_msg = result.replace("Error: ", "");
-            error!("Failed to create reminder in list {}: {}", list, error_msg);
+            error!("Failed to create reminder in list {}: {}", list_name, error_msg);
         }
     }
 
@@ -108,9 +92,22 @@ end tell"#,
     } else {
         Err(anyhow!(ReminderError::General(format!(
             "Failed to create reminder '{}' in any specified list",
-            config.title
+            title
         ))))
     }
+}
+
+/// Run an AppleScript command and return the output
+fn run_applescript(script: &str) -> Result<String> {
+    let output = Command::new("osascript").arg("-e").arg(script).output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!(ReminderError::ScriptError(
+            String::from_utf8_lossy(&output.stderr).to_string()
+        )));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 /// Get available reminder lists

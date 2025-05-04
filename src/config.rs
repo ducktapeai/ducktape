@@ -8,7 +8,7 @@ pub struct Config {
     #[serde(default)]
     pub calendar: CalendarConfig,
     #[serde(default)]
-    pub todo: TodoConfig,
+    pub reminder: ReminderConfig,
     #[serde(default)]
     pub notes: NotesConfig,
     #[serde(default)]
@@ -23,7 +23,7 @@ pub struct CalendarConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct TodoConfig {
+pub struct ReminderConfig {
     pub default_list: Option<String>,
     pub default_reminder: bool,
 }
@@ -54,7 +54,7 @@ impl Default for Config {
                 default_reminder_minutes: Some(15),
                 default_duration_minutes: Some(60),
             },
-            todo: TodoConfig {
+            reminder: ReminderConfig {
                 default_list: Some("Reminders".to_string()),
                 default_reminder: true,
             },
@@ -133,7 +133,7 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.calendar.default_calendar, Some("Calendar".to_string()));
         assert_eq!(config.calendar.default_reminder_minutes, Some(15));
-        assert_eq!(config.todo.default_list, Some("Reminders".to_string()));
+        assert_eq!(config.reminder.default_list, Some("Reminders".to_string()));
         assert!(matches!(config.language_model.provider, None));
     }
 
@@ -150,7 +150,7 @@ mod tests {
                 default_reminder_minutes: Some(30),
                 default_duration_minutes: Some(45),
             },
-            todo: TodoConfig {
+            reminder: ReminderConfig {
                 default_list: Some("TestList".to_string()),
                 default_reminder: false,
             },
@@ -176,8 +176,8 @@ mod tests {
             loaded_config.calendar.default_duration_minutes,
             test_config.calendar.default_duration_minutes
         );
-        assert_eq!(loaded_config.todo.default_list, test_config.todo.default_list);
-        assert_eq!(loaded_config.todo.default_reminder, test_config.todo.default_reminder);
+        assert_eq!(loaded_config.reminder.default_list, test_config.reminder.default_list);
+        assert_eq!(loaded_config.reminder.default_reminder, test_config.reminder.default_reminder);
         assert_eq!(loaded_config.notes.default_folder, test_config.notes.default_folder);
 
         // Test that different LLM providers are correctly serialized/deserialized

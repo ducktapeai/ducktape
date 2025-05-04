@@ -149,7 +149,9 @@ impl Application {
         const KNOWN_COMMANDS: &[&str] = &[
             "calendar",
             "reminder",
+            "reminders",
             "todo",
+            "todos",
             "note",
             "config",
             "contact",
@@ -401,7 +403,9 @@ impl Application {
             const KNOWN_COMMANDS: &[&str] = &[
                 "calendar",
                 "reminder",
+                "reminders",
                 "todo",
+                "todos",
                 "note",
                 "config",
                 "contact",
