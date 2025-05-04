@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ducktape::state::{CalendarItem, StateManager, TodoItem};
+use ducktape::state::{CalendarItem, ReminderItem, StateManager};
 use std::env;
 use std::fs;
 use tempfile::tempdir;
@@ -52,22 +52,22 @@ fn test_calendar_operations() -> Result<()> {
 fn test_todo_operations() -> Result<()> {
     let (_temp_dir, state_manager) = setup_test_env()?;
 
-    // Create a test todo
-    let todo = TodoItem {
+    // Create a test reminder
+    let reminder = ReminderItem {
         title: "Buy Groceries".to_string(),
         notes: Some("Milk, bread, eggs".to_string()),
         lists: vec!["Shopping".to_string()],
         reminder_time: None,
     };
 
-    // Save the todo and verify it was saved
-    state_manager.add(todo.clone())?;
-    let todos = state_manager.load::<TodoItem>()?;
-    assert!(!todos.is_empty(), "No todos found after adding one");
-    let first_todo = &todos[0];
-    assert_eq!(first_todo.title, "Buy Groceries");
-    assert!(!first_todo.lists.is_empty(), "Todo should have at least one list");
-    assert_eq!(first_todo.lists[0], "Shopping");
+    // Save the reminder and verify it was saved
+    state_manager.add(reminder.clone())?;
+    let reminders = state_manager.load::<ReminderItem>()?;
+    assert!(!reminders.is_empty(), "No reminders found after adding one");
+    let first_reminder = &reminders[0];
+    assert_eq!(first_reminder.title, "Buy Groceries");
+    assert!(!first_reminder.lists.is_empty(), "Reminder should have at least one list");
+    assert_eq!(first_reminder.lists[0], "Shopping");
 
     Ok(())
 }
