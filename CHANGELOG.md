@@ -5,6 +5,18 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.14] - 2025-05-05
+### Added
+- Enhanced time pattern detection in natural language processing
+
+### Changed
+- Updated dependency versions for security improvements
+- Improved error handling for API requests
+
+### Fixed
+- Fixed "tomorrow morning at X" time pattern in natural language processing
+- Cleaned up CHANGELOG structure for better maintainability
+
 ## [0.16.13] - 2025-05-05
 ### Changed
 - Enhanced code organization following Rust coding standards
