@@ -47,6 +47,62 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
     };
     debug!("Extracted calendar name from command: '{}'", calendar_name);
 
+    // Special case for "tomorrow morning" pattern
+    let re_tomorrow_morning =
+        Regex::new(r"(?i)tomorrow\s+morning\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)").unwrap();
+    if let Some(time_caps) = re_tomorrow_morning.captures(&input_lower) {
+        debug!("Matched 'tomorrow morning at' pattern");
+
+        // Extract hour, minute and am/pm
+        let hour: u32 = time_caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+        let minute: u32 = time_caps
+            .get(2)
+            .map_or("0", |m| m.as_str().trim_start_matches(':'))
+            .parse()
+            .unwrap_or(0);
+        let meridiem = time_caps.get(3).map_or("", |m| m.as_str());
+
+        // Convert to 24-hour time
+        let (hour_24, minute_final) = convert_to_24_hour(hour, minute, meridiem);
+
+        // Format times
+        let start_time = format!("{:02}:{:02}", hour_24, minute_final);
+        let end_time = format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final);
+
+        // Get tomorrow's date
+        let date = (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+
+        // Clean up title - extract from original command without time expression
+        let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+        let title = if let Some(caps) = re.captures(command) {
+            let full_title = caps.get(1).map_or("", |m| m.as_str());
+            let mut cleaned_title = full_title.to_string();
+
+            // Remove time expression from the title
+            if let Ok(tpre) =
+                Regex::new(r"(?i)tomorrow\s+morning\s+at\s+\d{1,2}(:\d{2})?([\s]*)(am|pm)")
+            {
+                cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+            }
+
+            cleaned_title.trim().to_string()
+        } else {
+            "Event".to_string()
+        };
+
+        // Extract suffix
+        let cmd_suffix = extract_command_suffix(command);
+
+        debug!("Extracted time: {} -> {}:{}", meridiem, hour_24, minute_final);
+        debug!("Date: {}, Title: '{}'", date, title);
+
+        // Build the final command
+        return format!(
+            r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+            title, date, start_time, end_time, calendar_name, cmd_suffix
+        );
+    }
+
     // Look for time expressions in the input - expanded with more variations
     let time_patterns = [
         // Common time patterns with "tonight", "today", etc.
@@ -278,6 +334,19 @@ mod tests {
         assert!(fixed.contains("10:00"));
         assert!(fixed.contains("Meeting"));
         assert!(fixed.contains("Personal"));
+
+        // Test "tomorrow morning" pattern
+        let input = "create a zoom meeting for tomorrow morning at 7am called mycheck";
+        let command = "ducktape calendar create \"mycheck\" today 00:00 01:00 \"Work\"";
+        let fixed = extract_time_from_title(command, input);
+        assert!(fixed.contains("07:00"));
+        assert!(fixed.contains("08:00"));
+        assert!(fixed.contains("mycheck"));
+        assert!(fixed.contains("Work"));
+
+        // Verify tomorrow's date is used (we can't check exact date since it depends on current date)
+        let tomorrow = (Local::now() + Duration::days(1)).format("%Y-%m-%d").to_string();
+        assert!(fixed.contains(&tomorrow));
 
         // Test afternoon time with fractional hour
         let input = "create an event called Call today at 3:30pm";
