@@ -1,15 +1,15 @@
-## [0.16.12] - 2025-05-04
+## [0.16.13] - 2025-05-05
 ### Changed
-- Enhanced performance for calendar search operations
-- Updated dependencies for improved security
-- Optimized memory usage in natural language processing
+- Enhanced code organization following Rust coding standards
+- Improved module structure for better maintainability
+- Updated dependencies for security and performance
 
 ### Fixed
-- Fixed edge case in reminder date parsing
-- Improved error handling for network connectivity issues
-- Enhanced type safety in the command parser implementation
+- Fixed parser module imports for consistent API
+- Improved error handling in state management
+- Enhanced validation for user inputs
 
-## [0.16.11] - 2025-04-26
+## [0.16.12] - 2025-05-04
 ### Changed
 - Version bump for new release
 - Minor stability improvements
