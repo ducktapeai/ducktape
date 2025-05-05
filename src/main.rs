@@ -8,9 +8,9 @@ use anyhow::Result;
 use clap::Parser;
 use log::debug;
 
-// Define a constant for the version to ensure it's correctly embedded in the binary
-// This serves as a fallback in case env!("CARGO_PKG_VERSION") doesn't work correctly
-const VERSION: &str = "0.16.13";
+// Use the Cargo.toml version consistently throughout the application
+// This gets the version from the package metadata at compile time
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() -> Result<()> {
