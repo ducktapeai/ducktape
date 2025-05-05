@@ -23,7 +23,7 @@ pub mod state;
 pub mod storage;
 // todo module removed in version 0.17.0, use reminder module instead
 pub mod utils;
-pub mod validation;
+// pub mod validation; // Removed in cleanup
 pub mod zoom;
 
 // Deprecated modules - will be removed after migration
