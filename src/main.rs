@@ -10,7 +10,7 @@ use log::debug;
 
 // Define a constant for the version to ensure it's correctly embedded in the binary
 // This serves as a fallback in case env!("CARGO_PKG_VERSION") doesn't work correctly
-const VERSION: &str = "0.16.12";
+const VERSION: &str = "0.16.13";
 
 #[tokio::main]
 async fn main() -> Result<()> {
