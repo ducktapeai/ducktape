@@ -5,6 +5,19 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.15] - 2025-05-06
+### Added
+- Enhanced support for recurring event patterns in calendar operations
+- Improved handling of timezone conversions
+
+### Changed
+- Refined error messaging for better user experience
+- Updated dependencies for better performance
+
+### Fixed
+- Fixed edge cases in time parsing for specific date formats
+- Improved stability in WebSocket connections
+
 ## [0.16.14] - 2025-05-05
 ### Added
 - Enhanced time pattern detection in natural language processing
