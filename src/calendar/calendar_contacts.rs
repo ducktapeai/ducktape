@@ -10,6 +10,38 @@ use log::{debug, error, info};
 /// Lookup a contact by name and return their email addresses
 pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     debug!("Looking up contact: '{}'", name);
+
+    // First, check if the Contacts app is running
+    let check_script = r#"
+    try
+        tell application "System Events"
+            set isRunning to exists (processes where name is "Contacts")
+            return isRunning
+        end tell
+    on error
+        return false
+    end try
+    "#;
+
+    let check_output = tokio::process::Command::new("osascript")
+        .arg("-e")
+        .arg(check_script)
+        .output()
+        .await;
+
+    let contacts_running = match check_output {
+        Ok(output) if output.status.success() => {
+            let result = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+            result == "true"
+        }
+        _ => false,
+    };
+
+    if !contacts_running {
+        info!("Contacts application is not running. Skipping contact lookup.");
+        return Ok(Vec::new());
+    }
+
     let script = format!(
         r#"tell application "Contacts"
             set the_emails to {{}}

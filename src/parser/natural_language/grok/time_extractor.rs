@@ -3,7 +3,7 @@
 //! This module provides functionality to extract time expressions from event titles
 //! in natural language processing.
 
-use chrono::{Duration, Local, Timelike};
+use chrono::{Datelike, Duration, Local, Timelike};
 use log::debug;
 use regex::Regex;
 
@@ -103,6 +103,292 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         );
     }
 
+    // Check for time of day expressions (morning, afternoon, evening, noon, midnight)
+    let time_of_day_patterns = [
+        // Format: day + time of day (no explicit time)
+        (r"(?i)tomorrow\s+morning", "tomorrow", "09:00", "10:00"),
+        (r"(?i)tomorrow\s+afternoon", "tomorrow", "14:00", "15:00"),
+        (r"(?i)tomorrow\s+evening", "tomorrow", "19:00", "20:00"),
+        (r"(?i)tomorrow\s+night", "tomorrow", "20:00", "21:00"),
+        (r"(?i)today\s+morning", "today", "09:00", "10:00"),
+        (r"(?i)today\s+afternoon", "today", "14:00", "15:00"),
+        (r"(?i)today\s+evening", "today", "19:00", "20:00"),
+        (r"(?i)today\s+night", "today", "20:00", "21:00"),
+        (r"(?i)this\s+morning", "today", "09:00", "10:00"),
+        (r"(?i)this\s+afternoon", "today", "14:00", "15:00"),
+        (r"(?i)this\s+evening", "today", "19:00", "20:00"),
+        (r"(?i)this\s+night", "today", "20:00", "21:00"),
+        // Specific times
+        (r"(?i)noon\s+today", "today", "12:00", "13:00"),
+        (r"(?i)noon\s+tomorrow", "tomorrow", "12:00", "13:00"),
+        (r"(?i)midnight\s+today", "today", "00:00", "01:00"),
+        (r"(?i)midnight\s+tomorrow", "tomorrow", "00:00", "01:00"),
+        // Just time of day without a day specifier (assumes today)
+        (r"(?i)this\s+noon", "today", "12:00", "13:00"),
+        (r"(?i)at\s+noon", "today", "12:00", "13:00"),
+        (r"(?i)at\s+midnight", "today", "00:00", "01:00"),
+        (r"(?i)morning", "today", "09:00", "10:00"),
+        (r"(?i)afternoon", "today", "14:00", "15:00"),
+        (r"(?i)evening", "today", "19:00", "20:00"),
+        (r"(?i)tonight", "today", "20:00", "21:00"),
+    ];
+
+    for (pattern, day, start_time, end_time) in &time_of_day_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if re.is_match(&input_lower) {
+            debug!("Matched time of day pattern: {}", pattern);
+
+            // Get the date
+            let date = if *day == "today" {
+                Local::now().format("%Y-%m-%d").to_string()
+            } else {
+                (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            };
+
+            // Clean up title - extract from original command without time expression
+            let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+            let title = if let Some(caps) = re.captures(command) {
+                let full_title = caps.get(1).map_or("", |m| m.as_str());
+                let mut cleaned_title = full_title.to_string();
+
+                // Remove the time expression from the title
+                if let Ok(tpre) = Regex::new(&format!("(?i){}", pattern)) {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                cleaned_title.trim().to_string()
+            } else {
+                "Event".to_string()
+            };
+
+            // Extract suffix
+            let cmd_suffix = extract_command_suffix(command);
+
+            debug!("Extracted time of day: {} -> {}", start_time, end_time);
+            debug!("Date: {}, Title: '{}'", date, title);
+
+            // Build the final command
+            return format!(
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, date, start_time, end_time, calendar_name, cmd_suffix
+            );
+        }
+    }
+
+    // Check for weekday patterns
+    let weekday_patterns = [
+        // "next weekday" patterns
+        (r"(?i)next\s+monday", 1, true),
+        (r"(?i)next\s+tuesday", 2, true),
+        (r"(?i)next\s+wednesday", 3, true),
+        (r"(?i)next\s+thursday", 4, true),
+        (r"(?i)next\s+friday", 5, true),
+        (r"(?i)next\s+saturday", 6, true),
+        (r"(?i)next\s+sunday", 7, true),
+        // Without "next" prefix - means coming weekday
+        (r"(?i)monday", 1, false),
+        (r"(?i)tuesday", 2, false),
+        (r"(?i)wednesday", 3, false),
+        (r"(?i)thursday", 4, false),
+        (r"(?i)friday", 5, false),
+        (r"(?i)saturday", 6, false),
+        (r"(?i)sunday", 7, false),
+    ];
+
+    for (pattern, weekday_num, is_next) in &weekday_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if re.is_match(&input_lower) {
+            // Skip if this is a "monday" pattern but the input contains "next monday"
+            if !is_next
+                && input_lower.contains(&format!("next {}", pattern.trim_start_matches("(?i)")))
+            {
+                continue;
+            }
+
+            debug!("Matched weekday pattern: {}", pattern);
+
+            // Calculate the date for the specified weekday
+            let now = Local::now();
+            let current_weekday = now.weekday().num_days_from_monday() + 1;
+            let days_to_add = if *is_next {
+                // "Next weekday" means the weekday after this coming one
+                let days_until_next = (*weekday_num as i64 + 7 - current_weekday as i64) % 7;
+                if days_until_next == 0 {
+                    7 // If today is the target weekday, "next" means in 7 days
+                } else {
+                    days_until_next + 7 // Add a week to get "next" weekday
+                }
+            } else {
+                // Without "next" means the coming weekday
+                let days_until = (*weekday_num as i64 - current_weekday as i64 + 7) % 7;
+                if days_until == 0 {
+                    7 // If today is the target weekday, we want next week
+                } else {
+                    days_until
+                }
+            };
+
+            let target_date =
+                (now + chrono::Duration::days(days_to_add)).format("%Y-%m-%d").to_string();
+
+            // Check for time within the weekday pattern
+            let raw_pattern = pattern.trim_start_matches("(?i)");
+            let time_re = Regex::new(&format!(
+                r"(?i){}(?:\s+at\s+(\d{{1,2}})(:\d{{2}})?(?:\s*)(am|pm)?)?",
+                raw_pattern
+            ))
+            .unwrap();
+            let (start_time, end_time) = if let Some(caps) = time_re.captures(&input_lower) {
+                if caps.get(1).is_some() {
+                    // Time is specified (e.g., "Monday at 3pm")
+                    let hour: u32 = caps.get(1).map_or("9", |m| m.as_str()).parse().unwrap_or(9);
+                    let minute: u32 = caps
+                        .get(2)
+                        .map_or("0", |m| m.as_str().trim_start_matches(':'))
+                        .parse()
+                        .unwrap_or(0);
+                    let meridiem = caps.get(3).map_or("am", |m| m.as_str());
+
+                    let (hour_24, minute_final) = convert_to_24_hour(hour, minute, meridiem);
+
+                    (
+                        format!("{:02}:{:02}", hour_24, minute_final),
+                        format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final),
+                    )
+                } else {
+                    // No time specified, default to 9am
+                    ("09:00".to_string(), "10:00".to_string())
+                }
+            } else {
+                // This case shouldn't happen since we already matched the pattern
+                ("09:00".to_string(), "10:00".to_string())
+            };
+
+            // Clean up title - extract from original command without time expression
+            let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+            let title = if let Some(caps) = re.captures(command) {
+                let full_title = caps.get(1).map_or("", |m| m.as_str());
+                let mut cleaned_title = full_title.to_string();
+
+                // Remove the weekday expression from the title
+                if let Ok(tpre) = Regex::new(&format!("(?i){}", raw_pattern)) {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                // Also remove possible "at X:XX am/pm" part
+                if let Ok(tpre) = Regex::new(r"(?i)at\s+\d{1,2}(:\d{2})?([\s]*)(am|pm)?") {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                cleaned_title.trim().to_string()
+            } else {
+                "Event".to_string()
+            };
+
+            // Extract suffix
+            let cmd_suffix = extract_command_suffix(command);
+
+            debug!("Extracted weekday date: {}", target_date);
+            debug!("Extracted time: {} -> {}", start_time, end_time);
+            debug!("Title: '{}'", title);
+
+            // Build the final command
+            return format!(
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, target_date, start_time, end_time, calendar_name, cmd_suffix
+            );
+        }
+    }
+
+    // Check for date formats (YYYY-MM-DD, MM/DD/YYYY, etc.)
+    let date_pattern = Regex::new(r"(?i)on\s+((\d{4}[-/]\d{1,2}[-/]\d{1,2})|(\d{1,2}[-/]\d{1,2}[-/]\d{4})|(\d{1,2}[-/]\d{1,2}))(?:\s+at\s+(\d{1,2})(:\d{2})?([\s]*)(am|pm)?)?").unwrap();
+    if let Some(caps) = date_pattern.captures(&input_lower) {
+        debug!("Matched date pattern");
+
+        let date_str = caps.get(1).map_or("", |m| m.as_str());
+        let mut date = String::new();
+
+        // Check date format and convert if needed
+        if let Some(cap2) = caps.get(2) {
+            // YYYY-MM-DD or YYYY/MM/DD
+            date = cap2.as_str().replace('/', "-");
+        } else if let Some(cap3) = caps.get(3) {
+            // MM/DD/YYYY or MM-DD-YYYY, convert to YYYY-MM-DD
+            let parts: Vec<&str> = cap3.as_str().split(|c| c == '/' || c == '-').collect();
+            if parts.len() == 3 {
+                date = format!("{}-{:0>2}-{:0>2}", parts[2], parts[0], parts[1]);
+            }
+        } else if let Some(cap4) = caps.get(4) {
+            // MM/DD or MM-DD, assumes current year
+            let current_year = Local::now().year();
+            let parts: Vec<&str> = cap4.as_str().split(|c| c == '/' || c == '-').collect();
+            if parts.len() == 2 {
+                date = format!("{}-{:0>2}-{:0>2}", current_year, parts[0], parts[1]);
+            }
+        }
+
+        if date.is_empty() {
+            // Fallback to today if parsing failed
+            date = Local::now().format("%Y-%m-%d").to_string();
+        }
+
+        // Extract time if specified
+        let (start_time, end_time) = if caps.get(5).is_some() {
+            // Time is specified (e.g., "on 2025-05-10 at 3pm")
+            let hour: u32 = caps.get(5).map_or("9", |m| m.as_str()).parse().unwrap_or(9);
+            let minute: u32 = caps
+                .get(6)
+                .map_or("0", |m| m.as_str().trim_start_matches(':'))
+                .parse()
+                .unwrap_or(0);
+            let meridiem = caps.get(8).map_or("am", |m| m.as_str());
+
+            let (hour_24, minute_final) = convert_to_24_hour(hour, minute, meridiem);
+
+            (
+                format!("{:02}:{:02}", hour_24, minute_final),
+                format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final),
+            )
+        } else {
+            // No time specified, default to 9am
+            ("09:00".to_string(), "10:00".to_string())
+        };
+
+        // Clean up title - extract from original command without date/time expression
+        let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+        let title = if let Some(caps) = re.captures(command) {
+            let full_title = caps.get(1).map_or("", |m| m.as_str());
+            let mut cleaned_title = full_title.to_string();
+
+            // Remove "on DATE" and potential "at TIME" expressions
+            if let Ok(tpre) = Regex::new(
+                r"(?i)on\s+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{4}|\d{1,2}[-/]\d{1,2})",
+            ) {
+                cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+            }
+            if let Ok(tpre) = Regex::new(r"(?i)at\s+\d{1,2}(:\d{2})?([\s]*)(am|pm)?") {
+                cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+            }
+
+            cleaned_title.trim().to_string()
+        } else {
+            "Event".to_string()
+        };
+
+        // Extract suffix
+        let cmd_suffix = extract_command_suffix(command);
+
+        debug!("Extracted date: {}", date);
+        debug!("Extracted time: {} -> {}", start_time, end_time);
+        debug!("Title: '{}'", title);
+
+        // Build the final command
+        return format!(
+            r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+            title, date, start_time, end_time, calendar_name, cmd_suffix
+        );
+    }
+
     // Look for time expressions in the input - expanded with more variations
     let time_patterns = [
         // Common time patterns with "tonight", "today", etc.
@@ -114,6 +400,12 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         (r"(?i)at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
         // Direct time mentions without specific date context
         (r"(?i)(\d{1,2})(:\d{2})?(?:\s*)(am|pm)", "today"),
+        // 24-hour format patterns without AM/PM
+        (r"(?i)tonight\s+at\s+(\d{1,2})(:\d{2})", "today"),
+        (r"(?i)today\s+at\s+(\d{1,2})(:\d{2})", "today"),
+        (r"(?i)tomorrow\s+at\s+(\d{1,2})(:\d{2})", "tomorrow"),
+        (r"(?i)this\s+evening\s+at\s+(\d{1,2})(:\d{2})", "today"),
+        (r"(?i)at\s+(\d{1,2})(:\d{2})", "today"),
     ];
 
     // Add support for relative time expressions: "in X minutes", "in X hours"
@@ -179,7 +471,7 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let title = if let Some(caps) = re.captures(command) {
             let full_title = caps.get(1).map_or("", |m| m.as_str());
             // Remove time expressions
-            if (full_title.to_lowercase().contains("tonight at 7pm")) {
+            if full_title.to_lowercase().contains("tonight at 7pm") {
                 full_title.replace("tonight at 7pm", "").trim().to_string()
             } else {
                 full_title.to_string()
