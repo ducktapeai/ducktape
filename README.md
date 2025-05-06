@@ -19,8 +19,10 @@ DuckTape is an AI-powered command-line interface that simplifies managing your A
 - **Apple Contacts Integration**: Automatically add attendees to events using Apple Contacts
 - **Reminder Management**: Create and manage reminders with due dates and notes
 - **Recurring Events**: Create daily, weekly, monthly, or yearly recurring events
-- **Improved Time Parsing**: Enhanced detection of time expressions in natural language commands
+- **Enhanced Recurring Pattern Support**: Improved support for complex recurring event patterns
+- **Advanced Time Parsing**: Better detection of time expressions and timezone handling
 - **Smart Contact Detection**: Better recognition of contact information in event creation
+- **WebSocket Stability**: Improved stability in WebSocket connections for API server
 
 ---
 
@@ -204,14 +206,14 @@ For more troubleshooting tips, visit our documentation at [ducktapeai.com/docs](
 
 ---
 
-## Recent Updates (v0.16.11)
+## Recent Updates (v0.16.15)
 
-- Fixed time parsing in natural language commands with specific time expressions
-- Improved AM/PM to 24-hour time conversion for calendar events
-- Enhanced contact extraction functionality for calendar events
-- Added support for "and invite" pattern in natural language commands
-- Improved error handling and stability for calendar operations
-- Fixed compilation issues in parser modules
+- Enhanced support for recurring event patterns in calendar operations
+- Improved handling of timezone conversions for international meetings
+- Refined error messaging for better user experience
+- Updated dependencies for better performance and security
+- Fixed edge cases in time parsing for specific date formats
+- Improved stability in WebSocket connections for API integrations
 
 ---
 
