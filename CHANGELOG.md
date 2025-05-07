@@ -5,19 +5,6 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.16.20] - 2025-05-07
-### Added
-- Improved pattern detection for "in X minutes/hours" time expressions
-- Enhanced calendar event time extraction logic
-
-### Changed
-- Refactored time extraction code for better maintainability
-- Updated error handling for calendar operations
-
-### Fixed
-- Fixed regex pattern matching for time expressions containing minutes
-- Improved time range extraction for calendar events
-
 ## [0.16.19] - 2025-05-07
 ### Added
 - Added support for explicit time range extraction in natural language commands (e.g., "from 8pm to 9pm")
