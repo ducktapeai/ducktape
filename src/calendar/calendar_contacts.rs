@@ -5,7 +5,8 @@
 use crate::calendar::calendar_types::EventConfig;
 use crate::calendar::calendar_validation::validate_email;
 use anyhow::{Result, anyhow};
-use log::{debug, error, info};
+use colored::Colorize;
+use log::{debug, error, info, warn};
 
 /// Lookup a contact by name and return their email addresses
 pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
@@ -38,8 +39,54 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
     };
 
     if !contacts_running {
-        info!("Contacts application is not running. Skipping contact lookup.");
-        return Ok(Vec::new());
+        // Print a user-friendly message
+        eprintln!("{} Contacts app is not running. Attempting to launch it...", "INFO:".blue());
+
+        // Try to launch the Contacts application
+        debug!("Contacts application is not running. Attempting to launch it silently...");
+
+        let launch_script = r#"
+        try
+            tell application "Contacts"
+                launch
+                delay 1  -- Wait a moment for the app to launch
+                -- Hide the app window to avoid disruption
+                tell application "System Events" to set visible of process "Contacts" to false
+                return true
+            end tell
+        on error errMsg
+            log "Error launching Contacts: " & errMsg
+            return false
+        end try
+        "#;
+
+        let launch_output = tokio::process::Command::new("osascript")
+            .arg("-e")
+            .arg(launch_script)
+            .output()
+            .await;
+
+        let launch_success = match launch_output {
+            Ok(output) if output.status.success() => {
+                let result = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+                result == "true"
+            }
+            _ => false,
+        };
+
+        if !launch_success {
+            // Print user-friendly error message
+            eprintln!(
+                "{} Could not launch Contacts app. Contact lookup for '{}' will be skipped.",
+                "WARNING:".yellow(),
+                name
+            );
+            warn!("Failed to launch Contacts application. Skipping contact lookup.");
+            return Ok(Vec::new());
+        }
+
+        eprintln!("{} Contacts app launched successfully.", "INFO:".blue());
+        info!("Contacts application launched silently for contact lookup.");
     }
 
     let script = format!(
@@ -82,14 +129,25 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             .filter(|s| !s.is_empty() && !s.contains("missing value"))
             .map(|s| s.trim_matches('"').trim().to_string())
             .collect();
+
+        // Add user-friendly message about contact lookup results
         if email_list.is_empty() {
+            eprintln!("{} No email addresses found for contact '{}'.", "INFO:".blue(), name);
             debug!("No emails found for contact '{}'", name);
         } else {
+            eprintln!(
+                "{} Found {} email address(es) for contact '{}'.",
+                "INFO:".blue(),
+                email_list.len(),
+                name
+            );
             debug!("Found {} email(s) for '{}': {:?}", email_list.len(), name, email_list);
         }
+
         Ok(email_list)
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
+        eprintln!("{} Error looking up contact '{}': {}", "ERROR:".red(), name, error);
         error!("Contact lookup error: {}", error);
         Ok(Vec::new())
     }
@@ -166,8 +224,19 @@ pub async fn create_event_with_contacts(
     contact_names: &[&str],
 ) -> anyhow::Result<()> {
     use crate::calendar::create_event;
+    use colored::Colorize;
 
     info!("Creating event with {} contact names: {:?}", contact_names.len(), contact_names);
+
+    if !contact_names.is_empty() {
+        eprintln!(
+            "{} Looking up {} contact(s): {:?}",
+            "INFO:".blue(),
+            contact_names.len(),
+            contact_names
+        );
+    }
+
     let mut found_emails = Vec::new();
 
     for name in contact_names {
@@ -183,6 +252,7 @@ pub async fn create_event_with_contacts(
                 }
             }
             Err(e) => {
+                eprintln!("{} Error looking up contact '{}': {}", "ERROR:".red(), name, e);
                 error!("Failed to lookup contact '{}': {}", name, e);
             }
         }
@@ -190,6 +260,14 @@ pub async fn create_event_with_contacts(
 
     // Log the found emails
     info!("Adding {} found email(s): {:?}", found_emails.len(), found_emails);
+
+    if !found_emails.is_empty() {
+        eprintln!(
+            "{} Adding {} found email address(es) to event",
+            "INFO:".blue(),
+            found_emails.len()
+        );
+    }
 
     // Create a completely fresh email list with proper capacity
     let mut all_emails = Vec::with_capacity(config.emails.len() + found_emails.len());
@@ -205,6 +283,15 @@ pub async fn create_event_with_contacts(
     all_emails.dedup();
 
     info!("Final email list after deduplication: {} emails", all_emails.len());
+
+    // Only show this message if we have any emails
+    if !all_emails.is_empty() {
+        eprintln!(
+            "{} Event will be shared with {} email address(es)",
+            "INFO:".blue(),
+            all_emails.len()
+        );
+    }
 
     // Set the emails in the config
     config.emails = all_emails;
