@@ -47,6 +47,117 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
     };
     debug!("Extracted calendar name from command: '{}'", calendar_name);
 
+    // Check for time range patterns first (from X to Y)
+    let time_range_patterns = [
+        // Patterns for "from X to Y" time ranges with various day specifications
+        (
+            r"(?i)from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+tonight",
+            "today",
+        ),
+        (
+            r"(?i)from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+today",
+            "today",
+        ),
+        (
+            r"(?i)from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+tomorrow",
+            "tomorrow",
+        ),
+        (
+            r"(?i)tonight\s+from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+            "today",
+        ),
+        (
+            r"(?i)today\s+from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+            "today",
+        ),
+        (
+            r"(?i)tomorrow\s+from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+            "tomorrow",
+        ),
+        // Generic pattern without day specification (defaults to today)
+        (
+            r"(?i)from\s+(\d{1,2})(:\d{2})?\s*(am|pm)?\s+to\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+            "today",
+        ),
+    ];
+
+    for (pattern, day) in &time_range_patterns {
+        let time_range_re = Regex::new(pattern).unwrap();
+        if let Some(caps) = time_range_re.captures(&input_lower) {
+            debug!("Time range pattern match found: {}", pattern);
+
+            // Extract start time components
+            let start_hour: u32 = caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+            let start_minute: u32 = caps
+                .get(2)
+                .map_or("0", |m| m.as_str().trim_start_matches(':'))
+                .parse()
+                .unwrap_or(0);
+            let start_meridiem = caps.get(3).map_or("am", |m| m.as_str());
+
+            // Extract end time components
+            let end_hour: u32 = caps.get(4).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+            let end_minute: u32 = caps
+                .get(5)
+                .map_or("0", |m| m.as_str().trim_start_matches(':'))
+                .parse()
+                .unwrap_or(0);
+            let end_meridiem = caps.get(6).map_or(start_meridiem, |m| m.as_str());
+
+            // Convert to 24-hour format
+            let (start_hour_24, start_minute_final) =
+                convert_to_24_hour(start_hour, start_minute, start_meridiem);
+            let (end_hour_24, end_minute_final) =
+                convert_to_24_hour(end_hour, end_minute, end_meridiem);
+
+            // Format the times
+            let start_time = format!("{:02}:{:02}", start_hour_24, start_minute_final);
+            let end_time = format!("{:02}:{:02}", end_hour_24, end_minute_final);
+
+            // Get the date
+            let date = if *day == "today" {
+                Local::now().format("%Y-%m-%d").to_string()
+            } else {
+                (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            };
+
+            // Clean up title - extract from original command without time expression
+            let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+            let title = if let Some(caps) = re.captures(command) {
+                let full_title = caps.get(1).map_or("", |m| m.as_str());
+                let mut cleaned_title = full_title.to_string();
+
+                // Remove various time range expressions from the title
+                if let Ok(tpre) = Regex::new(&format!("(?i){}", pattern)) {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                // Also try to remove just the "from X to Y" part if the pattern includes day specifiers
+                if let Ok(tpre) = Regex::new(
+                    r"(?i)from\s+\d{1,2}(:\d{2})?\s*(am|pm)?\s+to\s+\d{1,2}(:\d{2})?\s*(am|pm)?",
+                ) {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                cleaned_title.trim().to_string()
+            } else {
+                "Event".to_string()
+            };
+
+            // Extract suffix
+            let cmd_suffix = extract_command_suffix(command);
+
+            debug!("Extracted time range: {} to {}", start_time, end_time);
+            debug!("Date: {}, Title: '{}'", date, title);
+
+            // Build the final command
+            return format!(
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, date, start_time, end_time, calendar_name, cmd_suffix
+            );
+        }
+    }
+
     // Special case check directly at the beginning for more reliable handling
     if input_lower.contains("tonight at 7pm") || input_lower.contains("tonight at 7 pm") {
         debug!("Found exact match for 'tonight at 7pm'");
@@ -156,6 +267,84 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             r#"ducktape calendar create "{}" {} 15:30 16:30 "{}"{}"#,
             title, date, calendar_name, cmd_suffix
         );
+    }
+
+    // Check for time of day expressions with specific times first
+    // These patterns for tomorrow/today at X time should have higher priority
+    let tomorrow_at_patterns = [
+        r"(?i)tomorrow\s+at\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+        r"(?i)tomorrow\s+morning\s+at\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+        r"(?i)tomorrow\s+afternoon\s+at\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+        r"(?i)tomorrow\s+evening\s+at\s+(\d{1,2})(:\d{2})?\s*(am|pm)?",
+    ];
+
+    // Give these patterns highest priority
+    for pattern in &tomorrow_at_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if let Some(caps) = re.captures(&input_lower) {
+            debug!("Matched high-priority tomorrow at pattern: {}", pattern);
+
+            // Extract hour, minute and am/pm
+            let hour: u32 = caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+            let minute: u32 = caps
+                .get(2)
+                .map_or("0", |m| m.as_str().trim_start_matches(':'))
+                .parse()
+                .unwrap_or(0);
+            let meridiem = caps.get(3).map_or("am", |m| m.as_str());
+
+            // Convert to 24-hour time
+            let (hour_24, minute_final) = convert_to_24_hour(hour, minute, meridiem);
+
+            // Format times
+            let start_time = format!("{:02}:{:02}", hour_24, minute_final);
+            let end_time = format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final);
+
+            // Get tomorrow's date
+            let tomorrow =
+                (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+
+            // Extract title - remove time expressions from the title
+            let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+            let title = if let Some(caps) = re.captures(command) {
+                let full_title = caps.get(1).map_or("", |m| m.as_str());
+                let mut cleaned_title = full_title.to_string();
+
+                // Remove time expressions from title
+                if let Ok(tpre) = Regex::new(&format!("(?i){}", pattern)) {
+                    cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                }
+
+                // Also remove location expressions from title if present
+                let location_patterns = [
+                    r"(?i)at\s+the\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall))",
+                    r"(?i)at\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall))",
+                ];
+
+                for loc_pattern in &location_patterns {
+                    if let Ok(tpre) = Regex::new(loc_pattern) {
+                        cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                    }
+                }
+
+                cleaned_title.trim().to_string()
+            } else {
+                "Event".to_string()
+            };
+
+            // Extract calendar name and suffix
+            let calendar_name = extract_calendar_name(command);
+            let cmd_suffix = extract_command_suffix(command);
+
+            debug!("Extracted tomorrow at time: {} -> {}", start_time, end_time);
+            debug!("Date: {}, Title: '{}'", tomorrow, title);
+
+            // Build the command, location will be added by the location enhancer later
+            return format!(
+                r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+                title, tomorrow, start_time, end_time, calendar_name, cmd_suffix
+            );
+        }
     }
 
     // Check for specific time patterns within time-of-day expressions first
@@ -647,6 +836,157 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         }
     }
 
+    // Regex pattern for duration-based time expressions
+    let duration_re = Regex::new(r"(?i)for\s+(\d+)\s+(hour|minute|min)s?").unwrap();
+    if let Some(caps) = duration_re.captures(&input_lower) {
+        debug!("Matched 'for X hours/minutes' pattern");
+
+        // Extract the duration value and unit
+        let amount: i64 = caps.get(1).map_or("1", |m| m.as_str()).parse().unwrap_or(1);
+        let unit = caps.get(2).map_or("hour", |m| m.as_str());
+
+        // Convert minutes to hours if needed (with minimum of 15 minutes)
+        let hours = if unit.starts_with("hour") {
+            amount
+        } else {
+            // Convert minutes to hours, but handle special cases
+            if amount < 15 {
+                // For very short durations, default to 15 minutes (0.25 hours)
+                debug!("Duration less than 15 minutes, using 15 minutes instead");
+                0
+            } else if amount < 60 {
+                // For durations less than an hour, use fractional hour
+                0
+            } else {
+                // Convert to hours, rounding up
+                (amount + 59) / 60
+            }
+        };
+
+        // Calculate minutes for durations less than an hour
+        let minutes = if unit.starts_with("min") && amount < 60 { amount } else { 0 };
+
+        // Get a base time (either from other time patterns or use current hour)
+        let now = Local::now();
+
+        // Look for a specific time mention in the input
+        let time_mention_re = Regex::new(r"(?i)at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?").unwrap();
+        let (base_hour, base_minute) =
+            if let Some(time_caps) = time_mention_re.captures(&input_lower) {
+                let hour: u32 = time_caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+                let minute: u32 = time_caps.get(2).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+                let meridiem = time_caps.get(3).map_or("am", |m| m.as_str());
+                convert_to_24_hour(hour, minute, meridiem)
+            } else {
+                // If no specific time is mentioned, use the current hour
+                (now.hour(), 0)
+            };
+
+        // Calculate start and end times
+        let mut end_hour = base_hour;
+        let mut end_minute = base_minute;
+
+        if hours > 0 {
+            end_hour = (base_hour + hours as u32) % 24;
+        }
+
+        if minutes > 0 {
+            end_minute = base_minute + minutes as u32;
+            if end_minute >= 60 {
+                end_hour = (end_hour + 1) % 24;
+                end_minute %= 60;
+            }
+        } else if hours > 0 {
+            // If duration is in hours, keep the same minutes
+            end_minute = base_minute;
+        }
+
+        // Format the times
+        let start_time = format!("{:02}:{:02}", base_hour, base_minute);
+        let end_time = format!("{:02}:{:02}", end_hour, end_minute);
+
+        // Get date (check for tomorrow, today, etc.)
+        let date = if input_lower.contains("tomorrow") {
+            (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+        } else {
+            Local::now().format("%Y-%m-%d").to_string()
+        };
+
+        // Extract title
+        let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+        let title = if let Some(caps) = re.captures(command) {
+            caps.get(1).map_or("Event", |m| m.as_str())
+        } else {
+            "Event"
+        };
+
+        // Extract calendar name and command suffix
+        let calendar_name = extract_calendar_name(command);
+        let cmd_suffix = extract_command_suffix(command);
+
+        debug!("Extracted duration-based event: {} for {} {}(s)", title, amount, unit);
+        debug!("Time range: {} to {}", start_time, end_time);
+
+        // Build the final command
+        return format!(
+            r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+            title, date, start_time, end_time, calendar_name, cmd_suffix
+        );
+    }
+
+    // Check for "all day" event patterns
+    let all_day_patterns = [
+        r"(?i)all\s+day",
+        r"(?i)all-day",
+        r"(?i)full\s+day",
+        r"(?i)entire\s+day",
+        r"(?i)whole\s+day",
+    ];
+
+    for pattern in &all_day_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if re.is_match(&input_lower) {
+            debug!("Matched all-day event pattern: {}", pattern);
+
+            // Determine the date
+            let date = if input_lower.contains("tomorrow") {
+                (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            } else {
+                Local::now().format("%Y-%m-%d").to_string()
+            };
+
+            // Extract title from command
+            let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+            let title = if let Some(caps) = re.captures(command) {
+                let full_title = caps.get(1).map_or("", |m| m.as_str());
+                let mut cleaned_title = full_title.to_string();
+
+                // Remove all-day pattern from title
+                for p in &all_day_patterns {
+                    if let Ok(tpre) = Regex::new(&format!("(?i){}", p.replace("(?i)", ""))) {
+                        cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
+                    }
+                }
+
+                cleaned_title.trim().to_string()
+            } else {
+                "All-day Event".to_string()
+            };
+
+            // Extract calendar name and command suffix
+            let calendar_name = extract_calendar_name(command);
+            let cmd_suffix = extract_command_suffix(command);
+
+            debug!("Extracted all-day event: {} on {}", title, date);
+
+            // Use 00:00 to 23:59 as the time range for all-day events
+            return format!(
+                r#"ducktape calendar create "{}" {} 00:00 23:59 "{}"{} --all-day"#,
+                title, date, calendar_name, cmd_suffix
+            );
+        }
+    }
+
     debug!("No time patterns matched in input: '{}'", input);
     println!(
         "[DuckTape] Could not extract a time from your input. Try using e.g. 'in 30 minutes', 'at 3pm', or 'tomorrow at 9am'."
@@ -710,6 +1050,116 @@ pub fn extract_calendar_name(command: &str) -> String {
     } else {
         "Calendar".to_string() // Fallback to default if not found
     }
+}
+
+/// Extract duration information from natural language input
+///
+/// Handles inputs like "for 30 minutes" or "for 2 hours" and calculates
+/// appropriate end time based on the duration specified.
+fn extract_duration_from_input(input: &str, command: &str) -> Option<String> {
+    let input_lower = input.to_lowercase();
+    let calendar_name = extract_calendar_name(command);
+    let cmd_suffix = extract_command_suffix(command);
+
+    // Match duration patterns like "for X hours/minutes"
+    let duration_re = Regex::new(r"(?i)for\s+(\d+)\s+(hour|minute|min)s?").unwrap();
+    if let Some(caps) = duration_re.captures(&input_lower) {
+        debug!("Matched 'for X hours/minutes' pattern");
+
+        // Extract the duration value and unit
+        let amount: i64 = caps.get(1).map_or("1", |m| m.as_str()).parse().unwrap_or(1);
+        let unit = caps.get(2).map_or("hour", |m| m.as_str());
+
+        // Convert minutes to hours if needed (with minimum of 15 minutes)
+        let hours = if unit.starts_with("hour") {
+            amount
+        } else {
+            // For very short durations, use 0 hours (will add minutes later)
+            if amount < 60 {
+                0
+            } else {
+                // Convert to hours, rounding up
+                (amount + 59) / 60
+            }
+        };
+
+        // Calculate minutes for durations less than an hour
+        let minutes = if unit.starts_with("min") && amount < 60 { amount } else { 0 };
+
+        // Get a base time (either from other time patterns or use current hour)
+        let now = Local::now();
+
+        // Look for a specific time mention in the input
+        let time_mention_re = Regex::new(r"(?i)at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?").unwrap();
+        let (base_hour, base_minute) =
+            if let Some(time_caps) = time_mention_re.captures(&input_lower) {
+                let hour: u32 = time_caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+                let minute: u32 = time_caps.get(2).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
+                let meridiem = time_caps.get(3).map_or("am", |m| m.as_str());
+                convert_to_24_hour(hour, minute, meridiem)
+            } else {
+                // If no specific time is mentioned, use the current hour
+                (now.hour(), 0)
+            };
+
+        // Calculate start and end times
+        let mut end_hour = base_hour;
+        let mut end_minute = base_minute;
+
+        if hours > 0 {
+            end_hour = (base_hour + hours as u32) % 24;
+        }
+
+        if minutes > 0 {
+            end_minute = base_minute + minutes as u32;
+            if end_minute >= 60 {
+                end_hour = (end_hour + 1) % 24;
+                end_minute %= 60;
+            }
+        } else if hours > 0 {
+            // If duration is in hours, keep the same minutes
+            end_minute = base_minute;
+        }
+
+        // Format the times
+        let start_time = format!("{:02}:{:02}", base_hour, base_minute);
+        let end_time = format!("{:02}:{:02}", end_hour, end_minute);
+
+        // Get date (check for tomorrow, today, etc.)
+        let date = if input_lower.contains("tomorrow") {
+            (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+        } else {
+            Local::now().format("%Y-%m-%d").to_string()
+        };
+
+        // Extract title
+        let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
+        let title = if let Some(caps) = re.captures(command) {
+            let full_title = caps.get(1).map_or("", |m| m.as_str());
+            // Remove duration pattern from title if it's there
+            let cleaned_title = if let Ok(tpre) = Regex::new(r"(?i)for\s+\d+\s+(hour|minute|min)s?")
+            {
+                tpre.replace_all(full_title, "").to_string().trim().to_string()
+            } else {
+                full_title.to_string()
+            };
+
+            if cleaned_title.is_empty() { "Event".to_string() } else { cleaned_title }
+        } else {
+            "Event".to_string()
+        };
+
+        debug!("Extracted duration-based event: {} for {} {}(s)", title, amount, unit);
+        debug!("Time range: {} to {}", start_time, end_time);
+
+        // Build the final command
+        return Some(format!(
+            r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
+            title, date, start_time, end_time, calendar_name, cmd_suffix
+        ));
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -854,5 +1304,45 @@ mod tests {
         let command =
             "ducktape calendar create \"Meeting\" 2024-04-22 10:00 11:00 \"My Custom Calendar\"";
         assert_eq!(extract_calendar_name(command), "My Custom Calendar");
+    }
+
+    #[test]
+    fn test_time_range_extraction() {
+        // Test from X to Y pattern with "tonight"
+        let input = "create a meeting from 8pm to 9pm tonight called TeamSync";
+        let command = "ducktape calendar create \"TeamSync\" today 00:00 01:00 \"Work\"";
+        let fixed = extract_time_from_title(command, input);
+        assert!(fixed.contains("20:00")); // Start time should be 8pm (20:00)
+        assert!(fixed.contains("21:00")); // End time should be 9pm (21:00)
+        assert!(fixed.contains("TeamSync"));
+        assert!(fixed.contains("Work"));
+
+        // Test simple "from X to Y" without date specifier
+        let input = "create a meeting from 9am to 10am called Morning Standup";
+        let command = "ducktape calendar create \"Morning Standup\" today 00:00 01:00 \"Work\"";
+        let fixed = extract_time_from_title(command, input);
+        assert!(fixed.contains("09:00")); // Start time should be 9am
+        assert!(fixed.contains("10:00")); // End time should be 10am
+        assert!(fixed.contains("Morning Standup"));
+
+        // Test with tomorrow specifier
+        let input = "create a meeting from 2pm to 3:30pm tomorrow called Planning";
+        let command = "ducktape calendar create \"Planning\" today 00:00 01:00 \"Work\"";
+        let fixed = extract_time_from_title(command, input);
+        assert!(fixed.contains("14:00")); // Start time should be 2pm
+        assert!(fixed.contains("15:30")); // End time should be 3:30pm
+
+        // Verify tomorrow's date is used
+        let tomorrow = (Local::now() + Duration::days(1)).format("%Y-%m-%d").to_string();
+        assert!(fixed.contains(&tomorrow));
+
+        // Test with day prefix format
+        let input = "schedule today from 4pm to 5pm a Budget Review";
+        let command = "ducktape calendar create \"Budget Review\" today 00:00 01:00 \"Personal\"";
+        let fixed = extract_time_from_title(command, input);
+        assert!(fixed.contains("16:00")); // Start time should be 4pm
+        assert!(fixed.contains("17:00")); // End time should be 5pm
+        assert!(fixed.contains("Budget Review"));
+        assert!(fixed.contains("Personal"));
     }
 }

@@ -94,7 +94,18 @@ impl Parser for GrokParser {
                 Ok(command) => {
                     debug!("Grok parser generated calendar command: {}", command);
                     let sanitized = self.sanitize_command(&command);
-                    Ok(ParseResult::CommandString(sanitized))
+
+                    // Apply a series of enhancements to the command
+                    let with_recurrence = utils::enhance_recurrence_command(&sanitized);
+                    let with_zoom = utils::enhance_command_with_zoom(&with_recurrence, input);
+                    let with_contacts = utils::enhance_command_with_contacts(&with_zoom, input);
+                    let with_location = utils::enhance_command_with_location(&with_contacts, input);
+
+                    // Fix calendar end time format if needed
+                    let fixed_time = utils::fix_calendar_end_time_format(&with_location);
+
+                    debug!("Enhanced event command: {}", fixed_time);
+                    Ok(ParseResult::CommandString(fixed_time))
                 }
                 Err(e) => {
                     warn!("Failed to parse event creation command with API, using fallback method");
