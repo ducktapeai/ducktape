@@ -48,16 +48,39 @@ pub fn sanitize_nlp_command(command: &str) -> String {
         match provider {
             LLMProvider::Grok => {
                 debug!("Using Grok command sanitizer");
-                crate::parser::natural_language::grok::utils::sanitize_nlp_command(command)
+                // First apply command mapping to normalize "create" to "calendar create", etc.
+                let normalized = natural_language::command_mapping::normalize_command(command);
+                if normalized != command {
+                    debug!("Normalized command: '{}'", normalized);
+                    // If normalization happened, use the normalized command
+                    crate::parser::natural_language::grok::utils::sanitize_nlp_command(&normalized)
+                } else {
+                    // Otherwise use the original command
+                    crate::parser::natural_language::grok::utils::sanitize_nlp_command(command)
+                }
             }
             LLMProvider::DeepSeek => {
                 debug!("Using DeepSeek command sanitizer");
-                // Use the DeepSeek-specific sanitizer when available
-                natural_language::utils::sanitize_user_input(command)
+                // Apply command mapping for DeepSeek also for consistency
+                let normalized = natural_language::command_mapping::normalize_command(command);
+                if normalized != command {
+                    debug!("Normalized command: '{}'", normalized);
+                    format!("ducktape {}", normalized)
+                } else {
+                    // Use the DeepSeek-specific sanitizer when available
+                    format!("ducktape {}", natural_language::utils::sanitize_user_input(command))
+                }
             }
         }
     } else {
         // Default sanitizer for when no specific provider is set
-        command.to_string()
+        // Still apply command mapping for consistency
+        let normalized = natural_language::command_mapping::normalize_command(command);
+        if normalized != command {
+            debug!("Normalized command (default): '{}'", normalized);
+            format!("ducktape {}", normalized)
+        } else {
+            format!("ducktape {}", command)
+        }
     }
 }

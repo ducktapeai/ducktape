@@ -149,6 +149,7 @@ pub mod utils {
 }
 
 // Re-export submodules
+pub mod command_mapping;
 pub mod grok;
 
 #[cfg(test)]
