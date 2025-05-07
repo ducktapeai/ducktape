@@ -56,8 +56,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let title = if let Some(caps) = re.captures(command) {
             let full_title = caps.get(1).map_or("", |m| m.as_str());
             // Remove time expressions from the title if present
-            let cleaned_title = if full_title.to_lowercase().contains("tonight at 7pm") || 
-                                  full_title.to_lowercase().contains("tonight at 7 pm") {
+            let cleaned_title = if full_title.to_lowercase().contains("tonight at 7pm")
+                || full_title.to_lowercase().contains("tonight at 7 pm")
+            {
                 let title1 = full_title.replace("tonight at 7pm", "");
                 title1.replace("tonight at 7 pm", "").trim().to_string()
             } else {
@@ -92,8 +93,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let title = if let Some(caps) = re.captures(command) {
             let full_title = caps.get(1).map_or("", |m| m.as_str());
             // Remove time expressions from the title if present
-            let cleaned_title = if full_title.to_lowercase().contains("tomorrow at 9am") || 
-                                  full_title.to_lowercase().contains("tomorrow at 9 am") {
+            let cleaned_title = if full_title.to_lowercase().contains("tomorrow at 9am")
+                || full_title.to_lowercase().contains("tomorrow at 9 am")
+            {
                 let title1 = full_title.replace("tomorrow at 9am", "");
                 title1.replace("tomorrow at 9 am", "").trim().to_string()
             } else {
@@ -128,8 +130,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let title = if let Some(caps) = re.captures(command) {
             let full_title = caps.get(1).map_or("", |m| m.as_str());
             // Remove time expressions from the title if present
-            let cleaned_title = if full_title.to_lowercase().contains("today at 3:30pm") || 
-                                  full_title.to_lowercase().contains("today at 3:30 pm") {
+            let cleaned_title = if full_title.to_lowercase().contains("today at 3:30pm")
+                || full_title.to_lowercase().contains("today at 3:30 pm")
+            {
                 let title1 = full_title.replace("today at 3:30pm", "");
                 title1.replace("today at 3:30 pm", "").trim().to_string()
             } else {
@@ -169,12 +172,12 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         (r"(?i)tomorrow\s+afternoon\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)?", "tomorrow"),
         (r"(?i)tomorrow\s+evening\s+at\s+(\d{1,2})(:\d{2})?(?:\s*)(am|pm)?", "tomorrow"),
     ];
-    
+
     for (pattern, date_text) in &specific_tod_time_patterns {
         let time_re = Regex::new(pattern).unwrap();
         if let Some(time_caps) = time_re.captures(&input_lower) {
             debug!("Specific time-of-day with time pattern match found: {}", pattern);
-            
+
             // Extract hour, minute and am/pm
             let hour: u32 = time_caps.get(1).map_or("0", |m| m.as_str()).parse().unwrap_or(0);
             let minute: u32 = time_caps
@@ -183,44 +186,44 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
                 .parse()
                 .unwrap_or(0);
             let meridiem = time_caps.get(3).map_or("am", |m| m.as_str());
-            
+
             // Convert to 24-hour time
             let (hour_24, minute_final) = convert_to_24_hour(hour, minute, meridiem);
-            
+
             // Format times
             let start_time = format!("{:02}:{:02}", hour_24, minute_final);
             let end_time = format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final);
-            
+
             // Get the date
             let date = if *date_text == "today" {
                 Local::now().format("%Y-%m-%d").to_string()
             } else {
                 (Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
             };
-            
+
             // Clean up title - extract from original command without time expression
             let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
             let title = if let Some(caps) = re.captures(command) {
                 let full_title = caps.get(1).map_or("", |m| m.as_str());
                 let mut cleaned_title = full_title.to_string();
-                
+
                 // Remove various time expressions from the title
                 let regex_pattern = pattern.replace("(?i)", "").replace(r"(\d{1,2})", "\\d{1,2}");
                 if let Ok(tpre) = Regex::new(&format!("(?i){}", regex_pattern)) {
                     cleaned_title = tpre.replace_all(&cleaned_title, "").to_string();
                 }
-                
+
                 cleaned_title.trim().to_string()
             } else {
                 "Event".to_string()
             };
-            
+
             // Extract suffix
             let cmd_suffix = extract_command_suffix(command);
-            
+
             debug!("Extracted time: {} -> {}:{}", meridiem, hour_24, minute_final);
             debug!("Date: {}, Title: '{}'", date, title);
-            
+
             // Build the final command
             return format!(
                 r#"ducktape calendar create "{}" {} {} {} "{}"{}"#,
@@ -660,9 +663,10 @@ fn extract_command_suffix(command: &str) -> &str {
     if command.contains("\"Work\" --zoom") {
         return " --zoom";
     }
-    
+
     // General case using regex to extract everything after the calendar name
-    let re_calendar_name = Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#).unwrap();
+    let re_calendar_name =
+        Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#).unwrap();
     if let Some(caps) = re_calendar_name.captures(command) {
         let calendar_name = caps.get(1).map_or("", |m| m.as_str());
         // Find where the calendar name ends in the command string
@@ -673,18 +677,18 @@ fn extract_command_suffix(command: &str) -> &str {
             }
         }
     }
-    
+
     // Fallback to counting quotes method
     let mut quote_count = 0;
     let mut in_quotes = false;
-    
+
     for (pos, ch) in command.char_indices() {
         if ch == '"' {
             in_quotes = !in_quotes;
             if (!in_quotes) {
                 // We've found a complete quoted string
                 quote_count += 1;
-                
+
                 // If this is the end of the calendar name (fifth quoted string)
                 if quote_count == 5 && pos + 1 < command.len() {
                     return &command[pos + 1..].trim_start();
@@ -692,7 +696,7 @@ fn extract_command_suffix(command: &str) -> &str {
             }
         }
     }
-    
+
     // If we didn't find 5 quoted strings or there's nothing after the last quote
     ""
 }
@@ -786,8 +790,8 @@ mod tests {
         let input = "create a meeting this afternoon at 5pm called Leo drop off";
         let command = "ducktape calendar create \"Leo drop off\" today 00:00 01:00 \"shaun.stuart@hashicorp.com\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("17:00"));  // Should be 5pm (17:00), not the default afternoon time (14:00)
-        assert!(fixed.contains("18:00"));  // End time should be 1 hour later
+        assert!(fixed.contains("17:00")); // Should be 5pm (17:00), not the default afternoon time (14:00)
+        assert!(fixed.contains("18:00")); // End time should be 1 hour later
         assert!(fixed.contains("Leo drop off"));
         assert!(fixed.contains("shaun.stuart@hashicorp.com"));
 
@@ -795,7 +799,7 @@ mod tests {
         let input = "create a meeting this morning at 11am called Team standup";
         let command = "ducktape calendar create \"Team standup\" today 00:00 01:00 \"Work\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("11:00"));  // Should be 11am, not the default morning time (9:00)
+        assert!(fixed.contains("11:00")); // Should be 11am, not the default morning time (9:00)
         assert!(fixed.contains("12:00"));
         assert!(fixed.contains("Team standup"));
 
@@ -803,9 +807,9 @@ mod tests {
         let input = "create a meeting tomorrow afternoon at 4:30pm called Project review";
         let command = "ducktape calendar create \"Project review\" today 00:00 01:00 \"Work\"";
         let fixed = extract_time_from_title(command, input);
-        assert!(fixed.contains("16:30"));  // Should be 4:30pm, not the default afternoon time
+        assert!(fixed.contains("16:30")); // Should be 4:30pm, not the default afternoon time
         assert!(fixed.contains("17:30"));
-        
+
         // Verify tomorrow's date is used
         let tomorrow = (Local::now() + Duration::days(1)).format("%Y-%m-%d").to_string();
         assert!(fixed.contains(&tomorrow));
