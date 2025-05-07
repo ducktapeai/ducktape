@@ -260,6 +260,77 @@ pub fn enhance_command_with_contacts(command: &str, input: &str) -> String {
     enhanced
 }
 
+/// Extract and add location information from natural language input
+///
+/// This function analyzes natural language input for location indicators and adds
+/// a location flag to calendar event commands when a valid location is detected.
+///
+/// # Parameters
+/// * `command` - The calendar command string to enhance
+/// * `input` - The original natural language input to extract location from
+///
+/// # Returns
+/// The enhanced command with location flag added, or the original command if no location found
+///
+/// # Examples
+/// ```
+/// let command = "ducktape calendar create \"Meeting\" today 10:00 11:00 \"Work\"";
+/// let input = "create a meeting at the Conference Room";
+/// let enhanced = enhance_command_with_location(command, input);
+/// // enhanced will be: "ducktape calendar create \"Meeting\" today 10:00 11:00 \"Work\" --location \"Conference Room\""
+/// ```
+pub fn enhance_command_with_location(command: &str, input: &str) -> String {
+    // Skip non-calendar commands or commands that already have location specified
+    if !command.contains("calendar create") || command.contains("--location") {
+        return command.to_string();
+    }
+
+    // Patterns to extract location information, ordered by specificity
+    let location_patterns = [
+        // Location with "Building/Room/etc." suffix
+        r"(?i)at\s+the\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall|Theater|Theatre|Stadium|Park|Restaurant|Cafe|Cafeteria|Library|School|University|College|Hospital|Hotel|Venue))",
+        r"(?i)at\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall|Theater|Theatre|Stadium|Park|Restaurant|Cafe|Cafeteria|Library|School|University|College|Hospital|Hotel|Venue))",
+        r"(?i)in\s+the\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall|Theater|Theatre|Stadium|Park|Restaurant|Cafe|Cafeteria|Library|School|University|College|Hospital|Hotel|Venue))",
+        r"(?i)in\s+([A-Za-z0-9\s&',]+(?:Building|Office|Center|Centre|Room|Conference|Hall|Theater|Theatre|Stadium|Park|Restaurant|Cafe|Cafeteria|Library|School|University|College|Hospital|Hotel|Venue))",
+        // Explicit location labeling
+        r"(?i)location:?\s+(.+?)(?:\s+on\s+|\s+at\s+|\s+from\s+|\s+with\s+|\s+and\s+|$)",
+        // Generic "at X" pattern (least specific, higher chance of false positives)
+        r"(?i)at\s+((?:[A-Za-z0-9\s&',]){3,}?)(?:\s+on\s+|\s+at\s+|\s+from\s+|\s+with\s+|\s+and\s+|$)",
+    ];
+
+    for pattern in location_patterns {
+        let re = Regex::new(pattern).unwrap();
+        if let Some(caps) = re.captures(input) {
+            if let Some(location_match) = caps.get(1) {
+                let location = location_match.as_str().trim();
+
+                // Skip if location is just a common preposition or if it's too short
+                if location.len() < 3
+                    || ["the", "an", "a", "my", "our"].contains(&location.to_lowercase().as_str())
+                {
+                    continue;
+                }
+
+                // Skip if the location contains time-related words
+                if location.to_lowercase().contains("tomorrow")
+                    || location.to_lowercase().contains("today")
+                    || location.to_lowercase().contains("am")
+                    || location.to_lowercase().contains("pm")
+                    || location.to_lowercase().contains("minute")
+                    || location.to_lowercase().contains("hour")
+                {
+                    continue;
+                }
+
+                debug!("Extracted location: '{}'", location);
+                return format!(r#"{} --location "{}""#, command.trim(), location);
+            }
+        }
+    }
+
+    command.to_string()
+}
+
 /// Extract email addresses from natural language input
 fn extract_email_addresses(input: &str) -> Vec<String> {
     // Email regex pattern
