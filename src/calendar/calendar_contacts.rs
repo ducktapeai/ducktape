@@ -38,7 +38,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
         _ => false,
     };
 
-    if (!contacts_running) {
+    if !contacts_running {
         // Print a user-friendly message
         eprintln!("{} Contacts app is not running. Attempting to launch it...", "INFO:".blue());
 
@@ -74,7 +74,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
             _ => false,
         };
 
-        if (!launch_success) {
+        if !launch_success {
             // Print user-friendly error message
             eprintln!(
                 "{} Could not launch Contacts app. Contact lookup for '{}' will be skipped.",
