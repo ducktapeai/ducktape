@@ -5,6 +5,20 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.16] - 2025-05-07
+### Added
+- Improved command verb mapping for natural language processing
+- Enhanced detection of meeting-related keywords
+
+### Changed
+- Refactored natural language processing pipeline for better maintainability
+- Improved command normalization to prevent duplicate prefix issues
+
+### Fixed
+- Fixed issue with "create an zoom meeting" command not properly recognized
+- Enhanced command structure validation for natural language inputs
+- Improved integration between command mapping and time extraction
+
 ## [0.16.15] - 2025-05-06
 ### Added
 - Enhanced support for recurring event patterns in calendar operations

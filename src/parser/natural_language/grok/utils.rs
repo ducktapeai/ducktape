@@ -28,70 +28,91 @@ use regex::Regex;
 /// // result will be: "ducktape calendar create "Meeting" 2025-04-26 19:00 20:00 "Calendar""
 /// ```
 pub fn sanitize_nlp_command(command: &str) -> String {
-    // Ensure the command starts with ducktape
-    if !command.starts_with("ducktape") {
-        // Check for event creation patterns
-        let is_event_creation = command.contains("create an event")
-            || command.contains("schedule a")
-            || command.contains("create event")
-            || command.contains("schedule event")
-            || command.contains("create a meeting")
-            || command.contains("schedule meeting")
-            || command.contains("create a zoom meeting") // Added this pattern for Zoom meetings
-            || command.contains("schedule a zoom meeting"); // Added this pattern for Zoom meetings
+    // If already a ducktape command, just do basic sanitization
+    if command.starts_with("ducktape") {
+        return command
+            .replace("\u{a0}", " ") // Replace non-breaking spaces
+            .replace("\"\"", "\"") // Replace double quotes
+            .to_string();
+    }
 
-        if is_event_creation {
-            debug!("Converting event creation command to calendar command: {}", command);
+    // Apply command verb mapping for natural language commands
+    let normalized_command =
+        crate::parser::natural_language::command_mapping::normalize_command(command);
+    debug!("Command after verb normalization: '{}'", normalized_command);
 
-            // Extract event title if possible (keep existing logic)
-            let mut title = "Event";
-            if command.contains(" called ") {
-                let parts: Vec<&str> = command.split(" called ").collect();
-                if parts.len() > 1 {
-                    let title_part = parts[1];
-                    let end_markers = [" at ", " on ", " for ", " with ", " and "];
-                    let mut end_pos = title_part.len();
-                    for marker in &end_markers {
-                        if let Some(pos) = title_part.find(marker) {
-                            if pos < end_pos {
-                                end_pos = pos;
-                            }
+    // Check if the command already contains a recognized command prefix after normalization
+    let has_command_prefix = normalized_command.starts_with("calendar create")
+        || normalized_command.starts_with("reminder")
+        || normalized_command.starts_with("note")
+        || normalized_command.starts_with("todo");
+
+    // Check for event creation patterns
+    let is_event_creation = command.contains("create an event")
+        || command.contains("schedule a")
+        || command.contains("create event")
+        || command.contains("schedule event")
+        || command.contains("create a meeting")
+        || command.contains("schedule meeting")
+        || command.contains("create a zoom meeting")
+        || command.contains("schedule a zoom meeting")
+        || command.contains("create an zoom meeting")
+        || command.contains("create zoom");
+
+    if is_event_creation || normalized_command.starts_with("calendar create") {
+        debug!("Converting event creation command to calendar command: {}", command);
+
+        // Extract event title if possible (keep existing logic)
+        let mut title = "Event";
+        if command.contains(" called ") {
+            let parts: Vec<&str> = command.split(" called ").collect();
+            if parts.len() > 1 {
+                let title_part = parts[1];
+                let end_markers = [" at ", " on ", " for ", " with ", " and "];
+                let mut end_pos = title_part.len();
+                for marker in &end_markers {
+                    if let Some(pos) = title_part.find(marker) {
+                        if pos < end_pos {
+                            end_pos = pos;
                         }
                     }
-                    title = &title_part[..end_pos];
                 }
+                title = &title_part[..end_pos];
             }
-
-            // Get default calendar from config
-            let default_calendar = match crate::config::Config::load() {
-                Ok(config) => {
-                    config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
-                }
-                Err(_) => "Calendar".to_string(), // Fallback to "Calendar" if config can't be loaded
-            };
-
-            debug!("Using default calendar from config: {}", default_calendar);
-
-            // Build initial command with the default calendar from config
-            let initial_command = format!(
-                "ducktape calendar create \"{}\" today 00:00 01:00 \"{}\"",
-                title, default_calendar
-            );
-
-            // Always delegate to extract_time_from_title for robust time parsing
-            return crate::parser::natural_language::grok::time_extractor::extract_time_from_title(
-                &initial_command,
-                command,
-            );
         }
-        // For other commands, just prefix with ducktape
-        return format!("ducktape {}", command);
+
+        // Get default calendar from config
+        let default_calendar = match crate::config::Config::load() {
+            Ok(config) => {
+                config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
+            }
+            Err(_) => "Calendar".to_string(), // Fallback to "Calendar" if config can't be loaded
+        };
+
+        debug!("Using default calendar from config: {}", default_calendar);
+
+        // Build initial command with the default calendar from config
+        let initial_command = format!(
+            "ducktape calendar create \"{}\" today 00:00 01:00 \"{}\"",
+            title, default_calendar
+        );
+
+        // Always delegate to extract_time_from_title for robust time parsing
+        return crate::parser::natural_language::grok::time_extractor::extract_time_from_title(
+            &initial_command,
+            command,
+        );
     }
-    // Basic sanitization to fix common issues with NLP-generated commands
-    command
-        .replace("\u{a0}", " ") // Replace non-breaking spaces
-        .replace("\"\"", "\"") // Replace double quotes
-        .to_string()
+
+    // For other commands, prefix with ducktape
+    // If it's already been normalized to a command prefix, don't add "ducktape " twice
+    if has_command_prefix {
+        format!("ducktape {}", normalized_command)
+    } else if normalized_command != command {
+        format!("ducktape {}", normalized_command)
+    } else {
+        format!("ducktape {}", command)
+    }
 }
 
 /// Enhance command with recurrence information
@@ -435,5 +456,22 @@ mod tests {
         let command = "ducktape calendar create \"Team Meeting\" 2025-04-22 23:00 00:00 \"Work\"";
         let fixed = fix_calendar_end_time_format(command);
         assert_eq!(fixed, command);
+    }
+
+    #[test]
+    fn test_command_mapping_integration() {
+        // This test specifically addresses the issue with "create an zoom meeting"
+        let input = "create an zoom meeting at 9am this morning and invite Joe Duck";
+        let sanitized = sanitize_nlp_command(input);
+        assert!(sanitized.starts_with("ducktape calendar create"));
+        assert!(sanitized.contains("09:00")); // 9am should be converted to 09:00
+        assert!(sanitized.contains("--zoom")); // Should have zoom flag
+
+        // Test another problematic pattern: "create zoom meeting"
+        let input = "create zoom meeting tomorrow at 10am";
+        let sanitized = sanitize_nlp_command(input);
+        assert!(sanitized.starts_with("ducktape calendar create"));
+        assert!(sanitized.contains("10:00")); // 10am should be converted to 10:00
+        assert!(sanitized.contains("--zoom")); // Should have zoom flag
     }
 }
