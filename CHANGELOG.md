@@ -5,6 +5,17 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.18] - 2025-05-07
+### Added
+- Enhanced special case handling for common time expressions in natural language processing
+- Improved command suffix extraction for calendar operations
+
+### Fixed
+- Fixed time extraction issues with specific patterns like "tonight at 7pm" and "tomorrow at 9am"
+- Fixed command suffix handling for options like "--zoom" and contact lists
+- Improved time pattern detection accuracy in the natural language parser
+- Enhanced 12-hour to 24-hour time conversion logic
+
 ## [0.16.17] - 2025-05-07
 ### Added
 - Enhanced contact lookup functionality with user-friendly messages
