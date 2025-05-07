@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
 use log::{debug, info, warn};
+use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
@@ -514,12 +515,33 @@ impl CommandHandler for CalendarHandler {
                     if let Some(contacts_str) = contacts {
                         info!("Processing contacts string: '{}'", contacts_str);
 
+                        // Extract time information using a more comprehensive regex that filters out time-related phrases
+                        let time_regex = Regex::new(r"(?i)(?:from|at|in|tonight|today|tomorrow|morning|afternoon|evening|\d+(am|pm)|:\d{2}|for \d+ (hour|minute)s?|\d+:\d+)").unwrap();
+
                         // Process contact string and convert to a vector of string slices
                         // First split by commas to handle multiple contacts
                         let contact_vec: Vec<&str> = contacts_str
                             .split(',')
                             .map(|s| s.trim())
-                            .filter(|s| !s.is_empty())
+                            .filter(|s| {
+                                // Filter out time-related phrases and empty strings
+                                !s.is_empty() && !time_regex.is_match(s) &&
+                                // Also filter out phrases with "called" which are likely part of the meeting name
+                                !s.contains("called") &&
+                                // Filter out common time period words
+                                !s.contains("tonight") && 
+                                !s.contains("today") && 
+                                !s.contains("tomorrow") && 
+                                !s.contains("morning") && 
+                                !s.contains("afternoon") && 
+                                !s.contains("evening") &&
+                                // Filter out location-related words
+                                !s.contains("at the") && 
+                                !s.contains("in the") &&
+                                // Also filter out cross-day events terminology
+                                !s.contains("until") &&
+                                !s.contains("through")
+                            })
                             .collect();
 
                         if !contact_vec.is_empty() {
