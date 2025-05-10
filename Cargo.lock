@@ -1370,6 +1370,7 @@ dependencies = [
  "hmac",
  "ical",
  "jwt",
+ "lazy_static",
  "log",
  "lru",
  "oauth2",
