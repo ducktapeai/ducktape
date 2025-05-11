@@ -112,13 +112,17 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
         config.start_date,
         if config.all_day { "00:00" } else { &config.start_time }
     );
-    debug!("Parsing start datetime from config (expected to be local): {}", start_datetime_str);
+    debug!(
+        "Parsing start datetime from config (expected to be local): {}",
+        start_datetime_str
+    );
     let naive_start_dt = NaiveDateTime::parse_from_str(&start_datetime_str, "%Y-%m-%d %H:%M")
         .map_err(|e| anyhow!("Invalid start datetime from config: {}", e))?;
 
     // Assume NaiveDateTime from config is in the user's local timezone.
-    let local_start = Local.from_local_datetime(&naive_start_dt).single()
-        .ok_or_else(|| anyhow!("Failed to interpret config start time {} as local system time", naive_start_dt))?;
+    let local_start = Local.from_local_datetime(&naive_start_dt).single().ok_or_else(|| {
+        anyhow!("Failed to interpret config start time {} as local system time", naive_start_dt)
+    })?;
 
     if let Some(original_tz_str) = config.timezone.as_deref() {
         info!(
@@ -126,7 +130,10 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
             original_tz_str, local_start, config.start_date, config.start_time
         );
     } else {
-        info!("Event time parsed as local time: {} (Raw config date: {}, time: {})", local_start, config.start_date, config.start_time);
+        info!(
+            "Event time parsed as local time: {} (Raw config date: {}, time: {})",
+            local_start, config.start_date, config.start_time
+        );
     }
     // Log the components that were parsed to form naive_start_dt for clarity
     info!(
@@ -134,21 +141,35 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
         naive_start_dt.year(),
         naive_start_dt.month(),
         match naive_start_dt.month() {
-            1 => "January", 2 => "February", 3 => "March", 4 => "April", 5 => "May", 6 => "June",
-            7 => "July", 8 => "August", 9 => "September", 10 => "October", 11 => "November", 12 => "December",
+            1 => "January",
+            2 => "February",
+            3 => "March",
+            4 => "April",
+            5 => "May",
+            6 => "June",
+            7 => "July",
+            8 => "August",
+            9 => "September",
+            10 => "October",
+            11 => "November",
+            12 => "December",
             _ => "Unknown",
         },
         naive_start_dt.day(),
-        naive_start_dt.hour(), naive_start_dt.minute(),
-        config.start_date, config.start_time
+        naive_start_dt.hour(),
+        naive_start_dt.minute(),
+        config.start_date,
+        config.start_time
     );
 
-
     let end_dt = if let Some(ref end_time_str) = config.end_time {
-        let naive_start_time_obj = NaiveTime::parse_from_str(&config.start_time, "%H:%M")
-            .map_err(|e| anyhow!("Invalid start_time format for comparison: {} - {}", config.start_time, e))?;
-        let naive_end_time_obj = NaiveTime::parse_from_str(end_time_str, "%H:%M")
-            .map_err(|e| anyhow!("Invalid end_time format for comparison: {} - {}", end_time_str, e))?;
+        let naive_start_time_obj =
+            NaiveTime::parse_from_str(&config.start_time, "%H:%M").map_err(|e| {
+                anyhow!("Invalid start_time format for comparison: {} - {}", config.start_time, e)
+            })?;
+        let naive_end_time_obj = NaiveTime::parse_from_str(end_time_str, "%H:%M").map_err(|e| {
+            anyhow!("Invalid end_time format for comparison: {} - {}", end_time_str, e)
+        })?;
 
         // Check if start and end times from config are identical.
         // Note: config.start_date is used for both, so we only compare times.
@@ -162,8 +183,17 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
             // Construct NaiveDateTime for the end time using config.start_date and end_time_str.
             // These are assumed to be components of a local time.
             let naive_end_dt_candidate = NaiveDateTime::parse_from_str(
-                &format!("{} {}", config.start_date, end_time_str), "%Y-%m-%d %H:%M"
-            ).map_err(|e| anyhow!("Invalid NaiveDateTime from end_time {} on start_date {}: {}", end_time_str, config.start_date, e))?;
+                &format!("{} {}", config.start_date, end_time_str),
+                "%Y-%m-%d %H:%M",
+            )
+            .map_err(|e| {
+                anyhow!(
+                    "Invalid NaiveDateTime from end_time {} on start_date {}: {}",
+                    end_time_str,
+                    config.start_date,
+                    e
+                )
+            })?;
 
             let final_naive_end_dt = if naive_end_dt_candidate.time() < naive_start_dt.time() {
                 // End time is earlier than start time (e.g., 23:00 to 02:00), implies crossing midnight.
@@ -172,8 +202,9 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
                     "End time {} on (local) start date {} is earlier than (local) start time {}. Assuming event crosses midnight to the next day.",
                     end_time_str, config.start_date, config.start_time
                 );
-                let next_day_date = naive_start_dt.date().succ_opt()
-                    .ok_or_else(|| anyhow!("Failed to calculate next day for event crossing midnight"))?;
+                let next_day_date = naive_start_dt.date().succ_opt().ok_or_else(|| {
+                    anyhow!("Failed to calculate next day for event crossing midnight")
+                })?;
                 NaiveDateTime::new(next_day_date, naive_end_dt_candidate.time())
             } else {
                 // End time is after start time, on the same day.
@@ -181,8 +212,12 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
             };
 
             // Convert final_naive_end_dt (which is a local naive datetime) to DateTime<Local>
-            Local.from_local_datetime(&final_naive_end_dt).single()
-                .ok_or_else(|| anyhow!("Failed to interpret final naive end time {} as local system time", final_naive_end_dt))?
+            Local.from_local_datetime(&final_naive_end_dt).single().ok_or_else(|| {
+                anyhow!(
+                    "Failed to interpret final naive end time {} as local system time",
+                    final_naive_end_dt
+                )
+            })?
         }
     } else {
         // No config.end_time, default to 1 hour from local_start.
@@ -208,11 +243,14 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
         info!("Creating Zoom meeting for event: {}", config.title);
         let mut client = ZoomClient::new()?;
         let zoom_start_time = format_zoom_time(&config.start_date, &config.start_time)?;
-        
+
         // Calculate duration for Zoom based on the final local_start and end_dt
         let meeting_duration_minutes = (end_dt - local_start).num_minutes();
         let zoom_api_duration = if meeting_duration_minutes <= 0 {
-            debug!("Calculated meeting duration for Zoom is zero or negative ({} minutes). Defaulting Zoom duration to 60 minutes.", meeting_duration_minutes);
+            debug!(
+                "Calculated meeting duration for Zoom is zero or negative ({} minutes). Defaulting Zoom duration to 60 minutes.",
+                meeting_duration_minutes
+            );
             60 // Default to 60 minutes if duration is zero/negative
         } else {
             meeting_duration_minutes as u32
