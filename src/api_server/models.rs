@@ -54,6 +54,7 @@ pub struct CalendarResponse {
 }
 
 /// Create event request
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct CreateEventRequest {
     /// Event title
@@ -86,6 +87,7 @@ pub struct CreateEventRequest {
 }
 
 /// Create todo request
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct CreateTodoRequest {
     /// Todo item title
@@ -111,6 +113,7 @@ pub struct TodoResponse {
 }
 
 /// Create note request
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct CreateNoteRequest {
     /// Note title

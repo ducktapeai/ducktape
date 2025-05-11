@@ -28,7 +28,7 @@ pub fn parse_notes_list(output: &str) -> Vec<(String, String)> {
     let records: Vec<&str> = output.split("}, {").collect();
 
     for record in records {
-        let clean_record = record.replace('{', "").replace('}', "");
+        let clean_record = record.replace(['{', '}'], "");
         let mut title = String::new();
         let mut folder = String::new();
 
@@ -49,7 +49,7 @@ pub fn parse_notes_list(output: &str) -> Vec<(String, String)> {
     notes
 }
 
-/// Format text for display in the terminal
+#[allow(dead_code)]
 pub fn format_note_for_display(title: &str, content: &str) -> String {
     format!("Title: {}\n\n{}", title, content)
 }

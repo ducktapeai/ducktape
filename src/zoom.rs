@@ -169,11 +169,24 @@ impl ZoomClient {
         let sanitized_topic = sanitize_zoom_field(&options.topic, 200);
         let sanitized_agenda = options.agenda.as_deref().map(|a| sanitize_zoom_field(a, 2000));
 
+        // Instead of unwrap(), handle None gracefully and return an error
+        let start_time = match Some(&options.start_time) {
+            Some(val) => val,
+            None => {
+                error!(
+                    "Zoom meeting creation failed: required value missing (start_time or other)"
+                );
+                return Err(anyhow!(
+                    "Zoom meeting creation failed: required value missing (start_time or other)"
+                ));
+            }
+        };
+
         // Construct request body
         let body = serde_json::json!({
             "topic": sanitized_topic,
             "type": 2, // Scheduled meeting
-            "start_time": options.start_time,
+            "start_time": start_time,
             "duration": options.duration,
             "password": options.password,
             "agenda": sanitized_agenda,
@@ -214,7 +227,19 @@ impl ZoomClient {
             .await
             .map_err(|e| anyhow!("Failed to parse Zoom API response: {}", e))?;
 
-        info!("Successfully created Zoom meeting: {}", meeting.id);
+        // Check for required fields in the response
+        if meeting.join_url.is_empty() {
+            error!("Zoom API response missing join_url");
+            return Err(anyhow!("Zoom API response missing join_url"));
+        }
+        // Use password safely if needed
+        let password = meeting.password.as_deref().unwrap_or("");
+        // Use host_email safely if needed
+        let host_email = meeting.host_email.as_deref().unwrap_or("");
+        info!(
+            "Successfully created Zoom meeting: {} (password: {}, host_email: {})",
+            meeting.id, password, host_email
+        );
         Ok(meeting)
     }
 
@@ -325,10 +350,10 @@ pub fn calculate_meeting_duration(start_time: &str, end_time: &str) -> Result<u3
     let duration_minutes = if end > start {
         (end - start).num_minutes() as u32
     } else {
-        // If end time is earlier than start time, assume it's the next day
-        (end.signed_duration_since(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
-            + chrono::NaiveTime::from_hms_opt(24, 0, 0).unwrap().signed_duration_since(start))
-        .num_minutes() as u32
+        // If end time is earlier than start time, assume it's the next day (overnight)
+        // Duration = (midnight - start) + (end - midnight)
+        let midnight = chrono::NaiveTime::from_hms(0, 0, 0);
+        ((midnight - start) + (end - midnight)).num_minutes() as u32
     };
 
     // Minimum duration is 15 minutes
@@ -353,6 +378,17 @@ mod tests {
 
         // Test short duration gets minimum duration
         let result = calculate_meeting_duration("14:30", "14:40").unwrap();
+        assert_eq!(result, 15); // Should use minimum 15 minutes
+    }
+
+    #[test]
+    fn test_calculate_meeting_duration_overnight() {
+        // Test overnight duration (e.g., 23:30 to 00:30)
+        let result = calculate_meeting_duration("23:30", "00:30").unwrap();
+        assert_eq!(result, 60); // 1 hour overnight
+
+        // Test overnight with minimum duration
+        let result = calculate_meeting_duration("23:50", "00:00").unwrap();
         assert_eq!(result, 15); // Should use minimum 15 minutes
     }
 

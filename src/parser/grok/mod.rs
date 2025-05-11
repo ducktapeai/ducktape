@@ -21,6 +21,7 @@ impl GrokParser {
         Ok(Self)
     }
 
+    #[allow(dead_code)]
     /// Check for the required XAI_API_KEY environment variable
     fn check_env_vars() -> Result<()> {
         check_xai_api_key()
@@ -84,10 +85,7 @@ fn sanitize_nlp_command(command: &str) -> String {
         .trim()
         .replace(';', " ")
         .replace('&', " and ")
-        .replace('|', " ")
-        .replace('>', " ")
-        .replace('<', " ")
-        .replace('`', " ");
+        .replace(['|', '>', '<', '`'], " ");
 
     // If we found time information, make sure it's preserved in the output
     if let Some(time) = time_info {

@@ -3,8 +3,6 @@
 // This module provides async functions for interacting with macOS Calendar.app via AppleScript.
 
 use crate::calendar::{EventConfig, RecurrenceFrequency};
-use crate::config::Config;
-use crate::state::{CalendarItem, StateManager};
 use crate::zoom::{ZoomClient, ZoomMeetingOptions, calculate_meeting_duration, format_zoom_time};
 use anyhow::{Result, anyhow};
 use chrono::Datelike;
@@ -186,29 +184,26 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
                 .from_local_datetime(&adjusted_end)
                 .single()
                 .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
-        } else {
-            if let Some(tz_str) = config.timezone.as_deref() {
-                match Tz::from_str(tz_str) {
-                    Ok(tz) => {
-                        let tz_dt =
-                            tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
-                                anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
-                            })?;
-                        tz_dt.with_timezone(&Local)
-                    }
-                    Err(_) => Local::now()
-                        .timezone()
-                        .from_local_datetime(&naive_end)
-                        .single()
-                        .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
+        } else if let Some(tz_str) = config.timezone.as_deref() {
+            match Tz::from_str(tz_str) {
+                Ok(tz) => {
+                    let tz_dt = tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
+                        anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
+                    })?;
+                    tz_dt.with_timezone(&Local)
                 }
-            } else {
-                Local::now()
+                Err(_) => Local::now()
                     .timezone()
                     .from_local_datetime(&naive_end)
                     .single()
-                    .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+                    .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
             }
+        } else {
+            Local::now()
+                .timezone()
+                .from_local_datetime(&naive_end)
+                .single()
+                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
         }
     } else {
         let default_end_dt = local_start + chrono::Duration::hours(1);
@@ -275,7 +270,7 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
     };
     let mut extra = String::new();
     if let Some(loc) = &config.location {
-        if (!loc.is_empty()) {
+        if !loc.is_empty() {
             extra.push_str(&format!(", location:\"{}\"", loc));
         }
     }

@@ -5,6 +5,17 @@ All notable changes to the Ducktape project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.21] - 2025-05-11
+### Fixed
+- Improved time extraction for 'tonight' pattern in natural language parser.
+
+## [0.16.20] - 2025-05-07
+### Fixed
+- Fixed email address formatting issue in calendar invitations where domain names could be duplicated
+- Improved contact email validation to prevent malformed addresses
+- Enhanced email deduplication logic to properly handle similar addresses
+- Added additional logging for email address processing to improve debugging
+
 ## [0.16.19] - 2025-05-07
 ### Added
 - Added support for explicit time range extraction in natural language commands (e.g., "from 8pm to 9pm")

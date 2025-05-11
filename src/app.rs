@@ -1,6 +1,6 @@
 use crate::command_processor::{CommandArgs, CommandProcessor};
 use crate::config::{Config, LLMProvider};
-use crate::parser::{ParseResult, Parser, ParserFactory};
+use crate::parser::ParserFactory;
 use anyhow::{Result, anyhow};
 use clap::Parser as ClapParser;
 use rustyline::DefaultEditor;
@@ -394,7 +394,7 @@ impl Application {
     }
 
     /// Called by the CLI entry point to execute a command from args
-    pub async fn execute_from_args(&self, mut args: Vec<String>) -> Result<()> {
+    pub async fn execute_from_args(&self, args: Vec<String>) -> Result<()> {
         // Check for natural language intent when the first argument isn't a recognized command
         if args.len() > 1 {
             let first_arg = &args[1].to_lowercase(); // args[0] is the program name

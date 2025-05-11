@@ -23,12 +23,12 @@ pub fn format_reminder_time(time_str: &str) -> Result<String> {
         let minute = captures[5].parse::<u32>()?;
 
         // Validate date components
-        if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 {
+        if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 {
             return Err(anyhow!("Invalid date or time components"));
         }
 
         // Format for AppleScript: MM/dd/yyyy hh:mm:ss AM/PM
-        let date =
+        let _date =
             NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| anyhow!("Invalid date"))?;
 
         // Format with specific date format required by AppleScript
@@ -125,12 +125,7 @@ pub fn parse_natural_language_time(time_expr: &str) -> Result<String> {
 
 /// Parse the output of the list command to extract reminder items
 pub fn parse_reminder_list_output(_output: &str) -> Vec<super::ReminderItem> {
-    let reminders = Vec::new();
-
-    // In a real implementation, this would parse the output of the list command
-    // For now, returning an empty vector
-
-    reminders
+    Vec::new()
 }
 
 #[cfg(test)]

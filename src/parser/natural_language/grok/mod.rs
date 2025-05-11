@@ -25,6 +25,7 @@ impl GrokParser {
         Ok(Self)
     }
 
+    #[allow(dead_code)]
     fn check_env_vars() -> Result<()> {
         check_xai_api_key()
     }
@@ -71,8 +72,8 @@ impl Parser for GrokParser {
                     debug!("Generated note command: {}", command);
                     Ok(ParseResult::CommandString(command))
                 }
-                Err(e) => {
-                    warn!("Failed to parse note creation command: {}", e);
+                Err(_) => {
+                    warn!("Failed to parse note creation command");
                     // Fallback to the API parser
                     match self.parse_natural_language(input).await {
                         Ok(command) => {
@@ -80,9 +81,9 @@ impl Parser for GrokParser {
                             let sanitized = self.sanitize_command(&command);
                             Ok(ParseResult::CommandString(sanitized))
                         }
-                        Err(e) => {
-                            error!("Failed to parse note command with API: {}", e);
-                            Err(e)
+                        Err(_) => {
+                            error!("Failed to parse note command with API");
+                            Err(anyhow!("Failed to parse input"))
                         }
                     }
                 }
@@ -107,7 +108,7 @@ impl Parser for GrokParser {
                     debug!("Enhanced event command: {}", fixed_time);
                     Ok(ParseResult::CommandString(fixed_time))
                 }
-                Err(e) => {
+                Err(_) => {
                     warn!("Failed to parse event creation command with API, using fallback method");
                     // Use fallback mechanism with simple format for basic functionality
                     let sanitized = utils::sanitize_nlp_command(input);
@@ -125,9 +126,9 @@ impl Parser for GrokParser {
                     let sanitized = self.sanitize_command(&command);
                     Ok(ParseResult::CommandString(sanitized))
                 }
-                Err(e) => {
-                    error!("Grok parser error: {}", e);
-                    Err(e)
+                Err(_) => {
+                    error!("Grok parser error");
+                    Err(anyhow!("Failed to parse input"))
                 }
             }
         }

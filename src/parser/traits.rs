@@ -3,8 +3,6 @@
 //! This module defines the core traits and types for the parser system,
 //! providing a unified interface for different parser implementations.
 
-use crate::command_processor::CommandArgs;
-use crate::config::{Config, LLMProvider};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 

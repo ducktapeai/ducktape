@@ -1,6 +1,6 @@
 [package]
 name = "ducktape"
-version = "0.16.19"
+version = "0.16.21"
 edition = "2021"
 authors = ["DuckTapeAI"]
 description = "A terminal-based calendar management tool with natural language processing and AI integration"
@@ -53,6 +53,7 @@ base64 = "0.21.4"
 tokio-rustls = "0.26.0"
 secrecy = "0.8.0"
 shell-words = "1.1.0"
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 pretty_assertions = "1.3"

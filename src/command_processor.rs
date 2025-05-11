@@ -453,7 +453,7 @@ impl CommandHandler for CalendarHandler {
 
                     // Process recurrence information if provided
                     if let Some(freq_str) = recurrence_frequency {
-                        match crate::calendar::RecurrenceFrequency::from_str(&freq_str) {
+                        match crate::calendar::RecurrenceFrequency::from_str_custom(&freq_str) {
                             Ok(frequency) => {
                                 info!("Creating recurring event with frequency: {}", freq_str);
                                 let mut recurrence =
@@ -556,6 +556,11 @@ impl CommandHandler for CalendarHandler {
                             )
                             .await;
                         }
+                    }
+
+                    // Set timezone if provided
+                    if let Some(Some(tz)) = args.flags.get("timezone") {
+                        config.timezone = Some(tz.clone());
                     }
 
                     crate::calendar::create_event(config).await
@@ -1400,6 +1405,7 @@ pub fn print_help() -> Result<()> {
 
 /// Helper function to properly process contact names from command string
 /// Handles both comma-separated lists and multi-word contact names
+#[allow(dead_code)]
 fn process_contact_string(contacts_str: &str) -> Vec<&str> {
     debug!("Processing contact string: '{}'", contacts_str);
 
