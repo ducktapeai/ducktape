@@ -352,7 +352,7 @@ pub fn calculate_meeting_duration(start_time: &str, end_time: &str) -> Result<u3
     } else {
         // If end time is earlier than start time, assume it's the next day (overnight)
         // Duration = (midnight - start) + (end - midnight)
-        let midnight = chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+        let midnight = chrono::NaiveTime::from_hms(0, 0, 0);
         ((midnight - start) + (end - midnight)).num_minutes() as u32
     };
 

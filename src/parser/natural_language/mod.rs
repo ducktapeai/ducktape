@@ -6,6 +6,10 @@ use crate::parser::traits::Parser;
 use anyhow::Result;
 use async_trait::async_trait;
 
+// Expose our time parser modules
+pub mod time_parser_fix;
+pub mod time_parser_integration;
+
 /// Common functionality for all natural language parsers
 #[async_trait]
 pub trait NaturalLanguageParser: Parser {
