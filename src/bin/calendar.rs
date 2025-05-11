@@ -26,18 +26,18 @@ async fn main() -> Result<()> {
 
     // Parse command line arguments directly, preserving quoted strings
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
-    
+
     // Handle different command modes based on first argument
     if !raw_args.is_empty() {
         match raw_args[0].as_str() {
             // Natural Language Mode
             NL_FLAG | NATURAL_FLAG => {
                 return process_natural_language(&raw_args[1..]).await;
-            },
+            }
             // Interactive Mode
             INTERACTIVE_CMD => {
                 return start_interactive_mode().await;
-            },
+            }
             // Otherwise continue with regular command processing
             _ => {}
         }
@@ -155,25 +155,27 @@ fn process_contact_string(contacts_str: &str) -> Vec<&str> {
 async fn process_natural_language(args: &[String]) -> Result<()> {
     // Ensure we have some text to process
     if args.is_empty() {
-        return Err(anyhow::anyhow!("No natural language query provided. Usage: ducktape --nl \"your request here\""));
+        return Err(anyhow::anyhow!(
+            "No natural language query provided. Usage: ducktape --nl \"your request here\""
+        ));
     }
-    
+
     // Join all remaining arguments as the natural language query
     let nl_query = args.join(" ");
-    
+
     info!("Processing natural language query: {}", nl_query);
-    
+
     // Initialize the NLP parser
     let parser = GrokParser::new()?;
-    
+
     // Sanitize user input
     let sanitized_input = ducktape::parser::natural_language::utils::sanitize_user_input(&nl_query);
-    
+
     // Parse the natural language into a structured command
     let structured_command = parser.parse_natural_language(&sanitized_input).await?;
-    
+
     debug!("Converted to structured command: {}", structured_command);
-    
+
     // Parse the structured command and execute it
     match CommandArgs::parse(&structured_command) {
         Ok(args) => {
@@ -186,7 +188,7 @@ async fn process_natural_language(args: &[String]) -> Result<()> {
             return Err(e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -200,13 +202,13 @@ async fn process_natural_language(args: &[String]) -> Result<()> {
 ///
 /// Returns an error if there's a problem with the interactive session
 async fn start_interactive_mode() -> Result<()> {
-    use rustyline::error::ReadlineError;
     use rustyline::DefaultEditor;
+    use rustyline::error::ReadlineError;
 
     println!("Ducktape Interactive Mode");
     println!("Type your requests in natural language or use structured commands");
     println!("Type 'exit' or 'quit' to exit");
-    
+
     let mut rl = DefaultEditor::new()?;
     let parser = GrokParser::new()?;
     let processor = CommandProcessor::new();
@@ -237,10 +239,10 @@ async fn start_interactive_mode() -> Result<()> {
         match parser.parse_natural_language(input).await {
             Ok(structured_command) => {
                 debug!("Interactive mode generated command: {}", structured_command);
-                
+
                 // Show the user what command will be executed
                 println!("Executing: {}", structured_command);
-                
+
                 // Execute the command
                 match CommandArgs::parse(&structured_command) {
                     Ok(args) => {
