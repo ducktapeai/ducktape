@@ -173,8 +173,12 @@ impl ZoomClient {
         let start_time = match Some(&options.start_time) {
             Some(val) => val,
             None => {
-                error!("Zoom meeting creation failed: required value missing (start_time or other)");
-                return Err(anyhow!("Zoom meeting creation failed: required value missing (start_time or other)"));
+                error!(
+                    "Zoom meeting creation failed: required value missing (start_time or other)"
+                );
+                return Err(anyhow!(
+                    "Zoom meeting creation failed: required value missing (start_time or other)"
+                ));
             }
         };
 
@@ -232,7 +236,10 @@ impl ZoomClient {
         let password = meeting.password.as_deref().unwrap_or("");
         // Use host_email safely if needed
         let host_email = meeting.host_email.as_deref().unwrap_or("");
-        info!("Successfully created Zoom meeting: {} (password: {}, host_email: {})", meeting.id, password, host_email);
+        info!(
+            "Successfully created Zoom meeting: {} (password: {}, host_email: {})",
+            meeting.id, password, host_email
+        );
         Ok(meeting)
     }
 

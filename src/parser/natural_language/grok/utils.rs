@@ -136,7 +136,9 @@ pub fn enhance_recurrence_command(command: &str) -> String {
         }
     } else if (command.contains(" every year")
         || command.contains(" yearly")
-        || command.contains(" annually")) && !enhanced.contains("--repeat") {
+        || command.contains(" annually"))
+        && !enhanced.contains("--repeat")
+    {
         enhanced = enhanced.trim().to_string() + " --repeat yearly";
     }
 

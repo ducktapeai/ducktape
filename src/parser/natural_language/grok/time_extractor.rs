@@ -3,12 +3,12 @@
 //! This module provides functionality to extract time expressions from event titles
 //! in natural language processing.
 
+use chrono::{DateTime, TimeZone};
 use chrono::{Datelike, Duration, Timelike};
+use chrono_tz::Tz;
 use lazy_static::lazy_static;
 use log::debug;
 use regex::Regex;
-use chrono_tz::Tz;
-use chrono::{DateTime, TimeZone};
 
 /// Convert 12-hour time to 24-hour format
 fn convert_to_24_hour(hour: u32, minute: u32, meridiem: &str) -> (u32, u32) {
@@ -242,7 +242,8 @@ fn extract_title_from_input(input: &str) -> String {
 
 pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<Tz>)> {
     // Regex for time (e.g., "8pm", "09:30", etc.)
-    let time_re = Regex::new(r"(?i)(?P<hour>\d{1,2})(:(?P<minute>\d{2}))?\s*(?P<ampm>am|pm)?").unwrap();
+    let time_re =
+        Regex::new(r"(?i)(?P<hour>\d{1,2})(:(?P<minute>\d{2}))?\s*(?P<ampm>am|pm)?").unwrap();
     // Regex for time zone (abbreviation or IANA)
     let tz_re = Regex::new(r"(?i)(?P<tz>([A-Z]{2,5}|[A-Za-z_]+/[A-Za-z_]+))").unwrap();
 
@@ -315,7 +316,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             "Event"
         };
         // Extract the calendar name from the original command
-        let re_calendar = Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#).unwrap();
+        let re_calendar =
+            Regex::new(r#"calendar create\s+"[^"]+"\s+[^\s]+\s+[^\s]+\s+[^\s]+\s+"([^"]+)""#)
+                .unwrap();
         let calendar_name = if let Some(caps) = re_calendar.captures(command) {
             caps.get(1).map_or("Calendar", |m| m.as_str())
         } else {
@@ -332,11 +335,7 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
                 format!(" --timezone \"{}\"", tz.name()),
             )
         } else {
-            (
-                dt.format("%Y-%m-%d").to_string(),
-                dt.format("%H:%M").to_string(),
-                String::new(),
-            )
+            (dt.format("%Y-%m-%d").to_string(), dt.format("%H:%M").to_string(), String::new())
         };
         return format!(
             r#"ducktape calendar create "{}" {} {} {} "{}"{}{}"#,
@@ -475,7 +474,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             let date = if *day == "today" {
                 chrono::Local::now().format("%Y-%m-%d").to_string()
             } else {
-                (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+                (chrono::Local::now() + chrono::Duration::days(1))
+                    .format("%Y-%m-%d")
+                    .to_string()
             };
 
             // Clean up title - extract from original command without time expression
@@ -733,8 +734,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             let end_time = format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final);
 
             // Get tomorrow's date
-            let tomorrow =
-                (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+            let tomorrow = (chrono::Local::now() + chrono::Duration::days(1))
+                .format("%Y-%m-%d")
+                .to_string();
 
             // Extract title - remove time expressions from the title
             let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
@@ -819,7 +821,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             let date = if *date_text == "today" {
                 chrono::Local::now().format("%Y-%m-%d").to_string()
             } else {
-                (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+                (chrono::Local::now() + chrono::Duration::days(1))
+                    .format("%Y-%m-%d")
+                    .to_string()
             };
 
             // Clean up title - extract from original command without time expression
@@ -876,7 +880,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         let end_time = format!("{:02}:{:02}", (hour_24 + 1) % 24, minute_final);
 
         // Get tomorrow's date
-        let date = (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
+        let date = (chrono::Local::now() + chrono::Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
 
         // Clean up title - extract from original command without time expression
         let re = Regex::new(r#"calendar create\s+"([^"]+)"\s+"#).unwrap();
@@ -948,7 +954,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             let date = if *day == "today" {
                 chrono::Local::now().format("%Y-%m-%d").to_string()
             } else {
-                (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+                (chrono::Local::now() + chrono::Duration::days(1))
+                    .format("%Y-%m-%d")
+                    .to_string()
             };
 
             // Clean up title - extract from original command without time expression
@@ -1339,7 +1347,9 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
 
         // Get date (check for tomorrow, today, etc.)
         let date = if input_lower.contains("tomorrow") {
-            (chrono::Local::now() + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            (chrono::Local::now() + chrono::Duration::days(1))
+                .format("%Y-%m-%d")
+                .to_string()
         } else {
             chrono::Local::now().format("%Y-%m-%d").to_string()
         };
