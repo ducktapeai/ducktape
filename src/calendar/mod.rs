@@ -1,12 +1,7 @@
 use crate::config::Config;
 use crate::state::{CalendarItem, StateManager};
-use crate::zoom::{ZoomClient, ZoomMeetingOptions, calculate_meeting_duration, format_zoom_time};
 use anyhow::{Result, anyhow};
-use chrono::{Datelike, Local, NaiveDateTime, TimeZone};
-use chrono_tz::Tz;
 use log::{debug, error, info};
-use std::process::Command;
-use std::str::FromStr;
 
 mod calendar_applescript;
 mod calendar_contacts;

@@ -154,6 +154,7 @@ pub async fn lookup_contact(name: &str) -> Result<Vec<String>> {
 }
 
 /// Helper to search by a specific part of the name (first or last)
+#[allow(dead_code)]
 async fn lookup_by_name_part(name_part: &str, part_type: &str) -> Result<Vec<String>> {
     debug!("Looking up contacts by {} name: '{}'", part_type, name_part);
 

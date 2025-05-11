@@ -6,6 +6,7 @@ use thiserror::Error;
 
 /// Custom error type for calendar operations
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum CalendarError {
     #[error("Calendar application is not running")]
     NotRunning,
@@ -50,7 +51,7 @@ impl RecurrenceFrequency {
     }
 
     /// Parse recurrence frequency from string
-    pub fn from_str(s: &str) -> anyhow::Result<Self> {
+    pub fn from_str_custom(s: &str) -> anyhow::Result<Self> {
         match s.to_lowercase().as_str() {
             "daily" | "day" | "days" => Ok(RecurrenceFrequency::Daily),
             "weekly" | "week" | "weeks" => Ok(RecurrenceFrequency::Weekly),

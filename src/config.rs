@@ -134,7 +134,7 @@ mod tests {
         assert_eq!(config.calendar.default_calendar, Some("Calendar".to_string()));
         assert_eq!(config.calendar.default_reminder_minutes, Some(15));
         assert_eq!(config.reminder.default_list, Some("Reminders".to_string()));
-        assert!(matches!(config.language_model.provider, None));
+        assert!(config.language_model.provider.is_none());
     }
 
     #[test]

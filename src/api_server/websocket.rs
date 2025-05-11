@@ -15,11 +15,10 @@ use std::time::Duration;
 use tokio::time::interval;
 use uuid::Uuid;
 
-use crate::Config;
 use crate::calendar::{EventConfig, create_event, import_csv_events, import_ics_events};
 use crate::cli;
 use crate::command_processor::CommandArgs;
-use crate::parser::{ParseResult, ParserFactory};
+use crate::parser::ParseResult;
 use anyhow::{Result, anyhow};
 use std::path::Path;
 

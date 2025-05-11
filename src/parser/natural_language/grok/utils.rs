@@ -3,7 +3,6 @@
 //! This module provides helper functions for the Grok parser,
 //! including command enhancement and sanitization.
 
-use anyhow::Result;
 use log::debug;
 use regex::Regex;
 
@@ -106,12 +105,10 @@ pub fn sanitize_nlp_command(command: &str) -> String {
 
     // For other commands, prefix with ducktape
     // If it's already been normalized to a command prefix, don't add "ducktape " twice
-    if has_command_prefix {
-        format!("ducktape {}", normalized_command)
-    } else if normalized_command != command {
+    if has_command_prefix || normalized_command != command {
         format!("ducktape {}", normalized_command)
     } else {
-        format!("ducktape {}", command)
+        command.to_string()
     }
 }
 
@@ -137,13 +134,10 @@ pub fn enhance_recurrence_command(command: &str) -> String {
         if !enhanced.contains("--repeat") {
             enhanced = enhanced.trim().to_string() + " --repeat monthly";
         }
-    } else if command.contains(" every year")
+    } else if (command.contains(" every year")
         || command.contains(" yearly")
-        || command.contains(" annually")
-    {
-        if !enhanced.contains("--repeat") {
-            enhanced = enhanced.trim().to_string() + " --repeat yearly";
-        }
+        || command.contains(" annually")) && !enhanced.contains("--repeat") {
+        enhanced = enhanced.trim().to_string() + " --repeat yearly";
     }
 
     // Handle "every X days/weeks/months/years" with regex

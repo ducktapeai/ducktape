@@ -2,10 +2,9 @@
 //!
 //! This module provides common functionality for natural language parsers.
 
-use crate::parser::traits::{ParseResult, Parser};
+use crate::parser::traits::Parser;
 use anyhow::Result;
 use async_trait::async_trait;
-use log::debug;
 
 /// Common functionality for all natural language parsers
 #[async_trait]
@@ -63,7 +62,7 @@ pub mod utils {
                 regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap();
 
             // Split by known separators that indicate multiple people
-            for name_part in after_word.split(|c: char| c == ',' || c == ';' || c == '.') {
+            for name_part in after_word.split([',', ';', '.']) {
                 let name_part = name_part.trim();
 
                 // Skip empty parts

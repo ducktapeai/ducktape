@@ -5,7 +5,7 @@
 
 /// Utility functions for parsing
 use anyhow::Result;
-use chrono::{Local, NaiveDate, NaiveTime};
+use chrono::Local;
 use log::debug;
 use regex::Regex;
 use thiserror::Error;
@@ -167,7 +167,7 @@ fn extract_date_time(input: &str) -> Option<(String, String, String)> {
         let hour: u32 = caps[1].parse().ok()?;
         let minute: u32 = caps.get(2).map_or(0, |m| m.as_str().parse().unwrap_or(0));
         let ampm = caps.get(3).map(|m| m.as_str());
-        let mut hour = if let Some(ampm) = ampm {
+        let hour = if let Some(ampm) = ampm {
             if ampm == "pm" && hour < 12 { hour + 12 } else { hour }
         } else {
             hour
@@ -185,7 +185,7 @@ fn extract_date_time(input: &str) -> Option<(String, String, String)> {
         let hour: u32 = caps[1].parse().ok()?;
         let minute: u32 = caps.get(2).map_or(0, |m| m.as_str().parse().unwrap_or(0));
         let ampm = caps.get(3).map(|m| m.as_str());
-        let mut hour = if let Some(ampm) = ampm {
+        let hour = if let Some(ampm) = ampm {
             if ampm == "pm" && hour < 12 { hour + 12 } else { hour }
         } else {
             hour

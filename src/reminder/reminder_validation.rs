@@ -83,7 +83,7 @@ pub fn validate_list_name(name: &str) -> Result<()> {
 }
 
 /// Validate reminder configuration before creating
-pub fn validate_reminder_config<'a>(config: &super::ReminderConfig<'a>) -> Result<()> {
+pub fn validate_reminder_config(config: &super::ReminderConfig<'_>) -> Result<()> {
     // Validate title
     validate_title(config.title)?;
 
