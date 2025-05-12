@@ -96,7 +96,21 @@ pub fn sanitize_nlp_command(command: &str) -> String {
             title, default_calendar
         );
 
-        // Always delegate to extract_time_from_title for robust time parsing
+        // First try with our improved time parser integration
+        let with_time =
+            crate::parser::natural_language::time_parser_integration::process_time_expressions(
+                &initial_command,
+                command,
+            );
+
+        // If our time parser successfully processed the time, return that result
+        if with_time != initial_command {
+            debug!("Processed time with improved time parser: {}", with_time);
+            return with_time;
+        }
+
+        // Fall back to the existing time extractor if our parser doesn't find a match
+        debug!("Falling back to legacy time extractor");
         return crate::parser::natural_language::grok::time_extractor::extract_time_from_title(
             &initial_command,
             command,
@@ -540,5 +554,63 @@ mod tests {
         assert!(sanitized.starts_with("ducktape calendar create"));
         assert!(sanitized.contains("10:00")); // 10am should be converted to 10:00
         assert!(sanitized.contains("--zoom")); // Should have zoom flag
+    }
+
+    #[test]
+    fn test_sanitize_nlp_command_with_time_parsing() {
+        // Test with various time expressions
+
+        // Test with PM times
+        let input = "create an event called Team Meeting tonight at 7pm";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("19:00"), "Failed to parse '7pm': {}", result);
+        assert!(result.contains("20:00"), "End time should be 1 hour after start: {}", result);
+
+        let input = "schedule a meeting called Review at 3:30pm";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("15:30"), "Failed to parse '3:30pm': {}", result);
+        assert!(result.contains("16:30"), "End time should be 1 hour after start: {}", result);
+
+        // Test with AM times
+        let input = "create an event called Breakfast at 9am";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("09:00"), "Failed to parse '9am': {}", result);
+        assert!(result.contains("10:00"), "End time should be 1 hour after start: {}", result);
+
+        let input = "schedule a meeting called Early call at 6:45am tomorrow";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("06:45"), "Failed to parse '6:45am': {}", result);
+        assert!(result.contains("07:45"), "End time should be 1 hour after start: {}", result);
+
+        // Test with 12-hour edge cases
+        let input = "create an event called Lunch at 12pm";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("12:00"), "Failed to parse '12pm': {}", result);
+        assert!(result.contains("13:00"), "End time should be 1 hour after start: {}", result);
+
+        let input = "create an event called Midnight Party at 12am";
+        let result = sanitize_nlp_command(input);
+        assert!(result.contains("00:00"), "Failed to parse '12am': {}", result);
+        assert!(result.contains("01:00"), "End time should be 1 hour after start: {}", result);
+    }
+
+    #[test]
+    fn test_sanitize_nlp_command_preserves_other_commands() {
+        // Test that non-calendar commands are preserved
+        let input = "create a note called Shopping List";
+        let result = sanitize_nlp_command(input);
+        assert!(
+            result.starts_with("ducktape note"),
+            "Should convert to note command: {}",
+            result
+        );
+
+        let input = "add a reminder to call mom";
+        let result = sanitize_nlp_command(input);
+        assert!(
+            result.starts_with("ducktape reminder"),
+            "Should convert to reminder command: {}",
+            result
+        );
     }
 }

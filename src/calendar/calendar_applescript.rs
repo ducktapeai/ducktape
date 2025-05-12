@@ -6,9 +6,8 @@ use crate::calendar::{EventConfig, RecurrenceFrequency};
 use crate::zoom::{ZoomClient, ZoomMeetingOptions, calculate_meeting_duration, format_zoom_time};
 use anyhow::{Result, anyhow};
 use chrono::Datelike;
-use chrono::TimeZone;
-use chrono::{Local, NaiveDateTime};
-use chrono_tz::Tz;
+use chrono::TimeZone; // Keep for Local.from_local_datetime
+use chrono::{Local, NaiveDateTime, NaiveTime, Timelike}; // Added Timelike
 use log::{debug, error, info};
 use std::process::Command;
 use std::str::FromStr;
@@ -107,21 +106,42 @@ pub async fn get_available_calendars() -> Result<Vec<String>> {
 
 /// Create a single event in Calendar.app
 pub async fn create_single_event(config: EventConfig) -> Result<()> {
-    debug!("Creating event with config: {:?}", config);
-    // Parse start datetime with improved date handling
-    let start_datetime = format!(
+    debug!("Creating event with config (times expected to be local): {:?}", config);
+
+    let start_datetime_str = format!(
         "{} {}",
         config.start_date,
         if config.all_day { "00:00" } else { &config.start_time }
     );
-    debug!("Parsing start datetime: {}", start_datetime);
-    let start_dt = NaiveDateTime::parse_from_str(&start_datetime, "%Y-%m-%d %H:%M")
-        .map_err(|e| anyhow!("Invalid start datetime: {}", e))?;
+    debug!(
+        "Parsing start datetime from config (expected to be local): {}",
+        start_datetime_str
+    );
+    let naive_start_dt = NaiveDateTime::parse_from_str(&start_datetime_str, "%Y-%m-%d %H:%M")
+        .map_err(|e| anyhow!("Invalid start datetime from config: {}", e))?;
+
+    // Assume NaiveDateTime from config is in the user's local timezone.
+    let local_start = Local.from_local_datetime(&naive_start_dt).single().ok_or_else(|| {
+        anyhow!("Failed to interpret config start time {} as local system time", naive_start_dt)
+    })?;
+
+    if let Some(original_tz_str) = config.timezone.as_deref() {
+        info!(
+            "Event time was originally specified in timezone: {}. Parsed as local time: {} (Raw config date: {}, time: {})",
+            original_tz_str, local_start, config.start_date, config.start_time
+        );
+    } else {
+        info!(
+            "Event time parsed as local time: {} (Raw config date: {}, time: {})",
+            local_start, config.start_date, config.start_time
+        );
+    }
+    // Log the components that were parsed to form naive_start_dt for clarity
     info!(
-        "Using explicitly parsed date components: year={}, month={} ({}), day={}, raw_date={}",
-        start_dt.year(),
-        start_dt.month(),
-        match start_dt.month() {
+        "Using explicitly parsed date components from config for local_start: year={}, month={} ({}), day={}, time={}:{}, raw_date={}, raw_time={}",
+        naive_start_dt.year(),
+        naive_start_dt.month(),
+        match naive_start_dt.month() {
             1 => "January",
             2 => "February",
             3 => "March",
@@ -136,102 +156,111 @@ pub async fn create_single_event(config: EventConfig) -> Result<()> {
             12 => "December",
             _ => "Unknown",
         },
-        start_dt.day(),
-        config.start_date
+        naive_start_dt.day(),
+        naive_start_dt.hour(),
+        naive_start_dt.minute(),
+        config.start_date,
+        config.start_time
     );
-    let local_start = if let Some(tz_str) = config.timezone.as_deref() {
-        match Tz::from_str(tz_str) {
-            Ok(tz) => {
-                let tz_dt = tz.from_local_datetime(&start_dt).single().ok_or_else(|| {
-                    anyhow!("Invalid or ambiguous start time in timezone {}", tz_str)
-                })?;
-                tz_dt.with_timezone(&Local)
-            }
-            Err(_) => {
-                error!("Invalid timezone specified: {}. Using local timezone.", tz_str);
-                Local::now()
-                    .timezone()
-                    .from_local_datetime(&start_dt)
-                    .single()
-                    .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
-            }
-        }
-    } else {
-        Local::now()
-            .timezone()
-            .from_local_datetime(&start_dt)
-            .single()
-            .ok_or_else(|| anyhow!("Invalid or ambiguous start time"))?
-    };
-    let end_dt = if let Some(ref end_time) = config.end_time {
-        let end_datetime = format!("{} {}", config.start_date, end_time);
-        debug!("End datetime string: {}", end_datetime);
-        let naive_end = NaiveDateTime::parse_from_str(&end_datetime, "%Y-%m-%d %H:%M")
-            .map_err(|e| anyhow!("Invalid end datetime: {}", e))?;
-        if naive_end <= start_dt {
+
+    let end_dt = if let Some(ref end_time_str) = config.end_time {
+        let naive_start_time_obj =
+            NaiveTime::parse_from_str(&config.start_time, "%H:%M").map_err(|e| {
+                anyhow!("Invalid start_time format for comparison: {} - {}", config.start_time, e)
+            })?;
+        let naive_end_time_obj = NaiveTime::parse_from_str(end_time_str, "%H:%M").map_err(|e| {
+            anyhow!("Invalid end_time format for comparison: {} - {}", end_time_str, e)
+        })?;
+
+        // Check if start and end times from config are identical.
+        // Note: config.start_date is used for both, so we only compare times.
+        if naive_start_time_obj == naive_end_time_obj {
             debug!(
-                "End time {} is not after start time {}, adding 1 day",
-                naive_end.format("%H:%M"),
-                start_dt.format("%H:%M")
+                "End time {} is identical to start time {}. Defaulting to 1-hour duration from local_start.",
+                end_time_str, config.start_time
             );
-            let next_day = start_dt
-                .date()
-                .succ_opt()
-                .ok_or_else(|| anyhow!("Failed to calculate next day for end time"))?;
-            let adjusted_end = NaiveDateTime::new(next_day, naive_end.time());
-            Local::now()
-                .timezone()
-                .from_local_datetime(&adjusted_end)
-                .single()
-                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
-        } else if let Some(tz_str) = config.timezone.as_deref() {
-            match Tz::from_str(tz_str) {
-                Ok(tz) => {
-                    let tz_dt = tz.from_local_datetime(&naive_end).single().ok_or_else(|| {
-                        anyhow!("Invalid or ambiguous end time in timezone {}", tz_str)
-                    })?;
-                    tz_dt.with_timezone(&Local)
-                }
-                Err(_) => Local::now()
-                    .timezone()
-                    .from_local_datetime(&naive_end)
-                    .single()
-                    .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?,
-            }
+            local_start + chrono::Duration::hours(1)
         } else {
-            Local::now()
-                .timezone()
-                .from_local_datetime(&naive_end)
-                .single()
-                .ok_or_else(|| anyhow!("Invalid or ambiguous end time"))?
+            // Construct NaiveDateTime for the end time using config.start_date and end_time_str.
+            // These are assumed to be components of a local time.
+            let naive_end_dt_candidate = NaiveDateTime::parse_from_str(
+                &format!("{} {}", config.start_date, end_time_str),
+                "%Y-%m-%d %H:%M",
+            )
+            .map_err(|e| {
+                anyhow!(
+                    "Invalid NaiveDateTime from end_time {} on start_date {}: {}",
+                    end_time_str,
+                    config.start_date,
+                    e
+                )
+            })?;
+
+            let final_naive_end_dt = if naive_end_dt_candidate.time() < naive_start_dt.time() {
+                // End time is earlier than start time (e.g., 23:00 to 02:00), implies crossing midnight.
+                // This uses naive_start_dt which is derived from config.start_date and config.start_time.
+                debug!(
+                    "End time {} on (local) start date {} is earlier than (local) start time {}. Assuming event crosses midnight to the next day.",
+                    end_time_str, config.start_date, config.start_time
+                );
+                let next_day_date = naive_start_dt.date().succ_opt().ok_or_else(|| {
+                    anyhow!("Failed to calculate next day for event crossing midnight")
+                })?;
+                NaiveDateTime::new(next_day_date, naive_end_dt_candidate.time())
+            } else {
+                // End time is after start time, on the same day.
+                naive_end_dt_candidate
+            };
+
+            // Convert final_naive_end_dt (which is a local naive datetime) to DateTime<Local>
+            Local.from_local_datetime(&final_naive_end_dt).single().ok_or_else(|| {
+                anyhow!(
+                    "Failed to interpret final naive end time {} as local system time",
+                    final_naive_end_dt
+                )
+            })?
         }
     } else {
-        let default_end_dt = local_start + chrono::Duration::hours(1);
-        debug!(
-            "No end time specified, using start time + 1 hour: {}",
-            default_end_dt.format("%H:%M")
-        );
-        default_end_dt
+        // No config.end_time, default to 1 hour from local_start.
+        debug!("No end time specified, using local_start + 1 hour.");
+        local_start + chrono::Duration::hours(1)
     };
-    if end_dt <= local_start {
-        return Err(anyhow!("End time must be after start time"));
-    }
-    debug!("Final start time: {}", local_start.format("%Y-%m-%d %H:%M"));
+
+    // Re-assign end_dt if the safeguard was triggered or if it's not after local_start.
+    let end_dt = if end_dt <= local_start {
+        error!(
+            "Calculated end_dt {} was not after local_start {}. Forcing 1-hour duration. Review config: start_date={}, start_time={}, end_time={:?}",
+            end_dt, local_start, config.start_date, config.start_time, config.end_time
+        );
+        local_start + chrono::Duration::hours(1)
+    } else {
+        end_dt
+    };
+
+    debug!("Final local start time: {}", local_start.format("%Y-%m-%d %H:%M"));
     debug!("Final end time: {}", end_dt.format("%Y-%m-%d %H:%M"));
     let mut zoom_meeting_info = String::new();
     if config.create_zoom_meeting {
         info!("Creating Zoom meeting for event: {}", config.title);
         let mut client = ZoomClient::new()?;
         let zoom_start_time = format_zoom_time(&config.start_date, &config.start_time)?;
-        let duration = if let Some(end_time) = &config.end_time {
-            calculate_meeting_duration(&config.start_time, end_time)?
+
+        // Calculate duration for Zoom based on the final local_start and end_dt
+        let meeting_duration_minutes = (end_dt - local_start).num_minutes();
+        let zoom_api_duration = if meeting_duration_minutes <= 0 {
+            debug!(
+                "Calculated meeting duration for Zoom is zero or negative ({} minutes). Defaulting Zoom duration to 60 minutes.",
+                meeting_duration_minutes
+            );
+            60 // Default to 60 minutes if duration is zero/negative
         } else {
-            60
+            meeting_duration_minutes as u32
         };
+
         let meeting_options = ZoomMeetingOptions {
             topic: config.title.to_string(),
             start_time: zoom_start_time,
-            duration,
+            duration: zoom_api_duration, // Use calculated duration
             password: None,
             agenda: config.description.clone(),
         };
