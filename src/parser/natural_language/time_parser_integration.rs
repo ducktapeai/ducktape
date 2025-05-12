@@ -23,21 +23,21 @@ use log::debug;
 /// * `String` - The updated command with extracted time information
 pub fn process_time_expressions(command: &str, input: &str) -> String {
     debug!("Processing time expressions in: '{}'", input);
-    
+
     // Skip if not a calendar command
     if !command.contains("calendar create") {
         return command.to_string();
     }
-    
+
     // Process the command using our fixed time parser
     let processed_command = time_parser_fix::process_time_in_command(command, input);
-    
+
     // If the command was updated, ensure end time formatting is correct
     if processed_command != command {
         debug!("Time expression processed: '{}'", processed_command);
         return utils::fix_calendar_end_time_format(&processed_command);
     }
-    
+
     // If no time processing occurred, return the original command
     command.to_string()
 }
@@ -69,14 +69,14 @@ mod tests {
         let processed = process_time_expressions(command, input);
         assert!(processed.contains("20:00"));
         assert!(processed.contains("21:00"));
-        
+
         // Test with PM time
         let command = "ducktape calendar create \"Call\" today 00:00 01:00 \"Personal\"";
         let input = "Set up a call for 3:30pm";
         let processed = process_time_expressions(command, input);
         assert!(processed.contains("15:30"));
         assert!(processed.contains("16:30"));
-        
+
         // Test with AM time
         let command = "ducktape calendar create \"Breakfast\" today 00:00 01:00 \"Personal\"";
         let input = "Schedule breakfast for 8am tomorrow";
