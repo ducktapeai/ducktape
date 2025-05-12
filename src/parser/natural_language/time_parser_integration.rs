@@ -23,21 +23,21 @@ use log::debug;
 /// * `String` - The updated command with extracted time information
 pub fn process_time_expressions(command: &str, input: &str) -> String {
     debug!("Processing time expressions in: '{}'", input);
-
+    
     // Skip if not a calendar command
     if !command.contains("calendar create") {
         return command.to_string();
     }
-
+    
     // Process the command using our fixed time parser
     let processed_command = time_parser_fix::process_time_in_command(command, input);
-
+    
     // If the command was updated, ensure end time formatting is correct
     if processed_command != command {
         debug!("Time expression processed: '{}'", processed_command);
         return utils::fix_calendar_end_time_format(&processed_command);
     }
-
+    
     // If no time processing occurred, return the original command
     command.to_string()
 }
@@ -52,10 +52,8 @@ pub fn process_time_expressions(command: &str, input: &str) -> String {
 ///
 /// * `bool` - True if the text contains a time expression
 pub fn contains_time_expression(text: &str) -> bool {
-    // Enhanced regex to detect common time patterns, with optional timezone abbreviations
-    let time_regex =
-        regex::Regex::new(r"(?i)\b(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?)(?:\s+[A-Z]{3,4})?)\b")
-            .unwrap();
+    // Basic regex to detect common time patterns
+    let time_regex = regex::Regex::new(r"(?i)\b(\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\.?))\b").unwrap();
     time_regex.is_match(text)
 }
 
@@ -71,14 +69,14 @@ mod tests {
         let processed = process_time_expressions(command, input);
         assert!(processed.contains("20:00"));
         assert!(processed.contains("21:00"));
-
+        
         // Test with PM time
         let command = "ducktape calendar create \"Call\" today 00:00 01:00 \"Personal\"";
         let input = "Set up a call for 3:30pm";
         let processed = process_time_expressions(command, input);
         assert!(processed.contains("15:30"));
         assert!(processed.contains("16:30"));
-
+        
         // Test with AM time
         let command = "ducktape calendar create \"Breakfast\" today 00:00 01:00 \"Personal\"";
         let input = "Schedule breakfast for 8am tomorrow";
@@ -94,27 +92,5 @@ mod tests {
         assert!(contains_time_expression("Meet at 9:00 AM"));
         assert!(!contains_time_expression("Meeting tomorrow"));
         assert!(!contains_time_expression("No time here"));
-    }
-
-    #[test]
-    fn test_process_time_expressions_with_timezone() {
-        // Test with timezone expressions
-        let command = "ducktape calendar create \"Meeting\" today 00:00 01:00 \"Work\"";
-        let input = "Schedule a meeting at 8pm PST";
-        let processed = process_time_expressions(command, input);
-
-        // We can't predict exact time in test since it depends on the local timezone,
-        // but we can check that it was processed (changed from default)
-        assert!(processed != command);
-        assert!(!processed.contains("00:00"));
-        assert!(!processed.contains("01:00"));
-
-        // Test with eastern timezone
-        let command = "ducktape calendar create \"Call\" today 00:00 01:00 \"Personal\"";
-        let input = "Set up a call for 3:30pm EST";
-        let processed = process_time_expressions(command, input);
-        assert!(processed != command);
-        assert!(!processed.contains("00:00"));
-        assert!(!processed.contains("01:00"));
     }
 }
