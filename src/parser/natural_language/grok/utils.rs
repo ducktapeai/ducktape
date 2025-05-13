@@ -80,20 +80,69 @@ pub fn sanitize_nlp_command(command: &str) -> String {
             }
         }
 
-        // Get default calendar from config
-        let default_calendar = match crate::config::Config::load() {
+        // Extract calendar name from the command
+        let mut calendar_name = match crate::config::Config::load() {
             Ok(config) => {
                 config.calendar.default_calendar.unwrap_or_else(|| "Calendar".to_string())
             }
             Err(_) => "Calendar".to_string(), // Fallback to "Calendar" if config can't be loaded
         };
 
-        debug!("Using default calendar from config: {}", default_calendar);
+        // Check for specific calendar mentions in different formats
+        let cmd_lower = command.to_lowercase();
+        
+        // Parse "in the X calendar" format
+        if cmd_lower.contains(" in the ") && cmd_lower.contains(" calendar") {
+            let parts: Vec<&str> = command.split(" in the ").collect();
+            if parts.len() > 1 {
+                let calendar_part = parts[1];
+                if let Some(cal_end) = calendar_part.to_lowercase().find(" calendar") {
+                    // Extract calendar name
+                    let extracted_name = calendar_part[..cal_end].trim();
+                    if !extracted_name.is_empty() {
+                        calendar_name = extracted_name.to_string();
+                        debug!("Found calendar specification: {}", calendar_name);
+                    }
+                }
+            }
+        }
+        // Parse "in X calendar" format
+        else if cmd_lower.contains(" in ") && cmd_lower.contains(" calendar") {
+            let parts: Vec<&str> = command.split(" in ").collect();
+            if parts.len() > 1 {
+                let calendar_part = parts[1];
+                if let Some(cal_end) = calendar_part.to_lowercase().find(" calendar") {
+                    // Extract calendar name
+                    let extracted_name = calendar_part[..cal_end].trim();
+                    if !extracted_name.is_empty() {
+                        calendar_name = extracted_name.to_string();
+                        debug!("Found calendar specification: {}", calendar_name);
+                    }
+                }
+            }
+        }
+        // Parse "to X calendar" format
+        else if cmd_lower.contains(" to ") && cmd_lower.contains(" calendar") {
+            let parts: Vec<&str> = command.split(" to ").collect();
+            if parts.len() > 1 {
+                let calendar_part = parts[1];
+                if let Some(cal_end) = calendar_part.to_lowercase().find(" calendar") {
+                    // Extract calendar name
+                    let extracted_name = calendar_part[..cal_end].trim();
+                    if !extracted_name.is_empty() {
+                        calendar_name = extracted_name.to_string();
+                        debug!("Found calendar specification: {}", calendar_name);
+                    }
+                }
+            }
+        }
 
-        // Build initial command with the default calendar from config
+        debug!("Using calendar: {}", calendar_name);
+
+        // Build initial command with the calendar
         let initial_command = format!(
             "ducktape calendar create \"{}\" today 00:00 01:00 \"{}\"",
-            title, default_calendar
+            title, calendar_name
         );
 
         // First try with our improved time parser integration

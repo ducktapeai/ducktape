@@ -73,8 +73,18 @@ pub fn extract_time_info(input: &str) -> Option<(String, String, String)> {
 
         // Parse the time
         if let Some((hour, minute)) = parse_time_with_ampm(time_str) {
-            // Create date string (today)
-            let today = Local::now().format("%Y-%m-%d").to_string();
+            // Determine date - check for relative date words
+            let now = Local::now();
+            let date = if input.to_lowercase().contains("tomorrow") {
+                // Tomorrow's date
+                (now + chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            } else if input.to_lowercase().contains("yesterday") {
+                // Yesterday's date
+                (now - chrono::Duration::days(1)).format("%Y-%m-%d").to_string()
+            } else {
+                // Default to today
+                now.format("%Y-%m-%d").to_string()
+            };
 
             // Create formatted start and end times
             let start_time = format!("{:02}:{:02}", hour, minute);
@@ -83,7 +93,7 @@ pub fn extract_time_info(input: &str) -> Option<(String, String, String)> {
             let end_hour = if hour == 23 { 0 } else { hour + 1 };
             let end_time = format!("{:02}:{:02}", end_hour, minute);
 
-            return Some((today, start_time, end_time));
+            return Some((date, start_time, end_time));
         }
     }
 
