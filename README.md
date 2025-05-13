@@ -206,12 +206,11 @@ For more troubleshooting tips, visit our documentation at [ducktapeai.com/docs](
 
 ---
 
-## Recent Updates (v0.16.15)
+## Recent Updates (v0.16.22)
 
-- Enhanced support for recurring event patterns in calendar operations
-- Improved handling of timezone conversions for international meetings
-- Refined error messaging for better user experience
-- Updated dependencies for better performance and security
+- Refactored utility functions for improved clarity and maintainability
+- Enhanced calendar extraction in NLP commands
+- Improved time parsing for relative dates
 - Fixed edge cases in time parsing for specific date formats
 - Improved stability in WebSocket connections for API integrations
 
