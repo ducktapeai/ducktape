@@ -90,7 +90,7 @@ pub fn sanitize_nlp_command(command: &str) -> String {
 
         // Check for specific calendar mentions in different formats
         let cmd_lower = command.to_lowercase();
-        
+
         // Parse "in the X calendar" format
         if cmd_lower.contains(" in the ") && cmd_lower.contains(" calendar") {
             let parts: Vec<&str> = command.split(" in the ").collect();
