@@ -27,7 +27,7 @@ pub static COMMAND_VERB_MAPPING: Lazy<HashMap<&'static str, &'static str>> = Laz
     map.insert("remind", "reminder create");
     map.insert("remember", "reminder create");
     map.insert("reminder", "reminder create");
-    
+
     // Other command mappings can be added here
     map
 });
@@ -92,7 +92,7 @@ pub fn normalize_command(input: &str) -> String {
         debug!("Input contains meeting-related keywords, defaulting to calendar create");
         return format!("calendar create {}", input);
     }
-    
+
     // Check for reminder related keywords
     if input_lower.contains("remind me")
         || input_lower.contains("reminder")
@@ -136,7 +136,7 @@ mod tests {
             "calendar create zoom meeting with Team at 2pm"
         );
     }
-    
+
     #[test]
     fn test_normalize_with_reminder_keywords() {
         // Test mapping based on reminder keywords
@@ -161,7 +161,7 @@ mod tests {
             normalize_command("calendar create \"Meeting\" today 14:00 15:00"),
             "calendar create \"Meeting\" today 14:00 15:00"
         );
-        
+
         assert_eq!(
             normalize_command("reminder create \"Call mom\" --remind tomorrow"),
             "reminder create \"Call mom\" --remind tomorrow"

@@ -76,12 +76,12 @@ lazy_static! {
         let hours_pattern = TIME_UNIT_HOURS.join("|");
         let days_pattern = TIME_UNIT_DAYS.join("|");
         let weeks_pattern = TIME_UNIT_WEEKS.join("|");
-        
+
         let pattern = format!(
             r"(?i)in\s+(\d+)\s+(?:{}|{}|{}|{})",
             minutes_pattern, hours_pattern, days_pattern, weeks_pattern
         );
-        
+
         Regex::new(&pattern).expect("Failed to compile RELATIVE_TIME_RE regex")
     };
 
@@ -124,7 +124,7 @@ lazy_static! {
     // Group 3: AM/PM designator
     static ref FLEXIBLE_TIME_AMPM_RE: Regex = Regex::new(r"(?i)^(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?$")
         .expect("Failed to compile FLEXIBLE_TIME_AMPM_RE regex");
-    
+
     // Group 1: Hour (1 or 2 digits)
     // Group 2: Optional Minutes (2 digits)
     static ref FLEXIBLE_TIME_24H_RE: Regex = Regex::new(r"^(\d{1,2})(?::(\d{2}))?$")
@@ -465,7 +465,7 @@ pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<T
             "DEBUG: extract_time_with_timezone: TIME_ONLY_RE matched. Full match: '{}'",
             full_match
         );
-        
+
         for i in 0..caps.len() {
             // Print all groups, including 0
             println!(
@@ -474,19 +474,19 @@ pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<T
                 caps.get(i).map(|m| m.as_str())
             );
         }
-        
+
         // Group 1 is the optional (day_specifier_str + space)
         // Group 2 is the day_specifier_str itself
         // Group 3 is the time_str
         let day_specifier_match = caps.get(2).map(|m| m.as_str());
         let time_str = caps.get(3).map_or("", |m| m.as_str());
-        
+
         // Additional check to make sure this isn't a time with timezone that was missed
         // by the first regex
         let is_followed_by_timezone = TIMEZONE_ABBR_LIST.iter().any(|tz| {
             let tz_pattern = format!(r"(?i)\s+{}\b", tz);
             let tz_re = Regex::new(&tz_pattern).expect("Failed to compile timezone check regex");
-            
+
             // Check if the timezone appears in the input after the matched time
             if let Some(match_end) = caps.get(0).map(|m| m.end()) {
                 if match_end < input.len() {
@@ -495,12 +495,12 @@ pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<T
             }
             false
         });
-        
+
         if is_followed_by_timezone {
             println!(
                 "DEBUG: extract_time_with_timezone: TIME_ONLY_RE match is followed by a timezone, skipping."
             );
-            // Skip this match as it's likely a time with timezone that should have been 
+            // Skip this match as it's likely a time with timezone that should have been
             // caught by TIME_WITH_ZONE_RE
         } else {
             println!(
@@ -508,7 +508,9 @@ pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<T
                 day_specifier_match, time_str
             );
 
-            if let Some(naive_dt) = parse_time_with_possible_day(time_str, day_specifier_match, None) {
+            if let Some(naive_dt) =
+                parse_time_with_possible_day(time_str, day_specifier_match, None)
+            {
                 // For TIME_ONLY_RE, we assume the time is local.
                 // We convert this NaiveDateTime (which is local) to DateTime<Local>, then to DateTime<Tz> using UTC as an intermediary
                 // to ensure the underlying instant is preserved if we were to pass a Tz.
@@ -545,11 +547,11 @@ pub fn extract_time_with_timezone(input: &str) -> Option<(DateTime<Tz>, Option<T
 /// and converts them to a DateTime based on the current time
 pub fn extract_relative_time(input: &str) -> Option<(DateTime<Tz>, Option<Tz>)> {
     println!("DEBUG: extract_relative_time: Checking for relative time in: '{}'", input);
-    
+
     if let Some(captures) = RELATIVE_TIME_RE.captures(input) {
         let full_match = captures.get(0).map_or("", |m| m.as_str());
         println!("DEBUG: extract_relative_time: Match found: '{}'", full_match);
-        
+
         // Extract the number value
         let amount_str = captures.get(1).map_or("", |m| m.as_str());
         let amount: i64 = match amount_str.parse() {
@@ -559,13 +561,13 @@ pub fn extract_relative_time(input: &str) -> Option<(DateTime<Tz>, Option<Tz>)> 
                 return None;
             }
         };
-        
+
         // Determine the time unit
         let unit_str = full_match.to_lowercase();
-        
+
         // Get current local time as the base
         let now = Local::now();
-        
+
         // Add the appropriate duration based on the unit
         let future_time = if TIME_UNIT_MINUTES.iter().any(|&unit| unit_str.contains(unit)) {
             println!("DEBUG: extract_relative_time: Adding {} minutes", amount);
@@ -583,13 +585,13 @@ pub fn extract_relative_time(input: &str) -> Option<(DateTime<Tz>, Option<Tz>)> 
             println!("DEBUG: extract_relative_time: Unknown time unit in: '{}'", unit_str);
             return None;
         };
-        
+
         println!("DEBUG: extract_relative_time: Calculated future time: {}", future_time);
-        
+
         // Return the future time in UTC timezone (for consistency with other time functions)
         return Some((future_time.with_timezone(&chrono_tz::UTC), None));
     }
-    
+
     println!("DEBUG: extract_relative_time: No relative time expression found");
     None
 }
@@ -607,15 +609,15 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
             datetime_with_tz,
             original_tz.as_ref().map(|tz| tz.name())
         );
-        
+
         let local_datetime = datetime_with_tz.with_timezone(&Local);
-        
+
         let date_str = local_datetime.format("%Y-%m-%d").to_string();
         let start_time_str = local_datetime.format("%H:%M").to_string();
         let end_time_str = (local_datetime + Duration::hours(1)).format("%H:%M").to_string();
-        
+
         let mut temp_command = command.to_string();
-        
+
         // Replace date placeholder
         let date_placeholder_opt = DATE_RE
             .captures(&temp_command)
@@ -623,19 +625,19 @@ pub fn extract_time_from_title(command: &str, input: &str) -> String {
         if let Some(placeholder) = date_placeholder_opt {
             temp_command = temp_command.replacen(&placeholder, &date_str, 1);
         }
-        
+
         // Replace time placeholders
         let initial_start_placeholder = "00:00";
         let initial_end_placeholder = "01:00";
-        
+
         if temp_command.contains(initial_start_placeholder) {
             temp_command = temp_command.replacen(initial_start_placeholder, &start_time_str, 1);
         }
-        
+
         if temp_command.contains(initial_end_placeholder) {
             temp_command = temp_command.replacen(initial_end_placeholder, &end_time_str, 1);
         }
-        
+
         println!("DEBUG: extract_time_from_title: Command with relative time: {}", temp_command);
         return temp_command;
     }
@@ -1125,7 +1127,8 @@ mod tests {
         // We don't need the command variable for this test, but including for documentation
         let _command =
             "ducktape calendar create \\\"Quick Meeting\\\" today 00:00 01:00 \\\"Calendar\\\"";
-        let fixed = crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
+        let fixed =
+            crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
         assert!(fixed.is_some());
         let (datetime, _) = fixed.unwrap();
         let now = Local::now();
@@ -1137,7 +1140,8 @@ mod tests {
         let input = "create an event called Future Event in 2 hours";
         let _command =
             "ducktape calendar create \\\"Future Event\\\" today 00:00 01:00 \\\"Work\\\"";
-        let fixed = crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
+        let fixed =
+            crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
         assert!(fixed.is_some());
         let (datetime, _) = fixed.unwrap();
         let now = Local::now();
@@ -1149,7 +1153,8 @@ mod tests {
         let input = "create an event called Weekly Sync in 7 days";
         let _command =
             "ducktape calendar create \\\"Weekly Sync\\\" today 00:00 01:00 \\\"Calendar\\\"";
-        let fixed = crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
+        let fixed =
+            crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
         assert!(fixed.is_some());
         let (datetime, _) = fixed.unwrap();
         let now = Local::now();
@@ -1161,7 +1166,8 @@ mod tests {
         let input = "create an event called Project Kickoff in 2 weeks";
         let _command =
             "ducktape calendar create \\\"Project Kickoff\\\" today 00:00 01:00 \\\"Work\\\"";
-        let fixed = crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
+        let fixed =
+            crate::parser::natural_language::grok::time_extractor::extract_relative_time(input);
         assert!(fixed.is_some());
         let (datetime, _) = fixed.unwrap();
         let now = Local::now();

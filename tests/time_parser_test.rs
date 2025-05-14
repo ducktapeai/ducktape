@@ -156,17 +156,17 @@ mod time_parser_tests {
 
         fn extract_relative_time_string(input: &str) -> Option<String> {
             let re = Regex::new(r"(?i)in\s+(\d+)\s+(minute|minutes|min|mins|hour|hours|hr|hrs|day|days|week|weeks|wk|wks)").unwrap();
-            
+
             if let Some(caps) = re.captures(input) {
                 let amount = caps.get(1).unwrap().as_str();
                 let unit = caps.get(2).unwrap().as_str().to_lowercase();
-                
-                return Some(format!("{}_{}", amount, unit));  // Just return a string representation for testing
+
+                return Some(format!("{}_{}", amount, unit)); // Just return a string representation for testing
             }
-            
+
             None
         }
-        
+
         let test_cases = vec![
             ("Create a meeting in 30 minutes", Some(String::from("30_minutes"))),
             ("Remind me in 2 hours to call back", Some(String::from("2_hours"))),
@@ -176,58 +176,58 @@ mod time_parser_tests {
             ("Use shortened forms: in 1 hr", Some(String::from("1_hr"))),
             ("No relative time mentioned", None),
         ];
-        
+
         for (input, expected) in test_cases {
             let result = extract_relative_time_string(input);
             assert_eq!(result, expected, "Failed for input: {}", input);
         }
     }
-    
+
     #[test]
     fn test_command_processing_with_relative_time() {
-        // This test checks that commands like "in X minutes/hours" 
+        // This test checks that commands like "in X minutes/hours"
         // are properly processed in a way similar to the actual implementation
-        
+
         fn process_command_with_relative_time(command: &str, input: &str) -> String {
             // First check for relative time expressions
             let re = Regex::new(r"(?i)in\s+(\d+)\s+(minute|minutes|min|mins|hour|hours|hr|hrs|day|days|week|weeks|wk|wks)").unwrap();
-            
+
             if let Some(caps) = re.captures(input) {
                 // Get the unit - we don't need to use the amount for this test implementation
                 let _amount: i64 = caps.get(1).unwrap().as_str().parse().unwrap();
                 let unit = caps.get(2).unwrap().as_str().to_lowercase();
-                
+
                 // In a real implementation, we would calculate the actual time
                 // Here, we'll just replace the placeholders with something recognizable for testing
                 let mut processed = command.to_string();
-                
+
                 // Replace date placeholder if present
                 if processed.contains("today") {
                     let placeholder = if unit.contains("day") || unit.contains("week") {
-                        "FUTURE_DATE"  // Would be calculated date in real implementation
+                        "FUTURE_DATE" // Would be calculated date in real implementation
                     } else {
-                        "TODAY"  // Same day for minutes/hours
+                        "TODAY" // Same day for minutes/hours
                     };
                     processed = processed.replace("today", placeholder);
                 }
-                
+
                 // Replace time placeholders
                 if processed.contains("00:00") && processed.contains("01:00") {
                     // Create recognizable patterns for testing
                     let start_time = format!("REL_{}_START", unit);
                     let end_time = format!("REL_{}_END", unit);
-                    
+
                     processed = processed.replace("00:00", &start_time);
                     processed = processed.replace("01:00", &end_time);
                 }
-                
+
                 return processed;
             }
-            
+
             // If no relative time, return unchanged
             command.to_string()
         }
-        
+
         let test_cases = vec![
             (
                 "calendar create \"Quick Meeting\" today 00:00 01:00",
@@ -255,7 +255,7 @@ mod time_parser_tests {
                 "calendar create \"No Relative Time\" today 00:00 01:00",
             ),
         ];
-        
+
         for (command, input, expected) in test_cases {
             let result = process_command_with_relative_time(command, input);
             assert_eq!(result, expected, "Failed for input: {}", input);
