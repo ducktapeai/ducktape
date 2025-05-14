@@ -23,6 +23,11 @@ pub static COMMAND_VERB_MAPPING: Lazy<HashMap<&'static str, &'static str>> = Laz
     map.insert("appointment", "calendar create");
     map.insert("event", "calendar create");
 
+    // Reminder related commands
+    map.insert("remind", "reminder create");
+    map.insert("remember", "reminder create");
+    map.insert("reminder", "reminder create");
+    
     // Other command mappings can be added here
     map
 });
@@ -87,6 +92,17 @@ pub fn normalize_command(input: &str) -> String {
         debug!("Input contains meeting-related keywords, defaulting to calendar create");
         return format!("calendar create {}", input);
     }
+    
+    // Check for reminder related keywords
+    if input_lower.contains("remind me")
+        || input_lower.contains("reminder")
+        || input_lower.contains("todo")
+        || (input_lower.contains("remind") && !input_lower.starts_with("remind"))
+    {
+        // If it has reminder keywords but no recognized command, default to reminder create
+        debug!("Input contains reminder-related keywords, defaulting to reminder create");
+        return format!("reminder create {}", input);
+    }
 
     input.to_string()
 }
@@ -106,6 +122,10 @@ mod tests {
             normalize_command("schedule zoom call at 9am"),
             "calendar create zoom call at 9am"
         );
+        assert_eq!(
+            normalize_command("remind me to call Sarah"),
+            "reminder create me to call Sarah"
+        );
     }
 
     #[test]
@@ -116,6 +136,23 @@ mod tests {
             "calendar create zoom meeting with Team at 2pm"
         );
     }
+    
+    #[test]
+    fn test_normalize_with_reminder_keywords() {
+        // Test mapping based on reminder keywords
+        assert_eq!(
+            normalize_command("remind me to buy milk"),
+            "reminder create remind me to buy milk"
+        );
+        assert_eq!(
+            normalize_command("please remind me to call John tomorrow"),
+            "reminder create please remind me to call John tomorrow"
+        );
+        assert_eq!(
+            normalize_command("set a reminder to finish the report"),
+            "reminder create set a reminder to finish the report"
+        );
+    }
 
     #[test]
     fn test_normalize_unchanged() {
@@ -123,6 +160,11 @@ mod tests {
         assert_eq!(
             normalize_command("calendar create \"Meeting\" today 14:00 15:00"),
             "calendar create \"Meeting\" today 14:00 15:00"
+        );
+        
+        assert_eq!(
+            normalize_command("reminder create \"Call mom\" --remind tomorrow"),
+            "reminder create \"Call mom\" --remind tomorrow"
         );
     }
 }

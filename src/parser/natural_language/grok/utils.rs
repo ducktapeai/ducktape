@@ -57,6 +57,83 @@ pub fn sanitize_nlp_command(command: &str) -> String {
         || command.contains("schedule a zoom meeting")
         || command.contains("create an zoom meeting")
         || command.contains("create zoom");
+        
+    // Check for reminder creation patterns
+    let is_reminder_creation = command.contains("remind me")
+        || command.contains("set a reminder")
+        || command.contains("create a reminder")
+        || command.contains("add a reminder");
+
+    if is_reminder_creation || normalized_command.starts_with("reminder create") {
+        debug!("Converting reminder creation command to ducktape reminder command: {}", command);
+        
+        // Extract reminder text
+        let mut reminder_text = "Task";
+        let cmd_lower = command.to_lowercase();
+        
+        // Extract based on common reminder patterns
+        if cmd_lower.contains("remind me to ") {
+            let parts: Vec<&str> = command.split("remind me to ").collect();
+            if parts.len() > 1 {
+                reminder_text = parts[1].trim();
+            }
+        } else if cmd_lower.contains("reminder to ") {
+            let parts: Vec<&str> = command.split("reminder to ").collect();
+            if parts.len() > 1 {
+                reminder_text = parts[1].trim();
+            }
+        } else if cmd_lower.contains("reminder about ") {
+            let parts: Vec<&str> = command.split("reminder about ").collect();
+            if parts.len() > 1 {
+                reminder_text = parts[1].trim();
+            }
+        }
+        
+        // Create the reminder command
+        let initial_reminder_command = format!("ducktape reminder create \"{}\"", reminder_text);
+        
+        // Check for time indicators in the command
+        if command.contains("tomorrow") 
+            || command.contains("today") 
+            || command.contains(" at ") 
+            || command.contains(" on ")
+            || command.contains(" pm")
+            || command.contains(" am")
+        {
+            // Extract time information if available
+            debug!("Time indicator detected in reminder command, adding --remind flag");
+            
+            // Extract the time part based on common patterns
+            let mut time_part = String::new();
+            
+            if command.contains("tomorrow at ") {
+                let parts: Vec<&str> = command.split("tomorrow at ").collect();
+                if parts.len() > 1 {
+                    time_part = format!("tomorrow at {}", parts[1].trim());
+                }
+            } else if command.contains("today at ") {
+                let parts: Vec<&str> = command.split("today at ").collect();
+                if parts.len() > 1 {
+                    time_part = format!("today at {}", parts[1].trim());
+                }
+            } else if command.contains(" at ") {
+                let parts: Vec<&str> = command.split(" at ").collect();
+                if parts.len() > 1 {
+                    time_part = format!("at {}", parts[1].trim());
+                }
+            }
+            
+            if !time_part.is_empty() {
+                return format!("{} --remind \"{}\"", initial_reminder_command, time_part);
+            }
+            
+            // If we couldn't parse a specific time pattern, but time indicators are present,
+            // add the entire reminder text as the time for the --remind flag
+            return format!("{} --remind \"{}\"", initial_reminder_command, reminder_text);
+        }
+        
+        return initial_reminder_command;
+    }
 
     if is_event_creation || normalized_command.starts_with("calendar create") {
         debug!("Converting event creation command to calendar command: {}", command);
@@ -659,6 +736,44 @@ mod tests {
         assert!(
             result.starts_with("ducktape reminder"),
             "Should convert to reminder command: {}",
+            result
+        );
+    }
+    
+    #[test]
+    fn test_sanitize_nlp_command_for_reminders() {
+        // Test reminder creation patterns
+        let input = "remind me to call Jane tomorrow at 2pm";
+        let result = sanitize_nlp_command(input);
+        assert!(
+            result.starts_with("ducktape reminder create"),
+            "Should convert to reminder create command: {}",
+            result
+        );
+        assert!(
+            result.contains("\"call Jane tomorrow at 2pm\""),
+            "Should extract correct reminder text: {}",
+            result
+        );
+        
+        let input = "set a reminder to finish the report";
+        let result = sanitize_nlp_command(input);
+        assert!(
+            result.starts_with("ducktape reminder create"),
+            "Should convert 'set a reminder' to reminder create command: {}",
+            result
+        );
+        
+        let input = "create a reminder about buying groceries";
+        let result = sanitize_nlp_command(input);
+        assert!(
+            result.starts_with("ducktape reminder create"),
+            "Should convert 'create a reminder' to reminder create command: {}",
+            result
+        );
+        assert!(
+            result.contains("\"buying groceries\""),
+            "Should extract correct reminder text from 'about' pattern: {}",
             result
         );
     }
